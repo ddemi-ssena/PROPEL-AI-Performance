@@ -1,0 +1,49 @@
+
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: propel_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: propel_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./propel-backend
+      dockerfile: Dockerfile
+    container_name: propel_backend
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - ./propel-backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:123456@db:5432/propel_db
+      SECRET_KEY: 123456
+    depends_on:
+      - db
+
+#  frontend:
+#    build:
+#      context: ./propel-frontend
+#      dockerfile: Dockerfile
+#    container_name: propel_frontend
+#    volumes:
+#      - ./propel-frontend:/app
+#    ports:
+#      - "5173:5173"
+#    environment:
+#      # frontend backend'e böyle ulaşacak
+#      VITE_API_URL: "http://backend:8000"
+#    depends_on:
+#     - backend
+
+volumes:
+  postgres_data:

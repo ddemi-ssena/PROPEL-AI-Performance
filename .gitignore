@@ -1,0 +1,40 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database
+*.db
+*.sqlite3
+postgres_data/
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+
+/propel-frontend/node_modules/
+
+/propel-frontend/dist/
+
+/propel-backend/ml/models/.pkl
+/propel-backend/ml/models/.joblib
