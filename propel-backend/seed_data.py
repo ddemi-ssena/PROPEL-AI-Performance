@@ -1,4 +1,5 @@
-from datetime import datetime, date, timedelta
+# seed_data.py
+from datetime import date, timedelta
 import random
 from app.db.session import SessionLocal
 from app.db.models.user import User, UserRole
@@ -13,6 +14,7 @@ db = SessionLocal()
 def clear_all_data():
     """Tüm verileri temizle"""
     print("🗑️  Mevcut veriler temizleniyor...")
+    # Sıralamaya dikkat: önce ilişkili (child) tablolar, sonra parent tablolar
     db.query(SurveyResponse).delete()
     db.query(KPIRecord).delete()
     db.query(KPI).delete()
@@ -120,9 +122,9 @@ def create_employees(users, departments):
     hire_dates = [date(2023, 1, 15), date(2023, 6, 1), date(2024, 1, 10), date(2024, 6, 15)]
     
     # Admin'i pas geç (index 0)
-    user_idx = 1
+    user_idx = 1  # users[0] admin, users[1] ilk manager
     
-    # Yazılım Manager
+    # Yazılım Manager (users[1])
     employees.append(Employee(
         user_id=users[user_idx].id,
         department_id=departments[0].id,
@@ -131,7 +133,7 @@ def create_employees(users, departments):
     ))
     user_idx += 1
     
-    # Yazılım Developers
+    # Yazılım Developers (10)
     positions = ["Junior Developer", "Mid-Level Developer", "Senior Developer", "Lead Developer"]
     for i in range(10):
         employees.append(Employee(
@@ -151,7 +153,7 @@ def create_employees(users, departments):
     ))
     user_idx += 1
     
-    # Satış Employees
+    # Satış Employees (7)
     for i in range(7):
         employees.append(Employee(
             user_id=users[user_idx].id,
@@ -170,7 +172,7 @@ def create_employees(users, departments):
     ))
     user_idx += 1
     
-    # Pazarlama Employees
+    # Pazarlama Employees (5)
     for i in range(5):
         employees.append(Employee(
             user_id=users[user_idx].id,
@@ -187,96 +189,161 @@ def create_employees(users, departments):
     return employees
 
 def create_kpis(departments):
-    """KPI tanımları oluştur"""
+    """KPI tanımları oluştur (keyword args ile)"""
     print("📊 KPI'lar oluşturuluyor...")
+    
+    # departman isim -> id haritası
+    dept_map = {d.name: d.id for d in departments}
     
     kpis = [
         # Yazılım KPI'ları
-        KPI(name="Kod Satırı", description="Aylık yazılan kod satırı", 
-            unit=KPIUnit.numeric, department_id=departments[0].id, target_value=5000),
-        KPI(name="Bug Sayısı", description="Aylık bug sayısı", 
-            unit=KPIUnit.numeric, department_id=departments[0].id, target_value=5),
-        KPI(name="Code Review Skoru", description="Kod inceleme puanı", 
-            unit=KPIUnit.percentage, department_id=departments[0].id, target_value=90),
+        KPI(
+            name="Kod Satırı",
+            description="Aylık yazılan kod satırı",
+            unit=KPIUnit.numeric,
+            department_id=dept_map["Yazılım Geliştirme"],
+            target_value=5000
+        ),
+        KPI(
+            name="Bug Sayısı",
+            description="Aylık bug sayısı",
+            unit=KPIUnit.numeric,
+            department_id=dept_map["Yazılım Geliştirme"],
+            target_value=5
+        ),
+        KPI(
+            name="Code Review Skoru",
+            description="Kod inceleme puanı",
+            unit=KPIUnit.percentage,
+            department_id=dept_map["Yazılım Geliştirme"],
+            target_value=90
+        ),
         
         # Satış KPI'ları
-        KPI(name="Satış Hacmi", description="Aylık satış cirosu", 
-            unit=KPIUnit.currency, department_id=departments[1].id, target_value=100000),
-        KPI(name="Yeni Müşteri Sayısı", description="Aylık kazanılan müşteri", 
-            unit=KPIUnit.numeric, department_id=departments[1].id, target_value=20),
+        KPI(
+            name="Satış Hacmi",
+            description="Aylık satış cirosu",
+            unit=KPIUnit.currency,
+            department_id=dept_map["Satış"],
+            target_value=100000
+        ),
+        KPI(
+            name="Yeni Müşteri Sayısı",
+            description="Aylık kazanılan müşteri",
+            unit=KPIUnit.numeric,
+            department_id=dept_map["Satış"],
+            target_value=20
+        ),
         
         # Pazarlama KPI'ları
-        KPI(name="Lead Sayısı", description="Aylık potansiyel müşteri", 
-            unit=KPIUnit.numeric, department_id=departments[2].id, target_value=500),
-        KPI(name="Conversion Rate", description="Lead'den müşteriye dönüşüm oranı", 
-            unit=KPIUnit.percentage, department_id=departments[2].id, target_value=15),
+        KPI(
+            name="Lead Sayısı",
+            description="Aylık potansiyel müşteri",
+            unit=KPIUnit.numeric,
+            department_id=dept_map["Pazarlama"],
+            target_value=500
+        ),
+        KPI(
+            name="Conversion Rate",
+            description="Lead'den müşteriye dönüşüm oranı",
+            unit=KPIUnit.percentage,
+            department_id=dept_map["Pazarlama"],
+            target_value=15
+        ),
         
-        # Genel KPI
-        KPI(name="Motivasyon Skoru", description="Genel motivasyon puanı", 
-            unit=KPIUnit.percentage, department_id=None, target_value=85),
+        # Genel KPI (tüm şirket)
+        KPI(
+            name="Motivasyon Skoru",
+            description="Genel motivasyon puanı",
+            unit=KPIUnit.percentage,
+            department_id=None,
+            target_value=85
+        ),
     ]
     
     db.add_all(kpis)
     db.commit()
     
-    print(f"✅ {len(kpis)} KPI oluşturuldu!")
-    return kpis
+    # commit sonrası gerçek id'leri almak için sorgula
+    persisted_kpis = db.query(KPI).all()
+    kpi_map = {k.name: k.id for k in persisted_kpis}
+    
+    print(f"✅ {len(persisted_kpis)} KPI oluşturuldu!")
+    return persisted_kpis, kpi_map, dept_map
 
-def create_kpi_records(employees, kpis):
-    """Son 6 ay için KPI kayıtları oluştur"""
+def create_kpi_records(employees, kpi_map, dept_map):
+    """Son 6 ay için KPI kayıtları oluştur (kpi_map kullanılarak)"""
     print("📈 KPI kayıtları oluşturuluyor...")
     
     records = []
     today = date.today()
     
-    # Son 6 ay
+    # Son 6 ay (ay başı gibi yaklaşık)
     for month_offset in range(6):
         period_date = today - timedelta(days=30 * month_offset)
         
         for employee in employees:
             # Yazılım departmanı
-            if employee.department_id == 1:
-                # Kod Satırı (KPI 1)
+            if employee.department_id == dept_map["Yazılım Geliştirme"]:
+                # Kod Satırı
                 records.append(KPIRecord(
-                    kpi_id=1,
+                    kpi_id=kpi_map["Kod Satırı"],
                     employee_id=employee.id,
                     value=random.randint(3000, 7000),
                     period_date=period_date
                 ))
-                # Bug Sayısı (KPI 2)
+                # Bug Sayısı
                 records.append(KPIRecord(
-                    kpi_id=2,
+                    kpi_id=kpi_map["Bug Sayısı"],
                     employee_id=employee.id,
                     value=random.randint(2, 12),
                     period_date=period_date
                 ))
+                # Code Review Skoru (opsiyonel, örnek)
+                records.append(KPIRecord(
+                    kpi_id=kpi_map["Code Review Skoru"],
+                    employee_id=employee.id,
+                    value=random.randint(70, 100),
+                    period_date=period_date
+                ))
             
             # Satış departmanı
-            elif employee.department_id == 2:
-                # Satış Hacmi (KPI 4)
+            elif employee.department_id == dept_map["Satış"]:
                 records.append(KPIRecord(
-                    kpi_id=4,
+                    kpi_id=kpi_map["Satış Hacmi"],
                     employee_id=employee.id,
                     value=random.randint(50000, 150000),
                     period_date=period_date
                 ))
-                # Yeni Müşteri (KPI 5)
                 records.append(KPIRecord(
-                    kpi_id=5,
+                    kpi_id=kpi_map["Yeni Müşteri Sayısı"],
                     employee_id=employee.id,
                     value=random.randint(10, 30),
                     period_date=period_date
                 ))
             
             # Pazarlama departmanı
-            elif employee.department_id == 3:
-                # Lead Sayısı (KPI 6)
+            elif employee.department_id == dept_map["Pazarlama"]:
                 records.append(KPIRecord(
-                    kpi_id=6,
+                    kpi_id=kpi_map["Lead Sayısı"],
                     employee_id=employee.id,
                     value=random.randint(300, 700),
                     period_date=period_date
                 ))
+                records.append(KPIRecord(
+                    kpi_id=kpi_map["Conversion Rate"],
+                    employee_id=employee.id,
+                    value=random.randint(5, 25),
+                    period_date=period_date
+                ))
+            
+            # Genel KPI (her çalışana örnek)
+            records.append(KPIRecord(
+                kpi_id=kpi_map["Motivasyon Skoru"],
+                employee_id=employee.id,
+                value=random.randint(60, 100),
+                period_date=period_date
+            ))
     
     db.add_all(records)
     db.commit()
@@ -321,8 +388,8 @@ def main():
     users = create_users()
     departments = create_departments()
     employees = create_employees(users, departments)
-    kpis = create_kpis(departments)
-    kpi_records = create_kpi_records(employees, kpis)
+    kpis, kpi_map, dept_map = create_kpis(departments)
+    kpi_records = create_kpi_records(employees, kpi_map, dept_map)
     survey_responses = create_survey_responses(employees)
     
     print("\n✅ Seed data tamamlandı!")
