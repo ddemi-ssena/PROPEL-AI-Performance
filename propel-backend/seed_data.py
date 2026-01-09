@@ -62,11 +62,16 @@ def create_users():
     ]
     
     # Employees (Yazılım Departmanı)
+    dev_names = [
+        "Canan Dağdelen", "Berkant Demir", "Elif Öztürk", "Murat Kaya", 
+        "Selin Yılmaz", "Caner Yıldız", "Zeynep Çelik", "Burak Şahin",
+        "Gamze Arslan", "Onur Polat"
+    ]
     for i in range(1, 11):
         users.append(User(
             email=f"developer{i}@propel.com",
             hashed_password=get_password_hash("dev123"),
-            full_name=f"Yazılımcı {i}",
+            full_name=dev_names[i-1],
             role=UserRole.employee,
             is_active=True
         ))

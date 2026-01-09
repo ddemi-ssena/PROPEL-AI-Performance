@@ -9,10 +9,16 @@ from app.db.session import get_db
 from app.db.models.user import User, UserRole
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserResponse
+from app.api.dependencies import get_current_user  # Import added
 
 router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+
+@router.get("/me", response_model=UserResponse)
+def read_users_me(current_user: User = Depends(get_current_user)):
+    """Mevcut kullanıcı bilgilerini getir"""
+    return current_user
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):

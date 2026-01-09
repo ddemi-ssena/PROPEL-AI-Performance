@@ -16,24 +16,59 @@ const router = createRouter({
       component: () => import('@/views/auth/RegisterView.vue'),
       meta: { requiresGuest: true },
     },
-    /** 
+    // Admin Routes
     {
-      path: '/forgot-password',
-      name: 'forgot-password',
-      component: () => import('@/views/auth/ForgotPasswordView.vue'),
-      meta: { requiresGuest: true },
+      path: '/admin',
+      component: () => import('@/layouts/AppLayout.vue'),
+      meta: { requiresAuth: true, title: 'Genel Müdür Paneli' },
+      children: [
+        {
+          path: '',
+          name: 'admin-dashboard',
+          component: () => import('@/views/admin/AdminDashboard.vue'),
+        },
+        // Gelecekte eklenecek admin rotaları
+      ]
     },
+    // Manager Routes
     {
-      path: '/reset-password',
-      name: 'reset-password',
-      component: () => import('@/views/auth/ResetPasswordView.vue'),
-      meta: { requiresGuest: true },
-    },*/
+      path: '/manager',
+      component: () => import('@/layouts/AppLayout.vue'),
+      meta: { requiresAuth: true, title: 'Yazılım Geliştirme Yönetici Paneli' },
+      children: [
+        {
+          path: '',
+          name: 'manager-dashboard',
+          component: () => import('@/views/manager/ManagerDashboard.vue'),
+        }
+      ]
+    },
+    // Employee Routes
+    {
+      path: '/employee',
+      component: () => import('@/layouts/AppLayout.vue'),
+      meta: { requiresAuth: true, title: 'Personel Paneli' },
+      children: [
+        {
+          path: '',
+          name: 'employee-dashboard',
+          component: () => import('@/views/employee/EmployeeDashboard.vue'),
+        }
+      ]
+    },
+    // Legacy/Default Fallback
     {
       path: '/dashboard',
-      name: 'dashboard',
-      component: () => import('@/views/dashboard/DashboardView.vue'),
+      component: () => import('@/layouts/AppLayout.vue'),
       meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'dashboard',
+          // Rol bazlı yönlendirme yapılana kadar geçici olarak admin'e
+          component: () => import('@/views/admin/AdminDashboard.vue'),
+        }
+      ]
     },
     {
       path: '/',

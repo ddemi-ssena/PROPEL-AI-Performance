@@ -162,7 +162,17 @@ async function handleLogin() {
   const success = await authStore.login(credentials.value)
   
   if (success) {
-    router.push('/dashboard')
+    const role = authStore.user?.role
+    
+    if (role === 'admin') {
+      router.push('/admin')
+    } else if (role === 'department_manager') {
+      router.push('/manager')
+    } else if (role === 'employee') {
+      router.push('/employee')
+    } else {
+      router.push('/dashboard')
+    }
   }
 }
 </script>
