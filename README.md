@@ -37,6 +37,6 @@
 
 ---
 
-## 📄 Lisans
+
 
 Bu proje [MIT](https://choosealicense.com/licenses/mit/) lisansı ile lisanslanmıştır.
