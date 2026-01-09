@@ -34,43 +34,6 @@
 | **Veritabanı** | PostgreSQL |
 | **DevOps** | Docker, Docker Compose |
 
----
-
-## 🚀 Kurulum ve Çalıştırma
-
-Proje, Docker sayesinde tek komutla ayağa kalkacak şekilde tasarlanmıştır.
-
-### Ön Koşullar
-*   Docker ve Docker Compose
-*   Git
-
-### Adım Adım Kurulum
-
-1.  **Projeyi Klonlayın:**
-    ```bash
-    git clone [https://github.com/cansuyildirimmm/AI-Supported-Department-Employee-Performance-Analysis-System.git](https://github.com/cansuyildirimmm/AI-Supported-Department-Employee-Performance-Analysis-System.git)
-    cd AI-Supported-Department-Employee-Performance-Analysis-System
-    ```
-
-2.  **Docker ile Başlatın:**
-    ```bash
-    docker-compose up --build
-    ```
-    *(Bu işlem ilk seferde veritabanı kurulumu nedeniyle birkaç dakika sürebilir.)*
-
-3.  **Uygulamaya Erişin:**
-    *   **Frontend (Panel):** [http://localhost:5173](http://localhost:5173)
-    *   **Backend (API Docs):** [http://localhost:8001/docs](http://localhost:8001/docs)
-
-### 🔐 Test Hesapları
-
-| Rol | Email | Şifre |
-|-----|-------|-------|
-| **Admin** | `admin@propel.com` | `admin123` |
-| **Yönetici** | `manager.yazilim@propel.com` | `manager123` |
-| **Çalışan** | `developer1@propel.com` | `dev123` |
-
-
 
 ---
 
