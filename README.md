@@ -70,17 +70,7 @@ Proje, Docker sayesinde tek komutla ayağa kalkacak şekilde tasarlanmıştır.
 | **Yönetici** | `manager.yazilim@propel.com` | `manager123` |
 | **Çalışan** | `developer1@propel.com` | `dev123` |
 
----
 
-## 🤝 Contributing (Katkıda Bulunma)
-
-Bu proje açık kaynak topluluğunun katkılarına açıktır! Pull request (PR) göndererek projeyi geliştirmemize yardımcı olabilirsiniz.
-
-1.  Bu repoyu **Fork** edin.
-2.  Yeni bir feature branch oluşturun (`git checkout -b feature/amazing-feature`).
-3.  Değişikliklerinizi commit edin (`git commit -m 'Add some amazing feature'`).
-4.  Branch'inizi pushlayın (`git push origin feature/amazing-feature`).
-5.  Bir **Pull Request** açın.
 
 ---
 
