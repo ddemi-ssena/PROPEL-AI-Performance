@@ -48,7 +48,7 @@ Proje, Docker sayesinde tek komutla ayağa kalkacak şekilde tasarlanmıştır.
 
 1.  **Projeyi Klonlayın:**
     ```bash
-    git clone https://github.com/cansuyildirimmm/AI-Supported-Department-Employee-Performance-Analysis-System.git
+    git clone [https://github.com/cansuyildirimmm/AI-Supported-Department-Employee-Performance-Analysis-System.git](https://github.com/cansuyildirimmm/AI-Supported-Department-Employee-Performance-Analysis-System.git)
     cd AI-Supported-Department-Employee-Performance-Analysis-System
     ```
 
