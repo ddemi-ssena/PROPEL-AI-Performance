@@ -56,3 +56,4 @@ jobs:
           name: frontend-build
           path: propel-frontend/dist
           retention-days: 7
+

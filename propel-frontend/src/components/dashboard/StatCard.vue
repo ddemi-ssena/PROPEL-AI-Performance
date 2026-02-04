@@ -19,35 +19,46 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+
 const props = defineProps<{
   title: string
   value: string | number
   change?: string
   changeType?: 'increase' | 'decrease' | 'neutral'
   icon: any
-  color?: 'blue' | 'green' | 'red' | 'purple' | 'orange'
+  color?: 'blue' | 'green' | 'red' | 'purple' | 'orange' | 'indigo' | 'slate' | 'emerald' | 'rose' | 'amber'
 }>()
 
 const isPositive = computed(() => props.changeType === 'increase')
 
 const colorBg = computed(() => {
-  const colors = {
+  const colors: Record<string, string> = {
     blue: 'bg-blue-50',
     green: 'bg-green-50',
     red: 'bg-red-50',
     purple: 'bg-purple-50',
-    orange: 'bg-orange-50'
+    orange: 'bg-orange-50',
+    indigo: 'bg-indigo-50',
+    slate: 'bg-slate-50',
+    emerald: 'bg-emerald-50',
+    rose: 'bg-rose-50',
+    amber: 'bg-amber-50'
   }
   return colors[props.color || 'blue']
 })
 
 const colorText = computed(() => {
-  const colors = {
+  const colors: Record<string, string> = {
     blue: 'text-blue-600',
     green: 'text-green-600',
     red: 'text-red-600',
     purple: 'text-purple-600',
-    orange: 'text-orange-600'
+    orange: 'text-orange-600',
+    indigo: 'text-indigo-600',
+    slate: 'text-slate-600',
+    emerald: 'text-emerald-600',
+    rose: 'text-rose-600',
+    amber: 'text-amber-600'
   }
   return colors[props.color || 'blue']
 })

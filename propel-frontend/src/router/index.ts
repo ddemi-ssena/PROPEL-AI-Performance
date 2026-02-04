@@ -27,7 +27,30 @@ const router = createRouter({
           name: 'admin-dashboard',
           component: () => import('@/views/admin/AdminDashboard.vue'),
         },
-        // Gelecekte eklenecek admin rotaları
+        {
+          path: 'employees',
+          name: 'admin-employees',
+          component: () => import('@/views/admin/EmployeeManagement.vue'),
+          meta: { title: 'Personel Yönetimi' }
+        },
+        {
+          path: 'employees/:id',
+          name: 'admin-employee-details',
+          component: () => import('@/views/admin/EmployeeDetails.vue'),
+          meta: { title: 'Personel Detayı' }
+        },
+        {
+          path: 'data-management',
+          name: 'admin-data-management',
+          component: () => import('@/views/admin/DataManagement.vue'),
+          meta: { title: 'Veri Yönetimi' }
+        },
+        {
+          path: 'ai-insights',
+          name: 'admin-ai-insights',
+          component: () => import('@/views/admin/AIInsights.vue'),
+          meta: { title: 'Yapay Zeka İçgörüleri' }
+        }
       ]
     },
     // Manager Routes
@@ -40,6 +63,25 @@ const router = createRouter({
           path: '',
           name: 'manager-dashboard',
           component: () => import('@/views/manager/ManagerDashboard.vue'),
+        },
+        {
+          path: 'team',
+          name: 'manager-team',
+          component: () => import('@/views/manager/TeamManagement.vue'),
+          meta: { title: 'Ekibim' }
+        }
+      ]
+    },
+    // Settings Route (Shared)
+    {
+      path: '/settings',
+      component: () => import('@/layouts/AppLayout.vue'),
+      meta: { requiresAuth: true, title: 'Ayarlar' },
+      children: [
+        {
+          path: '',
+          name: 'settings',
+          component: () => import('@/views/Settings.vue'),
         }
       ]
     },
