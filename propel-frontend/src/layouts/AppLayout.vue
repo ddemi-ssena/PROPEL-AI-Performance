@@ -100,7 +100,8 @@ import {
   UserIcon,
   ArrowRightOnRectangleIcon,
   BellIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  Cog6ToothIcon
 } from '@heroicons/vue/24/outline'
 
 const route = useRoute()
@@ -133,8 +134,9 @@ const pageTitle = computed(() => {
 const allNavigation = [
   // Admin Routes
   { name: 'Genel Bakış', to: '/admin', icon: HomeIcon, role: 'admin' },
-  { name: 'Departman Yönetimi', to: '/admin/departments', icon: BuildingOfficeIcon, role: 'admin' },
   { name: 'Personel Yönetimi', to: '/admin/employees', icon: UsersIcon, role: 'admin' },
+  { name: 'Yapay Zeka İçgörüleri', to: '/admin/ai-insights', icon: ChartBarIcon, role: 'admin' }, // Using ChartBar for now
+  { name: 'Veri Yönetimi', to: '/admin/data-management', icon: BuildingOfficeIcon, role: 'admin' }, // Using BuildingOffice for now
   
   // Manager Routes
   { name: 'Departman Performansı', to: '/manager', icon: ChartBarIcon, role: 'department_manager' },
@@ -143,11 +145,14 @@ const allNavigation = [
   // Employee Routes
   { name: 'Kişisel Gelişim', to: '/employee', icon: UserIcon, role: 'employee' },
   { name: 'Performansım', to: '/employee/performance', icon: ChartBarIcon, role: 'employee' },
+
+  // Shared
+  { name: 'Ayarlar', to: '/settings', icon: Cog6ToothIcon, role: 'all' },
 ]
 
 // Filter navigation based on active role
 const navigation = computed(() => {
-  return allNavigation.filter(item => item.role === userRole.value)
+  return allNavigation.filter(item => item.role === 'all' || item.role === userRole.value)
 })
 
 const handleLogout = () => {

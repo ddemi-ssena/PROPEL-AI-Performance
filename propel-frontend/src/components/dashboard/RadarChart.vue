@@ -31,20 +31,21 @@ const props = defineProps<{
   datasets: {
     label: string
     data: number[]
-    borderColor: string
-    backgroundColor: string
+    borderColor?: string
+    backgroundColor?: string
+    [key: string]: any
   }[]
 }>()
 
 const chartData = computed(() => ({
   labels: props.labels,
   datasets: props.datasets.map(ds => ({
-    ...ds,
     borderWidth: 2,
     pointBackgroundColor: ds.borderColor,
     pointBorderColor: '#fff',
     pointHoverBackgroundColor: '#fff',
-    pointHoverBorderColor: ds.borderColor
+    pointHoverBorderColor: ds.borderColor,
+    ...ds
   }))
 }))
 

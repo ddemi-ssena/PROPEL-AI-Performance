@@ -1,7 +1,12 @@
 import { apiClient } from './client'
-import type { LoginCredentials, AuthResponse, User } from '../types/auth.types'
+import type { LoginCredentials, RegisterData, AuthResponse, User } from '../types/auth.types'
 
 export const authApi = {
+  async register(data: RegisterData): Promise<User> {
+    const { data: userData } = await apiClient.post<User>('/auth/register', data)
+    return userData
+  },
+
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const formData = new URLSearchParams()
     formData.append('username', credentials.username)
