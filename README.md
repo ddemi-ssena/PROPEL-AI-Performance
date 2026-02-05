@@ -1,4 +1,4 @@
-# 🧊 KUTUP – AI‑Driven Performance Management Platform
+#  KUTUP – AI‑Driven Performance Management Platform
 
 [![Backend CI](https://github.com/ddemi-ssena/PROPEL-AI-Performance/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/ddemi-ssena/PROPEL-AI-Performance/actions/workflows/backend-ci.yml)
 [![Frontend CI](https://github.com/ddemi-ssena/PROPEL-AI-Performance/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/ddemi-ssena/PROPEL-AI-Performance/actions/workflows/frontend-ci.yml)
