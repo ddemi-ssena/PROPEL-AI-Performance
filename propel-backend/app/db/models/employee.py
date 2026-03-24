@@ -16,3 +16,10 @@ class Employee(BaseModel):
     department = relationship("Department", back_populates="employees")
     kpi_records = relationship("KPIRecord", back_populates="employee")
     survey_responses = relationship("SurveyResponse", back_populates="employee")
+    # Mevcut dosyanın sonuna, kpi_records ve survey_responses'tan SONRA ekle:
+
+    given_feedbacks    = relationship("Feedback", foreign_keys="Feedback.reviewer_id", back_populates="reviewer")
+    received_feedbacks = relationship("Feedback", foreign_keys="Feedback.reviewee_id", back_populates="reviewee")
+    sent_requests      = relationship("FeedbackRequest", foreign_keys="FeedbackRequest.requester_id", back_populates="requester")
+    received_requests  = relationship("FeedbackRequest", foreign_keys="FeedbackRequest.target_id",    back_populates="target")
+    badges             = relationship("EmployeeBadge", back_populates="employee")
