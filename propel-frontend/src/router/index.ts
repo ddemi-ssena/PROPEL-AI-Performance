@@ -43,6 +43,24 @@ const router = createRouter({
         }
       ]
     },
+    
+      // Feedback Routes
+    {
+      path: '/feedback',
+      component: () => import('@/layouts/AppLayout.vue'),
+      meta: { requiresAuth: true, title: '360° Geri Bildirim Paneli' },
+      children: [
+        {
+          path: '',
+          name: 'feedback',
+          component: () => import('@/views/feedback/FeedbackView.vue'),
+        }
+      ]
+    },
+    {
+      path: '/feedback-dashboard',
+      redirect: '/feedback',
+    },
     // Employee Routes
     {
       path: '/employee',

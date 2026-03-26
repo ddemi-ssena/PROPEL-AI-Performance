@@ -92,6 +92,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { ChatBubbleLeftRightIcon } from '@heroicons/vue/24/solid'
 import {
   HomeIcon,
   UsersIcon,
@@ -135,6 +136,7 @@ const allNavigation = [
   { name: 'Genel Bakış', to: '/admin', icon: HomeIcon, role: 'admin' },
   { name: 'Departman Yönetimi', to: '/admin/departments', icon: BuildingOfficeIcon, role: 'admin' },
   { name: 'Personel Yönetimi', to: '/admin/employees', icon: UsersIcon, role: 'admin' },
+  { name: '360° Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon },
   
   // Manager Routes
   { name: 'Departman Performansı', to: '/manager', icon: ChartBarIcon, role: 'department_manager' },
@@ -147,7 +149,7 @@ const allNavigation = [
 
 // Filter navigation based on active role
 const navigation = computed(() => {
-  return allNavigation.filter(item => item.role === userRole.value)
+  return allNavigation.filter(item => !item.role || item.role === userRole.value)
 })
 
 const handleLogout = () => {
