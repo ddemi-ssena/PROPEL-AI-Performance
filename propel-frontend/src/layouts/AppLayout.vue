@@ -74,6 +74,15 @@
           </div>
         </div>
         <div class="flex items-center gap-4">
+            <!-- Global Survey Button -->
+            <button 
+              @click="isWeeklyPulseModalOpen = true"
+              class="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-bold border border-indigo-100 hover:bg-indigo-100 transition-all shadow-sm"
+            >
+              <HeartIcon class="w-4 h-4" />
+              <span>Nabız Anketi</span>
+            </button>
+            <div class="w-px h-6 bg-slate-200 mx-1"></div>
             <button class="p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50 transition-all relative">
                 <BellIcon class="w-6 h-6" />
                 <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
@@ -84,6 +93,13 @@
       <div class="p-6">
         <router-view />
       </div>
+
+      <!-- Global Modals -->
+      <WeeklyPulseModal 
+        :is-open="isWeeklyPulseModalOpen" 
+        @close="isWeeklyPulseModalOpen = false"
+        @submit="handlePulseSubmit"
+      />
     </main>
   </div>
 </template>
@@ -92,7 +108,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import {
+import { 
   HomeIcon,
   UsersIcon,
   BuildingOfficeIcon,
@@ -101,12 +117,38 @@ import {
   ArrowRightOnRectangleIcon,
   BellIcon,
   ArrowLeftIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  HeartIcon,
+  DocumentTextIcon 
 } from '@heroicons/vue/24/outline'
+import WeeklyPulseModal from '@/components/dashboard/WeeklyPulseModal.vue'
+import { employeeApi } from '@/services/api/employee.api'
+import { ref } from 'vue'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+
+const isWeeklyPulseModalOpen = ref(false)
+
+const handlePulseSubmit = async (data: any) => {
+    try {
+        const payload = {
+            employee_id: authStore.user?.id || 1,
+            period_date: new Date().toISOString().split('T')[0],
+            ...data
+        }
+        await employeeApi.submitWeeklyPulse(payload)
+        isWeeklyPulseModalOpen.value = false
+        alert("Anketiniz başarıyla kaydedildi! Motivasyon analiziniz güncellendi.")
+    } catch (error: any) {
+        if (error.response?.data?.detail) {
+             alert(error.response.data.detail)
+        } else {
+             alert("Anket gönderilirken bir hata oluştu.")
+        }
+    }
+}
 
 // Gerçek kullanıcı verilerini Store'dan al
 // Fallback olarak localStorage kontrolü
@@ -135,7 +177,10 @@ const allNavigation = [
   // Admin Routes
   { name: 'Genel Bakış', to: '/admin', icon: HomeIcon, role: 'admin' },
   { name: 'Personel Yönetimi', to: '/admin/employees', icon: UsersIcon, role: 'admin' },
-  { name: 'Yapay Zeka İçgörüleri', to: '/admin/ai-insights', icon: ChartBarIcon, role: 'admin' }, // Using ChartBar for now
+  { name: 'Yapay Zeka İçgörüleri', to: '/admin/ai-insights', icon: ChartBarIcon, role: 'admin' },
+  { name: 'Anket Sonuçları', to: '/admin/survey-results', icon: DocumentTextIcon, role: 'admin' },
+  { name: 'Yapay Zeka İçgörüleri', to: '/manager/ai-insights', icon: ChartBarIcon, role: 'department_manager' }, // Using ChartBar for now
+  { name: 'Anket Sonuçları', to: '/manager/survey-results', icon: DocumentTextIcon, role: 'department_manager' },
   { name: 'Veri Yönetimi', to: '/admin/data-management', icon: BuildingOfficeIcon, role: 'admin' }, // Using BuildingOffice for now
   
   // Manager Routes

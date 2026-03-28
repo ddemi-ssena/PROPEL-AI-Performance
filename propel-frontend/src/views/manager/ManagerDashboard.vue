@@ -19,10 +19,10 @@
     
     <!-- Stats Row -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard title="Genel Üretkenlik" value="8.2/10" change="+5%" changeType="increase" :icon="BoltIcon" color="indigo" />
-        <StatCard title="Ekip Bağlılığı" value="89%" change="-2%" changeType="decrease" :icon="HeartIcon" color="rose" />
-        <StatCard title="Tamamlanan Görev" value="1,204" change="+10%" changeType="increase" :icon="CheckCircleIcon" color="emerald" />
-        <StatCard title="Ortalama İş Yükü" value="95%" change="+1%" changeType="increase" :icon="ScaleIcon" color="amber" />
+        <StatCard title="Genel Bağlılık (MS)" :value="stats.avgMs" change="+2%" changeType="increase" :icon="HeartIcon" color="indigo" />
+        <StatCard title="Düşük Riskli" :value="stats.lowRisk" change="Stabil" changeType="neutral" :icon="CheckCircleIcon" color="emerald" />
+        <StatCard title="Yüksek Riskli" :value="stats.highRisk" change="+1" changeType="decrease" :icon="ExclamationTriangleIcon" color="rose" />
+        <StatCard title="Aktif Katılım" value="100%" change="0%" changeType="neutral" :icon="ScaleIcon" color="amber" />
     </div>
 
     <!-- Charts Section -->
@@ -56,25 +56,21 @@
                     </div>
                     <div>
                         <h3 class="font-bold text-white">YZ Analizleri</h3>
-                        <p class="text-xs text-slate-400">Veriye dayalı öngörüler</p>
                     </div>
                 </div>
                 
                 <div class="space-y-4">
-                    <div class="bg-white/5 p-4 rounded-xl border border-white/10 hover:bg-white/10 transition backdrop-blur-md">
-                        <div class="flex gap-2 text-rose-400 text-xs font-bold mb-2 items-center">
-                            <ExclamationTriangleIcon class="w-4 h-4" />
-                            <span>Yüksek Risk</span>
+                    <div v-for="rec in (insights?.recommendations || []).slice(0, 2)" :key="rec.title" 
+                         class="bg-white/5 p-4 rounded-xl border border-white/10 hover:bg-white/10 transition backdrop-blur-md">
+                        <div class="flex gap-2 text-indigo-400 text-xs font-bold mb-2 items-center">
+                            <SparklesIcon class="w-4 h-4" />
+                            <span>{{ rec.title }}</span>
                         </div>
-                        <p class="text-xs text-slate-300 leading-relaxed">Takım üzerinde sürdürülebilir olmayan iş yükü tespit edildi. Tükenmişlik riski artıyor.</p>
+                        <p class="text-xs text-slate-300 leading-relaxed">{{ rec.description }}</p>
                     </div>
 
-                    <div class="bg-white/5 p-4 rounded-xl border border-white/10 hover:bg-white/10 transition backdrop-blur-md">
-                        <div class="flex gap-2 text-emerald-400 text-xs font-bold mb-2 items-center">
-                            <TrophyIcon class="w-4 h-4" />
-                            <span>Haftanın Yıldızı</span>
-                        </div>
-                        <p class="text-xs text-slate-300 leading-relaxed"><strong class="text-white">Ahmet Yılmaz</strong>, hedefleri %25 oranında aştı.</p>
+                    <div v-if="!insights?.recommendations?.length" class="text-xs text-slate-500 italic p-4">
+                        Analiz için henüz yeterli veri toplanmadı.
                     </div>
                 </div>
             </div>
@@ -230,6 +226,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
 import { 
     ArrowDownTrayIcon, 
     BoltIcon, 
@@ -243,4 +240,37 @@ import {
 import StatCard from '@/components/dashboard/StatCard.vue'
 import LineChart from '@/components/dashboard/LineChart.vue'
 import RadarChart from '@/components/dashboard/RadarChart.vue'
+import { dashboardApi } from '@/services/api/dashboard.api'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const isLoading = ref(true)
+const insights = ref<any>(null)
+
+const stats = computed(() => {
+    if (!insights.value) return { avgMs: '0', lowRisk: '0', highRisk: '0' }
+    
+    const msKpi = insights.value.kpis.find((k: any) => k.title.includes('Bağlılık') || k.title.includes('Ortalama'))
+    return {
+        avgMs: msKpi ? msKpi.value : '0',
+        lowRisk: insights.value.riskData[0].toString(),
+        highRisk: insights.value.riskData[2].toString()
+    }
+})
+
+const fetchManagerData = async () => {
+    isLoading.value = true
+    try {
+        const data = await dashboardApi.getInsights()
+        insights.value = data
+    } catch (e) {
+        console.error("Failed to fetch manager insights", e)
+    } finally {
+        isLoading.value = false
+    }
+}
+
+onMounted(() => {
+    fetchManagerData()
+})
 </script>

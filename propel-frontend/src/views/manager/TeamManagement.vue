@@ -69,9 +69,9 @@
             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
               <th class="px-6 py-4">Çalışan</th>
               <th class="px-6 py-4">Rol</th>
-              <th class="px-6 py-4">Mevcut Görev</th>
-              <th class="px-6 py-4">Durum</th>
-              <th class="px-6 py-4">Öncelik</th>
+              <th class="px-6 py-4">Son Anket Skoru</th>
+              <th class="px-6 py-4">Motivasyon Trendi (MTE)</th>
+              <th class="px-6 py-4">Ayrılma Riski (ARS)</th>
               <th class="px-6 py-4 text-right">İşlemler</th>
             </tr>
           </thead>
@@ -115,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { 
   PlusIcon,
   MagnifyingGlassIcon,
@@ -124,90 +124,67 @@ import {
   CommandLineIcon,
   ChartBarIcon
 } from '@heroicons/vue/24/outline'
+import { employeeApi } from '@/services/api/employee.api'
 
-const teamMembers = ref([
-  {
-    id: 1,
-    name: 'Ahmet Yılmaz',
-    role: 'Yazılım Müdürü',
-    task: 'Çeyrek Raporlaması',
-    status: 'In Progress',
-    priority: 'High',
-    avatar: 'https://ui-avatars.com/api/?name=Ahmet+Yilmaz&background=fde68a&color=1e293b'
-  },
-  {
-    id: 2,
-    name: 'Canan Dağdelen',
-    role: 'Senior Developer',
-    task: 'Personel Detay Ekranı Geliştirmesi',
-    status: 'In Progress',
-    priority: 'High',
-    avatar: 'https://ui-avatars.com/api/?name=Canan+Dagdelen&background=cffafe&color=0e7490'
-  },
-  {
-    id: 3,
-    name: 'Berkant Demir',
-    role: 'Mid-Level Developer',
-    task: 'Frontend Performans Optimizasyonu',
-    status: 'In Review',
-    priority: 'Medium',
-    avatar: 'https://ui-avatars.com/api/?name=Berkant+Demir&background=fee2e2&color=991b1b'
-  },
-   {
-    id: 4,
-    name: 'Elif Öztürk',
-    role: 'Junior Developer',
-    task: 'Unit Test Yazımı',
-    status: 'Blocked',
-    priority: 'Low',
-    avatar: 'https://ui-avatars.com/api/?name=Elif+Ozturk&background=f3e8ff&color=6b21a8'
-  },
-  {
-    id: 5,
-    name: 'Murat Kaya',
-    role: 'Senior Developer',
-    task: 'API Entegrasyonu Süreci',
-    status: 'Done',
-    priority: 'Critical',
-    avatar: 'https://ui-avatars.com/api/?name=Murat+Kaya&background=dcfce7&color=166534'
-  }
-])
+const teamMembers = ref<any[]>([])
+const isLoading = ref(true)
+
+const fetchTeamMembers = async () => {
+    isLoading.value = true
+    try {
+        const data = await employeeApi.getEmployees()
+        teamMembers.value = data.map((emp: any) => ({
+            id: emp.id,
+            name: emp.user.full_name,
+            role: emp.position || emp.user.role,
+            task: emp.latest_ms ? `Bağlılık: ${emp.latest_ms}/5` : 'Anket Yok',
+            status: getMteStatus(emp.latest_mte),
+            priority: emp.risk_level || 'Low',
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.user.full_name)}&background=f3e8ff&color=6b21a8`
+        }))
+    } catch(e) {
+        console.error("Failed to load team members", e)
+    } finally {
+        isLoading.value = false
+    }
+}
+
+onMounted(() => {
+    fetchTeamMembers()
+})
+
+const getMteStatus = (mte: number | null) => {
+    if (mte === null) return 'Bilinmiyor'
+    if (mte > 0.1) return 'Pozitif (+)'
+    if (mte < -0.1) return 'Negatif (-)'
+    return 'Stabil'
+}
 
 const getStatusColor = (status: string) => {
     switch(status) {
-        case 'In Progress': return 'bg-blue-50 text-blue-700'
-        case 'In Review': return 'bg-amber-50 text-amber-700'
-        case 'Done': return 'bg-emerald-50 text-emerald-700'
-        case 'Blocked': return 'bg-red-50 text-red-700'
+        case 'Pozitif (+)': return 'bg-emerald-50 text-emerald-700'
+        case 'Stabil': return 'bg-blue-50 text-blue-700'
+        case 'Negatif (-)': return 'bg-red-50 text-red-700'
         default: return 'bg-slate-50 text-slate-700'
     }
 }
 
-const getStatusLabel = (status: string) => {
-    switch(status) {
-        case 'In Progress': return 'Devam Ediyor'
-        case 'In Review': return 'İncelemede'
-        case 'Done': return 'Tamamlandı'
-        case 'Blocked': return 'Engellendi'
-        default: return status
-    }
-}
+const getStatusLabel = (status: string) => status
 
 const getPriorityColor = (priority: string) => {
     switch(priority) {
-        case 'High': return 'bg-orange-500'
-        case 'Critical': return 'bg-red-500'
-        case 'Medium': return 'bg-blue-500'
+        case 'High': return 'bg-red-500'
+        case 'Medium': return 'bg-amber-500'
+        case 'Low': return 'bg-emerald-500'
         default: return 'bg-slate-400'
     }
 }
 
 const getPriorityLabel = (priority: string) => {
     switch(priority) {
-        case 'High': return 'Yüksek'
-        case 'Critical': return 'Kritik'
-        case 'Medium': return 'Orta'
-        case 'Low': return 'Düşük'
+        case 'High': return 'Yüksek (Risk)'
+        case 'Medium': return 'Orta (Risk)'
+        case 'Low': return 'Düşük (Risk)'
         default: return priority
     }
 }

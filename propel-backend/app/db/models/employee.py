@@ -16,3 +16,11 @@ class Employee(BaseModel):
     department = relationship("Department", back_populates="employees")
     kpi_records = relationship("KPIRecord", back_populates="employee")
     survey_responses = relationship("SurveyResponse", back_populates="employee")
+
+    @property
+    def full_name(self) -> str:
+        return self.user.full_name if self.user else ""
+
+    @property
+    def department_name(self) -> str:
+        return self.department.name if self.department else ""

@@ -37,61 +37,23 @@ def create_users():
             role=UserRole.admin,
             is_active=True
         ),
-        # Department Managers
+        # Software Manager
         User(
             email="manager.yazilim@propel.com",
             hashed_password=get_password_hash("manager123"),
             full_name="Ahmet Yılmaz",
             role=UserRole.department_manager,
             is_active=True
-        ),
-        User(
-            email="manager.satis@propel.com",
-            hashed_password=get_password_hash("manager123"),
-            full_name="Ayşe Kaya",
-            role=UserRole.department_manager,
-            is_active=True
-        ),
-        User(
-            email="manager.pazarlama@propel.com",
-            hashed_password=get_password_hash("manager123"),
-            full_name="Mehmet Demir",
-            role=UserRole.department_manager,
-            is_active=True
-        ),
+        )
     ]
     
     # Employees (Yazılım Departmanı)
-    dev_names = [
-        "Canan Dağdelen", "Berkant Demir", "Elif Öztürk", "Murat Kaya", 
-        "Selin Yılmaz", "Caner Yıldız", "Zeynep Çelik", "Burak Şahin",
-        "Gamze Arslan", "Onur Polat"
-    ]
-    for i in range(1, 11):
+    dev_names = ["Canan Dağdelen", "Berkant Demir", "Elif Öztürk", "Murat Kaya", "Selin Yılmaz"]
+    for i in range(1, 6):
         users.append(User(
             email=f"developer{i}@propel.com",
             hashed_password=get_password_hash("dev123"),
             full_name=dev_names[i-1],
-            role=UserRole.employee,
-            is_active=True
-        ))
-    
-    # Employees (Satış Departmanı)
-    for i in range(1, 8):
-        users.append(User(
-            email=f"sales{i}@propel.com",
-            hashed_password=get_password_hash("sales123"),
-            full_name=f"Satış Temsilcisi {i}",
-            role=UserRole.employee,
-            is_active=True
-        ))
-    
-    # Employees (Pazarlama Departmanı)
-    for i in range(1, 6):
-        users.append(User(
-            email=f"marketing{i}@propel.com",
-            hashed_password=get_password_hash("marketing123"),
-            full_name=f"Pazarlama Uzmanı {i}",
             role=UserRole.employee,
             is_active=True
         ))
@@ -108,9 +70,7 @@ def create_departments():
     
     departments = [
         Department(name="Yazılım Geliştirme", description="Backend ve Frontend ekibi"),
-        Department(name="Satış", description="B2B ve B2C satış ekibi"),
-        Department(name="Pazarlama", description="Dijital pazarlama ve içerik ekibi"),
-        Department(name="İnsan Kaynakları", description="İK ve eğitim ekibi"),
+        Department(name="İnsan Kaynakları", description="İK ve yönetim ekibi"),
     ]
     
     db.add_all(departments)
@@ -124,68 +84,32 @@ def create_employees(users, departments):
     print("👥 Çalışanlar oluşturuluyor...")
     
     employees = []
-    hire_dates = [date(2023, 1, 15), date(2023, 6, 1), date(2024, 1, 10), date(2024, 6, 15)]
+    hire_dates = [date(2023, 1, 15), date(2023, 6, 1), date(2024, 1, 10)]
     
-    # Admin'i pas geç (index 0)
-    user_idx = 1  # users[0] admin, users[1] ilk manager
+    # Admin (index 0)
+    employees.append(Employee(
+        user_id=users[0].id,
+        department_id=departments[1].id, # İK
+        position="Genel Müdür",
+        hire_date=hire_dates[0]
+    ))
     
     # Yazılım Manager (users[1])
     employees.append(Employee(
-        user_id=users[user_idx].id,
+        user_id=users[1].id,
         department_id=departments[0].id,
         position="Yazılım Müdürü",
         hire_date=hire_dates[0]
     ))
-    user_idx += 1
     
-    # Yazılım Developers (10)
-    positions = ["Junior Developer", "Mid-Level Developer", "Senior Developer", "Lead Developer"]
-    for i in range(10):
+    # Yazılım Developers (5)
+    for i in range(2, 7):
         employees.append(Employee(
-            user_id=users[user_idx].id,
+            user_id=users[i].id,
             department_id=departments[0].id,
-            position=random.choice(positions),
+            position="Yazılım Geliştirici",
             hire_date=random.choice(hire_dates)
         ))
-        user_idx += 1
-    
-    # Satış Manager
-    employees.append(Employee(
-        user_id=users[user_idx].id,
-        department_id=departments[1].id,
-        position="Satış Müdürü",
-        hire_date=hire_dates[0]
-    ))
-    user_idx += 1
-    
-    # Satış Employees (7)
-    for i in range(7):
-        employees.append(Employee(
-            user_id=users[user_idx].id,
-            department_id=departments[1].id,
-            position="Satış Temsilcisi",
-            hire_date=random.choice(hire_dates)
-        ))
-        user_idx += 1
-    
-    # Pazarlama Manager
-    employees.append(Employee(
-        user_id=users[user_idx].id,
-        department_id=departments[2].id,
-        position="Pazarlama Müdürü",
-        hire_date=hire_dates[0]
-    ))
-    user_idx += 1
-    
-    # Pazarlama Employees (5)
-    for i in range(5):
-        employees.append(Employee(
-            user_id=users[user_idx].id,
-            department_id=departments[2].id,
-            position="Pazarlama Uzmanı",
-            hire_date=random.choice(hire_dates)
-        ))
-        user_idx += 1
     
     db.add_all(employees)
     db.commit()
@@ -222,38 +146,6 @@ def create_kpis(departments):
             unit=KPIUnit.percentage,
             department_id=dept_map["Yazılım Geliştirme"],
             target_value=90
-        ),
-        
-        # Satış KPI'ları
-        KPI(
-            name="Satış Hacmi",
-            description="Aylık satış cirosu",
-            unit=KPIUnit.currency,
-            department_id=dept_map["Satış"],
-            target_value=100000
-        ),
-        KPI(
-            name="Yeni Müşteri Sayısı",
-            description="Aylık kazanılan müşteri",
-            unit=KPIUnit.numeric,
-            department_id=dept_map["Satış"],
-            target_value=20
-        ),
-        
-        # Pazarlama KPI'ları
-        KPI(
-            name="Lead Sayısı",
-            description="Aylık potansiyel müşteri",
-            unit=KPIUnit.numeric,
-            department_id=dept_map["Pazarlama"],
-            target_value=500
-        ),
-        KPI(
-            name="Conversion Rate",
-            description="Lead'den müşteriye dönüşüm oranı",
-            unit=KPIUnit.percentage,
-            department_id=dept_map["Pazarlama"],
-            target_value=15
         ),
         
         # Genel KPI (tüm şirket)
@@ -309,36 +201,6 @@ def create_kpi_records(employees, kpi_map, dept_map):
                     kpi_id=kpi_map["Code Review Skoru"],
                     employee_id=employee.id,
                     value=random.randint(70, 100),
-                    period_date=period_date
-                ))
-            
-            # Satış departmanı
-            elif employee.department_id == dept_map["Satış"]:
-                records.append(KPIRecord(
-                    kpi_id=kpi_map["Satış Hacmi"],
-                    employee_id=employee.id,
-                    value=random.randint(50000, 150000),
-                    period_date=period_date
-                ))
-                records.append(KPIRecord(
-                    kpi_id=kpi_map["Yeni Müşteri Sayısı"],
-                    employee_id=employee.id,
-                    value=random.randint(10, 30),
-                    period_date=period_date
-                ))
-            
-            # Pazarlama departmanı
-            elif employee.department_id == dept_map["Pazarlama"]:
-                records.append(KPIRecord(
-                    kpi_id=kpi_map["Lead Sayısı"],
-                    employee_id=employee.id,
-                    value=random.randint(300, 700),
-                    period_date=period_date
-                ))
-                records.append(KPIRecord(
-                    kpi_id=kpi_map["Conversion Rate"],
-                    employee_id=employee.id,
-                    value=random.randint(5, 25),
                     period_date=period_date
                 ))
             

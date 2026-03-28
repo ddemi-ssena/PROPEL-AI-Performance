@@ -103,38 +103,32 @@
     <!-- Creative Features Row: Pulse & Peer Praise -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <!-- Weekly Pulse Feedback (Clean UI) -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-lg hover:border-indigo-100 transition-all duration-300">
-            <div class="flex items-center justify-between mb-6">
+        <div class="bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-indigo-100 p-6 shadow-sm hover:shadow-lg hover:border-indigo-200 transition-all duration-300 relative overflow-hidden group">
+            <!-- Decorative circle -->
+            <div class="absolute -right-6 -top-6 w-24 h-24 bg-rose-50 rounded-full blur-2xl group-hover:bg-rose-100 transition-colors"></div>
+            
+            <div class="flex items-center justify-between mb-4 relative z-10">
                  <div>
-                    <h3 class="font-bold text-slate-800 flex items-center gap-2 text-lg">
-                        <HeartIcon class="w-6 h-6 text-rose-500" />
+                    <h3 class="font-bold text-indigo-900 flex items-center gap-2 text-lg">
+                        <HeartIcon class="w-6 h-6 text-rose-500 animate-pulse" />
                         Haftalık Nabız
                     </h3>
-                    <p class="text-sm text-slate-500 mt-1">Bu hafta projede nasıl hissediyorsun?</p>
+                    <p class="text-sm text-indigo-700/70 mt-1 font-medium">Motivasyon Skoru (MS) & Trend Eğimi Analizi</p>
                  </div>
-                 <span class="text-[10px] uppercase font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded border border-slate-200">Anonim</span>
+                 <span class="text-[10px] uppercase font-bold bg-white text-indigo-500 px-2 py-1 rounded shadow-sm border border-indigo-50">KUTUP YZ</span>
             </div>
             
-            <div class="grid grid-cols-4 gap-4">
-                <button class="group flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-slate-50 bg-slate-50/50 hover:border-rose-200 hover:bg-rose-50 transition-all active:scale-95">
-                    <span class="text-3xl mb-2 grayscale group-hover:grayscale-0 transition-all filter">😫</span>
-                    <span class="text-[10px] font-bold text-slate-400 group-hover:text-rose-600">Stresli</span>
-                </button>
-                <button class="group flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-slate-50 bg-slate-50/50 hover:border-amber-200 hover:bg-amber-50 transition-all active:scale-95">
-                    <span class="text-3xl mb-2 grayscale group-hover:grayscale-0 transition-all filter">😐</span>
-                    <span class="text-[10px] font-bold text-slate-400 group-hover:text-amber-600">Normal</span>
-                </button>
-                <button class="group flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-slate-50 bg-slate-50/50 hover:border-emerald-200 hover:bg-emerald-50 transition-all active:scale-95">
-                    <span class="text-3xl mb-2 grayscale group-hover:grayscale-0 transition-all filter">🙂</span>
-                    <span class="text-[10px] font-bold text-slate-400 group-hover:text-emerald-600">İyi</span>
-                </button>
-                <button class="group flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-indigo-100 bg-indigo-50 hover:bg-indigo-100 transition-all active:scale-95 shadow-sm">
-                    <span class="text-3xl mb-2">🤩</span>
-                    <span class="text-[10px] font-bold text-indigo-700">Harika</span>
-                </button>
+            <div class="relative z-10 bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-white mb-5 shadow-[inset_0_1px_0_rgba(255,255,255,1)]">
+                <p class="text-sm text-slate-600 leading-relaxed font-medium">Bu haftaki genel motivasyonunuzu, iş yükü dengenizi ve takımla işbirliğinizi dürüstçe değerlendirin. Yanıtlarınız kişisel gelişiminize katkı sağlayacaktır.</p>
+                <div class="flex items-center gap-2 mt-3 text-xs font-bold text-slate-400">
+                    <ClockIcon class="w-4 h-4" />
+                    <span>Ortalama süre: ~60 saniye</span>
+                </div>
             </div>
-            <div class="mt-6">
-                <textarea placeholder="Eklemek istediğin bir not var mı? (İsteğe bağlı)" class="w-full text-sm p-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-indigo-500/50 text-slate-700 placeholder-slate-400 transition-shadow"></textarea>
+
+            <div class="relative z-10 w-full flex items-center justify-center gap-2 py-3.5 bg-indigo-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-indigo-200 cursor-default opacity-80 border border-indigo-400/50">
+                <span>Ankete Yukarıda "Nabız Anketi" Butonundan Katılın</span>
+                <ArrowRightIcon class="w-4 h-4" />
             </div>
         </div>
 
@@ -208,10 +202,13 @@ import {
     CheckCircleIcon, 
     SparklesIcon,
     HeartIcon,
-    StarIcon
+    StarIcon,
+    ClockIcon,
+    ArrowRightIcon
 } from '@heroicons/vue/24/outline'
 import StatCard from '@/components/dashboard/StatCard.vue'
 import LineChart from '@/components/dashboard/LineChart.vue'
 import { useAuthStore } from '@/stores/auth'
+
 const userStore = useAuthStore()
 </script>

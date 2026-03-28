@@ -50,7 +50,13 @@ const router = createRouter({
           name: 'admin-ai-insights',
           component: () => import('@/views/admin/AIInsights.vue'),
           meta: { title: 'Yapay Zeka İçgörüleri' }
-        }
+        },
+        {
+          path: 'survey-results',
+          name: 'admin-survey-results',
+          component: () => import('@/views/shared/SurveyResults.vue'),
+          meta: { title: 'Anket Sonuçları' }
+        },
       ]
     },
     // Manager Routes
@@ -69,6 +75,18 @@ const router = createRouter({
           name: 'manager-team',
           component: () => import('@/views/manager/TeamManagement.vue'),
           meta: { title: 'Ekibim' }
+        },
+        {
+          path: 'ai-insights',
+          name: 'manager-ai-insights',
+          component: () => import('@/views/admin/AIInsights.vue'),
+          meta: { title: 'Yapay Zeka İçgörüleri' }
+        },
+        {
+          path: 'survey-results',
+          name: 'manager-survey-results',
+          component: () => import('@/views/shared/SurveyResults.vue'),
+          meta: { title: 'Anket Sonuçları' }
         }
       ]
     },
@@ -126,7 +144,11 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    next('/dashboard')
+    const role = authStore.userRole
+    if (role === 'admin') next('/admin')
+    else if (role === 'department_manager') next('/manager')
+    else if (role === 'employee') next('/employee')
+    else next('/dashboard')
   } else {
     next()
   }

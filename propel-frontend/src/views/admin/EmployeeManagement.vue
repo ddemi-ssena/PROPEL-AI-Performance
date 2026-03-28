@@ -122,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   UserPlusIcon, 
@@ -130,82 +130,37 @@ import {
   ArrowsUpDownIcon, 
   EllipsisHorizontalIcon 
 } from '@heroicons/vue/24/outline'
+import { employeeApi } from '@/services/api/employee.api'
 
 const router = useRouter()
 
-// Mock data based on seed_data.py
-const employees = ref([
-  { 
-    id: 1, 
-    name: 'Ahmet Yılmaz', 
-    email: 'manager.yazilim@propel.com', 
-    department: 'Yazılım Geliştirme', 
-    role: 'Yazılım Müdürü', 
-    score: 92, 
-    risk: 'Low',
-    avatar: 'https://ui-avatars.com/api/?name=Ahmet+Yilmaz&background=0284c7&color=fff' 
-  },
-  { 
-    id: 2, 
-    name: 'Canan Dağdelen', 
-    email: 'developer1@propel.com', 
-    department: 'Yazılım Geliştirme', 
-    role: 'Senior Developer', 
-    score: 88, 
-    risk: 'Medium',
-    avatar: 'https://ui-avatars.com/api/?name=Canan+Dagdelen&background=e11d48&color=fff' 
-  },
-  { 
-    id: 3, 
-    name: 'Berkant Demir', 
-    email: 'developer2@propel.com', 
-    department: 'Yazılım Geliştirme', 
-    role: 'Mid-Level Developer', 
-    score: 76, 
-    risk: 'Medium',
-    avatar: 'https://ui-avatars.com/api/?name=Berkant+Demir&background=059669&color=fff' 
-  },
-  { 
-    id: 4, 
-    name: 'Ayşe Kaya', 
-    email: 'manager.satis@propel.com', 
-    department: 'Satış', 
-    role: 'Satış Müdürü', 
-    score: 95, 
-    risk: 'Low',
-    avatar: 'https://ui-avatars.com/api/?name=Ayse+Kaya&background=7c3aed&color=fff' 
-  },
-  { 
-    id: 5, 
-    name: 'Mehmet Demir', 
-    email: 'manager.pazarlama@propel.com', 
-    department: 'Pazarlama', 
-    role: 'Pazarlama Müdürü', 
-    score: 82, 
-    risk: 'Low',
-    avatar: 'https://ui-avatars.com/api/?name=Mehmet+Demir&background=d97706&color=fff' 
-  },
-  { 
-    id: 6, 
-    name: 'Elif Öztürk', 
-    email: 'developer3@propel.com', 
-    department: 'Yazılım Geliştirme', 
-    role: 'Junior Developer', 
-    score: 65, 
-    risk: 'High',
-    avatar: 'https://ui-avatars.com/api/?name=Elif+Ozturk&background=db2777&color=fff' 
-  },
-  { 
-    id: 7, 
-    name: 'Murat Kaya', 
-    email: 'developer4@propel.com', 
-    department: 'Yazılım Geliştirme', 
-    role: 'Senior Developer', 
-    score: 94, 
-    risk: 'Low',
-    avatar: 'https://ui-avatars.com/api/?name=Murat+Kaya&background=2563eb&color=fff' 
-  }
-])
+const employees = ref<any[]>([])
+const isLoading = ref(true)
+
+const fetchEmployees = async () => {
+    isLoading.value = true
+    try {
+        const data = await employeeApi.getEmployees()
+        employees.value = data.map((emp: any) => ({
+            id: emp.id,
+            name: emp.user.full_name,
+            email: emp.user.email,
+            department: emp.department.name,
+            role: emp.position || emp.user.role,
+            score: emp.latest_ms ? Math.round(emp.latest_ms * 20) : 0, // Convert 5 point scale to 100%
+            risk: emp.risk_level || 'Low',
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.user.full_name)}&background=0284c7&color=fff`
+        }))
+    } catch(e) {
+        console.error("Failed to load employees for management", e)
+    } finally {
+        isLoading.value = false
+    }
+}
+
+onMounted(() => {
+    fetchEmployees()
+})
 
 const searchQuery = ref('')
 const selectedDepartment = ref('')
