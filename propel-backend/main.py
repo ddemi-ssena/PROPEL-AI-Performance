@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.db.session import engine
 from app.db.models import Base
-from app.api.routers import auth, departments,  employees, kpis, survey_responses
+from app.api.routers import auth, departments, employees, kpis, survey_responses, admin_uploads
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,7 +27,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # Vue.js'in çalışacağı adres
+    allow_origins=["http://localhost:5173", "http://localhost:5174"], # Vue.js'in çalışacağı adresler
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,6 +39,7 @@ app.include_router(departments.router, prefix=settings.API_V1_STR + "/department
 app.include_router(employees.router, prefix=settings.API_V1_STR + "/employees", tags=["Employees"])
 app.include_router(kpis.router, prefix=settings.API_V1_STR + "/kpis", tags=["KPIs"])  
 app.include_router(survey_responses.router, prefix=settings.API_V1_STR + "/surveys", tags=["Survey Responses"])
+app.include_router(admin_uploads.router, prefix=settings.API_V1_STR + "/admin/uploads", tags=["Admin Uploads"])
 
 @app.get("/")
 def read_root():
