@@ -5,13 +5,15 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.db.session import engine
 from app.db.models import Base
-from app.api.routers import auth, departments,  employees, kpis, survey_responses
+from app.db.vector_support import ensure_pgvector_support
+from app.api.routers import auth, departments,  employees, kpis, survey_responses, feedback, feedbacks
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     print("Starting API... Creating tables...")
     Base.metadata.create_all(bind=engine)
+    ensure_pgvector_support(engine)
 
     yield  # <--- Uygulama bu noktadan sonra çalışmaya devam eder
 
@@ -39,6 +41,16 @@ app.include_router(departments.router, prefix=settings.API_V1_STR + "/department
 app.include_router(employees.router, prefix=settings.API_V1_STR + "/employees", tags=["Employees"])
 app.include_router(kpis.router, prefix=settings.API_V1_STR + "/kpis", tags=["KPIs"])  
 app.include_router(survey_responses.router, prefix=settings.API_V1_STR + "/surveys", tags=["Survey Responses"])
+app.include_router(
+    feedback.router,
+    prefix=settings.API_V1_STR + "/feedback",
+    tags=["360° Feedback"]
+)
+app.include_router(
+    feedbacks.router,
+    prefix=settings.API_V1_STR + "/feedbacks",
+    tags=["Dynamic Weekly Pulse"]
+)
 
 @app.get("/")
 def read_root():

@@ -1,15 +1,8 @@
-# Python 3.10 kullanıyoruz (ML kütüphaneleri için stabil)
-FROM python:3.10-slim
+# Python 3.10 (stabil Debian tabani)
+FROM python:3.10-slim-bookworm
 
 # Çalışma dizini
 WORKDIR /app
-
-# Sistem bağımlılıklarını yükle (Postgres derleme araçları gerekebilir)
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
 
 # Gereksinimleri kopyala ve yükle
 COPY requirements.txt .

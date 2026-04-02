@@ -20,6 +20,18 @@ class Settings(BaseSettings):
 
     DEBUG: bool = False
 
+    # AI (Ollama / Gemini)
+    USE_LOCAL_LLM: bool = True
+    OLLAMA_URL: Optional[str] = None
+    OLLAMA_MODEL: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: Optional[str] = None
+    EMBEDDING_PROVIDER: str = "hash"
+    GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
+    EMBEDDING_DIMENSION: int = 128
+    ENABLE_PGVECTOR: bool = True
+    PGVECTOR_INDEX_LISTS: int = 100
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": True,

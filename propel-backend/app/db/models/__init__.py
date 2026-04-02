@@ -5,6 +5,15 @@ from .department import Department
 from .employee import Employee
 from .kpi import KPI, KPIRecord, KPIUnit
 from .survey_response import SurveyResponse
+from .feedback import (
+    Feedback, FeedbackRequest, EmployeeBadge, FeedbackType, FeedbackStatus, BadgeType, BadgeLevel,
+    FeedbackQuestion, FeedbackResponse, FeedbackDirection, FeedbackAssignment, FeedbackAssignmentType, FeedbackAssignmentStatus
+)
+from .nlp import (
+    FeedbackNLPAnalysis, EmployeeNLPProfile, NLPSourceType, RiskLevel, SentimentLabel, NLPPeriodType
+)
+from .rag import FeedbackMemoryChunk, FeedbackMemorySourceType
+
 
 __all__ = [
     "Base",
@@ -17,4 +26,8 @@ __all__ = [
     "KPIRecord",
     "KPIUnit",
     "SurveyResponse",
+    "Feedback", "FeedbackRequest", "EmployeeBadge", "FeedbackType", "FeedbackStatus", "BadgeType", "BadgeLevel",
+    "FeedbackQuestion", "FeedbackResponse", "FeedbackDirection", "FeedbackAssignment", "FeedbackAssignmentType", "FeedbackAssignmentStatus",
+    "FeedbackNLPAnalysis", "EmployeeNLPProfile", "NLPSourceType", "RiskLevel", "SentimentLabel", "NLPPeriodType",
+    "FeedbackMemoryChunk", "FeedbackMemorySourceType",
 ]

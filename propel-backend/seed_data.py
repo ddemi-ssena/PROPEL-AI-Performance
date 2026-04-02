@@ -7,6 +7,7 @@ from app.db.models.department import Department
 from app.db.models.employee import Employee
 from app.db.models.kpi import KPI, KPIRecord, KPIUnit
 from app.db.models.survey_response import SurveyResponse
+from app.db.models.feedback import FeedbackQuestion, FeedbackDirection, FeedbackResponse
 from app.core.security import get_password_hash
 
 db = SessionLocal()
@@ -16,6 +17,8 @@ def clear_all_data():
     print("🗑️  Mevcut veriler temizleniyor...")
     # Sıralamaya dikkat: önce ilişkili (child) tablolar, sonra parent tablolar
     db.query(SurveyResponse).delete()
+    db.query(FeedbackResponse).delete()
+    db.query(FeedbackQuestion).delete()
     db.query(KPIRecord).delete()
     db.query(KPI).delete()
     db.query(Employee).delete()
@@ -122,74 +125,59 @@ def create_departments():
 def create_employees(users, departments):
     """Çalışanlar oluştur"""
     print("👥 Çalışanlar oluşturuluyor...")
-    
+
     employees = []
     hire_dates = [date(2023, 1, 15), date(2023, 6, 1), date(2024, 1, 10), date(2024, 6, 15)]
-    
-    # Admin'i pas geç (index 0)
-    user_idx = 1  # users[0] admin, users[1] ilk manager
-    
-    # Yazılım Manager (users[1])
+    dept_map = {d.name: d.id for d in departments}
+    user_map = {u.email: u for u in users}
+
     employees.append(Employee(
-        user_id=users[user_idx].id,
-        department_id=departments[0].id,
+        user_id=user_map["manager.yazilim@propel.com"].id,
+        department_id=dept_map["Yazılım Geliştirme"],
         position="Yazılım Müdürü",
         hire_date=hire_dates[0]
     ))
-    user_idx += 1
-    
-    # Yazılım Developers (10)
-    positions = ["Junior Developer", "Mid-Level Developer", "Senior Developer", "Lead Developer"]
-    for i in range(10):
-        employees.append(Employee(
-            user_id=users[user_idx].id,
-            department_id=departments[0].id,
-            position=random.choice(positions),
-            hire_date=random.choice(hire_dates)
-        ))
-        user_idx += 1
-    
-    # Satış Manager
     employees.append(Employee(
-        user_id=users[user_idx].id,
-        department_id=departments[1].id,
+        user_id=user_map["manager.satis@propel.com"].id,
+        department_id=dept_map["Satış"],
         position="Satış Müdürü",
         hire_date=hire_dates[0]
     ))
-    user_idx += 1
-    
-    # Satış Employees (7)
-    for i in range(7):
-        employees.append(Employee(
-            user_id=users[user_idx].id,
-            department_id=departments[1].id,
-            position="Satış Temsilcisi",
-            hire_date=random.choice(hire_dates)
-        ))
-        user_idx += 1
-    
-    # Pazarlama Manager
     employees.append(Employee(
-        user_id=users[user_idx].id,
-        department_id=departments[2].id,
+        user_id=user_map["manager.pazarlama@propel.com"].id,
+        department_id=dept_map["Pazarlama"],
         position="Pazarlama Müdürü",
         hire_date=hire_dates[0]
     ))
-    user_idx += 1
-    
-    # Pazarlama Employees (5)
-    for i in range(5):
+
+    positions = ["Junior Developer", "Mid-Level Developer", "Senior Developer", "Lead Developer"]
+    for i in range(1, 11):
         employees.append(Employee(
-            user_id=users[user_idx].id,
-            department_id=departments[2].id,
+            user_id=user_map[f"developer{i}@propel.com"].id,
+            department_id=dept_map["Yazılım Geliştirme"],
+            position=random.choice(positions),
+            hire_date=random.choice(hire_dates)
+        ))
+
+    for i in range(1, 8):
+        employees.append(Employee(
+            user_id=user_map[f"sales{i}@propel.com"].id,
+            department_id=dept_map["Satış"],
+            position="Satış Temsilcisi",
+            hire_date=random.choice(hire_dates)
+        ))
+
+    for i in range(1, 6):
+        employees.append(Employee(
+            user_id=user_map[f"marketing{i}@propel.com"].id,
+            department_id=dept_map["Pazarlama"],
             position="Pazarlama Uzmanı",
             hire_date=random.choice(hire_dates)
         ))
-        user_idx += 1
-    
+
     db.add_all(employees)
     db.commit()
-    
+
     print(f"✅ {len(employees)} çalışan oluşturuldu!")
     return employees
 
@@ -386,6 +374,99 @@ def create_survey_responses(employees):
     print(f"✅ {len(responses)} anket cevabı oluşturuldu!")
     return responses
 
+
+def create_feedback_questions(departments):
+    """Haftalık dinamik feedback soruları oluştur"""
+    print("💬 Haftalık feedback soruları oluşturuluyor...")
+
+    dept_map = {d.name: d.id for d in departments}
+    yazilim_dept_id = dept_map.get("Yazılım Geliştirme")
+
+    questions = [
+        # Genel sorular
+        FeedbackQuestion(
+            week_number=1,
+            direction=FeedbackDirection.peer_to_peer,
+            question_text="Bu hafta teknik olarak en cok hangi blokajla karsilasti ve nasil cozmeye calisti?",
+            category="Teknik/Blokajlar",
+            department_id=None
+        ),
+        FeedbackQuestion(
+            week_number=2,
+            direction=FeedbackDirection.peer_to_peer,
+            question_text="Bu hafta motivasyonunu artiran veya dusuren ana etken neydi?",
+            category="Motivasyon",
+            department_id=None
+        ),
+        FeedbackQuestion(
+            week_number=3,
+            direction=FeedbackDirection.peer_to_peer,
+            question_text="Takim ici iletisimde bu hafta en guclu oldugu alan neydi?",
+            category="Iletisim",
+            department_id=None
+        ),
+        FeedbackQuestion(
+            week_number=4,
+            direction=FeedbackDirection.peer_to_peer,
+            question_text="Bu ay hangi gelisim alaninda en somut ilerlemeyi gosterdi?",
+            category="Gelisim",
+            department_id=None
+        ),
+    ]
+
+    if yazilim_dept_id:
+        questions.extend([
+            FeedbackQuestion(
+                week_number=1,
+                direction=FeedbackDirection.peer_to_peer,
+                question_text="Bu hafta kod review surecinde sundugu oneriler nasildi?",
+                category="Teknik/Blokajlar",
+                department_id=yazilim_dept_id
+            ),
+            FeedbackQuestion(
+                week_number=4,
+                direction=FeedbackDirection.peer_to_peer,
+                question_text="Kullandigimiz yeni framework adaptasyonunda ne kadar ilerledi?",
+                category="Gelisim",
+                department_id=yazilim_dept_id
+            ),
+            # Yöneticiden çalışana (manager_to_employee) — yazılım odaklı
+            FeedbackQuestion(
+                week_number=1,
+                direction=FeedbackDirection.manager_to_employee,
+                question_text="Bu hafta sprint planina gore teslimatlar ve riskler konusunda ne kadar proaktifti?",
+                category="Teknik/Blokajlar",
+                department_id=yazilim_dept_id
+            ),
+            FeedbackQuestion(
+                week_number=3,
+                direction=FeedbackDirection.manager_to_employee,
+                question_text="Bu hafta stakeholder ve ekip ici iletisimde hangi davranisi en faydaliydi?",
+                category="Iletisim",
+                department_id=yazilim_dept_id
+            ),
+            # Çalışandan yöneticiye (employee_to_manager) — yazılım odaklı
+            FeedbackQuestion(
+                week_number=2,
+                direction=FeedbackDirection.employee_to_manager,
+                question_text="Bu hafta yonetici, blokajlari kaldirmada ve onceliklendirmede ne kadar destekleyiciydi?",
+                category="Motivasyon",
+                department_id=yazilim_dept_id
+            ),
+            FeedbackQuestion(
+                week_number=4,
+                direction=FeedbackDirection.employee_to_manager,
+                question_text="Bu ay yonetici, teknik gelisimi (mentorluk, code review kulturü, egitim) ne kadar destekledi?",
+                category="Gelisim",
+                department_id=yazilim_dept_id
+            ),
+        ])
+
+    db.add_all(questions)
+    db.commit()
+    print(f"✅ {len(questions)} haftalık soru oluşturuldu!")
+    return questions
+
 def main():
     print("🚀 Seed data başlatılıyor...\n")
     
@@ -396,6 +477,7 @@ def main():
     kpis, kpi_map, dept_map = create_kpis(departments)
     kpi_records = create_kpi_records(employees, kpi_map, dept_map)
     survey_responses = create_survey_responses(employees)
+    feedback_questions = create_feedback_questions(departments)
     
     print("\n✅ Seed data tamamlandı!")
     print(f"""
@@ -406,6 +488,7 @@ def main():
 - {len(kpis)} KPI tanımı
 - {len(kpi_records)} KPI kaydı
 - {len(survey_responses)} anket cevabı
+- {len(feedback_questions)} haftalık feedback sorusu
     """)
     
     print("🔐 Test Kullanıcıları:")
