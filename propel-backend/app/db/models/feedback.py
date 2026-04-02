@@ -1,8 +1,9 @@
 # propel-backend/app/db/models/feedback.py
 # 360° Geri Bildirim Modülü — Veritabanı Modelleri
 
-from sqlalchemy import Column, String, Text, Float, Integer, Date, Boolean, ForeignKey, Enum as SQLEnum, JSON
+from sqlalchemy import Column, String, Text, Float, Integer, Date, Boolean, ForeignKey, Enum as SQLEnum, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import JSONB
 import enum
 from ..base_class import BaseModel
 
@@ -95,6 +96,7 @@ class Feedback(BaseModel):
     reviewer    = relationship("Employee", foreign_keys=[reviewer_id],  back_populates="given_feedbacks")
     reviewee    = relationship("Employee", foreign_keys=[reviewee_id],  back_populates="received_feedbacks")
     request     = relationship("FeedbackRequest", back_populates="feedback")
+    nlp_record  = relationship("FeedbackNLPAnalysis", back_populates="classic_feedback", uselist=False)
 
 
 # ──────────────────────────────────────────────
@@ -144,3 +146,87 @@ class EmployeeBadge(BaseModel):
 
     # İlişkiler
     employee = relationship("Employee", back_populates="badges")
+
+
+# ──────────────────────────────────────────────
+# DİNAMİK HAFTALIK NABIZ MODELLERİ
+# ──────────────────────────────────────────────
+
+class FeedbackDirection(str, enum.Enum):
+    manager_to_employee = "manager_to_employee"
+    employee_to_manager = "employee_to_manager"
+    peer_to_peer = "peer_to_peer"
+    manager_to_manager = "manager_to_manager"
+    employee_to_employee = "employee_to_employee"
+
+
+class FeedbackAssignmentType(str, enum.Enum):
+    mandatory_random = "mandatory_random"
+
+
+class FeedbackAssignmentStatus(str, enum.Enum):
+    pending = "pending"
+    completed = "completed"
+    expired = "expired"
+
+
+class FeedbackQuestion(BaseModel):
+    __tablename__ = "feedback_questions"
+
+    week_number = Column(Integer, nullable=False)  # 1..4
+    direction = Column(SQLEnum(FeedbackDirection), nullable=False)
+    question_text = Column(Text, nullable=False)
+    category = Column(String(100), nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    is_ai_generated = Column(Boolean, nullable=False, default=False)
+
+
+class FeedbackAssignment(BaseModel):
+    __tablename__ = "feedback_assignments"
+
+    sender_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    target_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    assignment_type = Column(SQLEnum(FeedbackAssignmentType), nullable=False, default=FeedbackAssignmentType.mandatory_random)
+    status = Column(SQLEnum(FeedbackAssignmentStatus), nullable=False, default=FeedbackAssignmentStatus.pending)
+    period_week = Column(Integer, nullable=False)
+    period_month = Column(Integer, nullable=False)
+    period_year = Column(Integer, nullable=False)
+    completed_feedback_response_id = Column(Integer, ForeignKey("feedback_responses.id"), nullable=True)
+
+    sender = relationship("Employee", foreign_keys=[sender_id])
+    target = relationship("Employee", foreign_keys=[target_id])
+    completed_feedback_response = relationship("FeedbackResponse", foreign_keys=[completed_feedback_response_id])
+
+    __table_args__ = (
+        UniqueConstraint(
+            "sender_id",
+            "assignment_type",
+            "period_week",
+            "period_month",
+            "period_year",
+            name="uq_feedback_assignment_sender_period_type",
+        ),
+    )
+
+
+class FeedbackResponse(BaseModel):
+    __tablename__ = "feedback_responses"
+
+    sender_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    receiver_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("feedback_questions.id"), nullable=False)
+    response_text = Column(Text, nullable=False)
+    score_communication = Column(Integer, nullable=False)
+    score_teamwork = Column(Integer, nullable=False)
+    score_leadership = Column(Integer, nullable=False)
+    score_technical = Column(Integer, nullable=False)
+    period_week = Column(Integer, nullable=False)
+    period_month = Column(Integer, nullable=False)
+    period_year = Column(Integer, nullable=False)
+    # PostgreSQL'de JSONB, diğer veritabanlarında JSON olarak saklanır.
+    nlp_analysis = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+
+    sender = relationship("Employee", foreign_keys=[sender_id])
+    receiver = relationship("Employee", foreign_keys=[receiver_id])
+    question = relationship("FeedbackQuestion")
+    nlp_record = relationship("FeedbackNLPAnalysis", back_populates="weekly_feedback", uselist=False)

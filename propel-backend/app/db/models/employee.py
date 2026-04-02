@@ -23,3 +23,5 @@ class Employee(BaseModel):
     sent_requests      = relationship("FeedbackRequest", foreign_keys="FeedbackRequest.requester_id", back_populates="requester")
     received_requests  = relationship("FeedbackRequest", foreign_keys="FeedbackRequest.target_id",    back_populates="target")
     badges             = relationship("EmployeeBadge", back_populates="employee")
+    nlp_analyses       = relationship("FeedbackNLPAnalysis", foreign_keys="FeedbackNLPAnalysis.employee_id", back_populates="employee")
+    nlp_profiles       = relationship("EmployeeNLPProfile", back_populates="employee")

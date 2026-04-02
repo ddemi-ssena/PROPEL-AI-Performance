@@ -1,41 +1,109 @@
 <template>
   <div class="min-h-screen bg-gray-50 flex font-sans text-slate-800">
-    <!-- Sidebar -->
     <aside class="w-72 bg-slate-900 border-r border-slate-800 hidden md:flex flex-col shadow-xl z-20">
       <div class="p-6 border-b border-slate-800 flex items-center gap-3">
         <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <span class="text-white font-bold text-lg">P</span>
+          <span class="text-white font-bold text-lg">K</span>
         </div>
         <div>
-            <h1 class="text-xl font-bold text-white tracking-tight">
-            TeamPulse
-            </h1>
-            <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Enterprise</p>
+          <h1 class="text-xl font-bold text-white tracking-tight">KUTUP</h1>
+          <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Enterprise</p>
         </div>
       </div>
 
       <nav class="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
         <div class="mb-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Menu
+          Menu
         </div>
         <template v-for="item in navigation" :key="item.name">
+          <button
+            v-if="item.type === 'group'"
+            type="button"
+            class="w-full"
+            @click="toggleGroup(item.name)"
+          >
+            <div
+              class="flex items-center justify-between gap-3 px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 group"
+              :class="isGroupActive(item) ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'"
+            >
+              <div class="flex items-center gap-3">
+                <component
+                  :is="item.icon"
+                  class="w-5 h-5 flex-shrink-0 transition-colors"
+                  :class="isGroupActive(item) ? 'text-white' : 'text-slate-500 group-hover:text-white'"
+                />
+                {{ item.name }}
+              </div>
+              <component
+                :is="isGroupOpen(item.name) ? ChevronDownIcon : ChevronRightIcon"
+                class="w-4 h-4 flex-shrink-0"
+              />
+            </div>
+          </button>
+          <div
+            v-else-if="item.type === 'section'"
+            class="px-3 pt-4 pb-2 text-[11px] font-semibold text-slate-500 uppercase tracking-[0.18em]"
+          >
+            {{ item.name }}
+          </div>
           <router-link
-            v-if="!item.role || item.role === userRole"
+            v-else-if="item.type !== 'group'"
             :to="item.to"
             class="flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 group"
             :class="[
-              $route.path === item.to
+              isActiveRoute(item.to)
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white',
+              item.indent ? 'ml-4 pl-4 text-[13px]' : ''
             ]"
           >
-            <component 
-                :is="item.icon" 
-                class="w-5 h-5 flex-shrink-0 transition-colors"
-                :class="$route.path === item.to ? 'text-white' : 'text-slate-500 group-hover:text-white'"
+            <component
+              :is="item.icon"
+              class="w-5 h-5 flex-shrink-0 transition-colors"
+              :class="isActiveRoute(item.to) ? 'text-white' : 'text-slate-500 group-hover:text-white'"
             />
             {{ item.name }}
           </router-link>
+
+          <transition
+            enter-active-class="transition-all duration-200 ease-out"
+            enter-from-class="opacity-0 -translate-y-1 max-h-0"
+            enter-to-class="opacity-100 translate-y-0 max-h-96"
+            leave-active-class="transition-all duration-150 ease-in"
+            leave-from-class="opacity-100 translate-y-0 max-h-96"
+            leave-to-class="opacity-0 -translate-y-1 max-h-0"
+          >
+            <div v-if="item.type === 'group' && isGroupOpen(item.name)" class="relative mt-1 space-y-1 overflow-hidden">
+              <div class="absolute left-6 top-2 bottom-2 w-px bg-slate-800"></div>
+            <template v-for="child in item.children" :key="`${item.name}-${child.name}`">
+              <div
+                v-if="child.type === 'section'"
+                class="ml-7 px-3 pt-3 pb-1 text-[11px] font-semibold text-slate-500 uppercase tracking-[0.18em]"
+              >
+                {{ child.name }}
+              </div>
+              <router-link
+                v-else
+                :to="child.to"
+                class="relative ml-7 flex items-center gap-3 px-3 py-3 text-[13px] font-medium rounded-lg transition-all duration-200 group"
+                :class="isActiveRoute(child.to)
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'"
+              >
+                <span
+                  class="absolute -left-[18px] top-1/2 h-8 w-[3px] -translate-y-1/2 rounded-full transition-all duration-200"
+                  :class="isActiveRoute(child.to) ? 'bg-indigo-400' : 'bg-transparent group-hover:bg-slate-700'"
+                ></span>
+                <component
+                  :is="child.icon"
+                  class="w-4 h-4 flex-shrink-0 transition-colors"
+                  :class="isActiveRoute(child.to) ? 'text-white' : 'text-slate-500 group-hover:text-white'"
+                />
+                {{ child.name }}
+              </router-link>
+            </template>
+            </div>
+          </transition>
         </template>
       </nav>
 
@@ -55,29 +123,25 @@
       </div>
     </aside>
 
-    <!-- Mobile Header -->
-    <div class="md:hidden flex flex-col min-h-screen w-full">
-        <!-- Header implementation for mobile can be added here -->
-    </div>
+    <div class="md:hidden flex flex-col min-h-screen w-full"></div>
 
-    <!-- Main Content -->
     <main class="flex-1 overflow-auto bg-gray-50/50">
       <header class="bg-white/80 backdrop-blur-md border-b border-gray-200 px-8 py-5 flex items-center justify-between sticky top-0 z-10 transition-shadow hover:shadow-sm">
         <div class="flex items-center gap-4">
-          <button @click="goBack" class="p-2 text-slate-400 hover:text-slate-700 hover:bg-gray-100/80 rounded-lg transition-colors" title="Geri Dön">
+          <button @click="goBack" class="p-2 text-slate-400 hover:text-slate-700 hover:bg-gray-100/80 rounded-lg transition-colors" title="Geri Don">
             <ArrowLeftIcon class="w-5 h-5" />
           </button>
           <div>
-              <h2 class="text-xl font-bold text-slate-900 tracking-tight">
-                {{ pageTitle }}
-              </h2>
+            <h2 class="text-xl font-bold text-slate-900 tracking-tight">
+              {{ pageTitle }}
+            </h2>
           </div>
         </div>
         <div class="flex items-center gap-4">
-            <button class="p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50 transition-all relative">
-                <BellIcon class="w-6 h-6" />
-                <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-            </button>
+          <button class="p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50 transition-all relative">
+            <BellIcon class="w-6 h-6" />
+            <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+          </button>
         </div>
       </header>
 
@@ -89,7 +153,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ChatBubbleLeftRightIcon } from '@heroicons/vue/24/solid'
@@ -101,56 +165,81 @@ import {
   UserIcon,
   ArrowRightOnRectangleIcon,
   BellIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  DocumentTextIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
 } from '@heroicons/vue/24/outline'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-// Gerçek kullanıcı verilerini Store'dan al
-// Fallback olarak localStorage kontrolü
 const userRole = computed(() => authStore.user?.role || localStorage.getItem('role') || 'employee')
-const userName = computed(() => authStore.user?.full_name || 'Kullanıcı')
+const userName = computed(() => authStore.user?.full_name || 'Kullanici')
 
 const userInitials = computed(() => {
-  return userName.value.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)
+  return userName.value.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2)
 })
 
 const userRoleLabel = computed(() => {
   const roles: Record<string, string> = {
-    admin: 'Sistem Yöneticisi',
-    department_manager: 'Departman Yöneticisi',
-    employee: 'Personel'
+    admin: 'Sistem Yoneticisi',
+    department_manager: 'Departman Yoneticisi',
+    employee: 'Personel',
   }
-  return roles[userRole.value] || 'Kullanıcı'
+  return roles[userRole.value] || 'Kullanici'
 })
 
-const pageTitle = computed(() => {
-    return route.meta.title || 'TeamPulse'
-})
+const pageTitle = computed(() => route.meta.title || 'KUTUP')
 
-// Navigation items definition
 const allNavigation = [
-  // Admin Routes
-  { name: 'Genel Bakış', to: '/admin', icon: HomeIcon, role: 'admin' },
-  { name: 'Departman Yönetimi', to: '/admin/departments', icon: BuildingOfficeIcon, role: 'admin' },
-  { name: 'Personel Yönetimi', to: '/admin/employees', icon: UsersIcon, role: 'admin' },
-  { name: '360° Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon },
-  
-  // Manager Routes
-  { name: 'Departman Performansı', to: '/manager', icon: ChartBarIcon, role: 'department_manager' },
-  { name: 'Ekibim', to: '/manager/team', icon: UsersIcon, role: 'department_manager' },
-  
-  // Employee Routes
-  { name: 'Kişisel Gelişim', to: '/employee', icon: UserIcon, role: 'employee' },
-  { name: 'Performansım', to: '/employee/performance', icon: ChartBarIcon, role: 'employee' },
+  { name: 'Genel Bakis', to: '/admin', icon: HomeIcon, role: 'admin' },
+  { name: 'Departman Yonetimi', to: '/admin/departments', icon: BuildingOfficeIcon, role: 'admin' },
+  { name: 'Personel Yonetimi', to: '/admin/employees', icon: UsersIcon, role: 'admin' },
+  { name: 'Departman Performansi', to: '/manager', icon: ChartBarIcon, role: 'department_manager' },
+  {
+    name: '360 Derece Feedback',
+    type: 'group',
+    icon: ChatBubbleLeftRightIcon,
+    role: 'department_manager',
+    children: [
+      { name: 'Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon },
+      { name: '360 Derece Feedback Raporlari', type: 'section' },
+      { name: 'Calisan Analizi', to: '/manager/feedback-reports/employees', icon: UsersIcon },
+      { name: 'Departman Analizi', to: '/manager/feedback-reports/department', icon: DocumentTextIcon },
+    ],
+  },
+  { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'employee' },
+  { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'admin' },
+  { name: 'Kisisel Gelisim', to: '/employee', icon: UserIcon, role: 'employee' },
+  { name: 'Performansim', to: '/employee/performance', icon: ChartBarIcon, role: 'employee' },
 ]
 
-// Filter navigation based on active role
-const navigation = computed(() => {
-  return allNavigation.filter(item => !item.role || item.role === userRole.value)
-})
+const navigation = computed(() => allNavigation.filter((item) => !item.role || item.role === userRole.value))
+const openGroups = ref<string[]>(['360 Derece Feedback'])
+
+const isActiveRoute = (target: string) => {
+  if (target === '/manager' || target === '/admin' || target === '/employee' || target === '/feedback') {
+    return route.path === target
+  }
+
+  return route.path === target || route.path.startsWith(`${target}/`)
+}
+
+const isGroupOpen = (groupName: string) => openGroups.value.includes(groupName)
+
+const toggleGroup = (groupName: string) => {
+  if (isGroupOpen(groupName)) {
+    openGroups.value = openGroups.value.filter((item) => item !== groupName)
+    return
+  }
+
+  openGroups.value = [...openGroups.value, groupName]
+}
+
+const isGroupActive = (item: any) =>
+  item.children?.some((child: any) => child.to && isActiveRoute(child.to)) || false
 
 const handleLogout = () => {
   authStore.logout()

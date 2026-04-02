@@ -21,6 +21,22 @@
                         <span class="text-slate-400 hidden md:inline">•</span>
                         <span class="text-slate-300">Yazılım Geliştirme Departmanı</span>
                      </div>
+                      <div v-if="badges.length" class="mt-4 flex flex-wrap gap-2">
+                         <div
+                           v-for="badge in badges.slice(0, 4)"
+                           :key="`dash-badge-${badge.id}`"
+                           class="flex items-center"
+                           :title="getBadgeDescription(badge)"
+                         >
+                           <BadgeMedal
+                             :badge-type="badge.badge_type"
+                             :badge-level="badge.badge_level"
+                             size="xs"
+                             show-label
+                             :description="getBadgeDescription(badge)"
+                           />
+                        </div>
+                     </div>
                  </div>
             </div>
 
@@ -210,8 +226,35 @@ import {
     HeartIcon,
     StarIcon
 } from '@heroicons/vue/24/outline'
+import { onMounted, ref } from 'vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
 import LineChart from '@/components/dashboard/LineChart.vue'
 import { useAuthStore } from '@/stores/auth'
+import BadgeMedal from '@/components/common/BadgeMedal.vue'
+import { feedbackApi, type BadgeResponse, type BadgeType } from '@/services/api/feedback.api'
 const userStore = useAuthStore()
+const badges = ref<BadgeResponse[]>([])
+
+function getBadgeDescription(badge: BadgeResponse | { badge_type: BadgeType; source_feedback_ids?: number[] }) {
+  const baseMap = {
+    team_player: "Ekip enerjisini ve uyumu yukseltiyor.",
+    problem_solver: "Blokajlara hizli ve sogukkanli yaklasiyor.",
+    communicator: "Geri bildirimlerinde net ve ogretici bir cizgi var.",
+    speed_champion: "Yuksek tempo ve hizli adaptasyon sagliyor.",
+    mentor: "Bilgi paylasimi ve mentorlukta one cikiyor.",
+    innovator: "Gelisime acik ve cevik ilerliyor.",
+    reliable: "Teknik sahiplenme ve saglam uygulama disiplini gosteriyor.",
+  } as const
+  return baseMap[badge.badge_type] ?? "Bu ayin analizlerinde istikrarli bir guc sergiledi."
+}
+
+onMounted(async () => {
+  try {
+    badges.value = await feedbackApi.getMyBadges()
+  } catch (error) {
+    console.error('Rozetler yüklenemedi:', error)
+    badges.value = []
+  }
+})
 </script>
+

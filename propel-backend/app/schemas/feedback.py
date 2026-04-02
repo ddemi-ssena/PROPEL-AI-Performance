@@ -135,6 +135,7 @@ class BadgeResponse(BaseModel):
     badge_level: BadgeLevel
     period_date: date
     created_at:  datetime
+    source_feedback_ids: Optional[List[int]] = None
 
     class Config:
         from_attributes = True

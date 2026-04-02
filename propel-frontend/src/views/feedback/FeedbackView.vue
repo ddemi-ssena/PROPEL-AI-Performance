@@ -16,6 +16,127 @@
       </button>
     </div>
 
+    <div class="bg-white rounded-xl p-4 border border-slate-200">
+      <p class="text-sm text-slate-700">
+        Bu haftaki zorunlu {{ weeklyProgress?.required_count ?? 3 }} feedbackten
+        <strong>{{ weeklyProgress?.completed_count ?? 0 }}</strong> tanesini tamamladin.
+      </p>
+      <div class="w-full bg-slate-100 rounded-full h-2.5 mt-3">
+        <div
+          class="h-2.5 rounded-full bg-indigo-600 transition-all"
+          :style="{ width: progressPercent + '%' }"
+        />
+      </div>
+    </div>
+
+    <div v-if="weeklyProgress && !weeklyProgress.is_completed" class="bg-amber-50 rounded-xl p-4 border border-amber-200">
+      <p class="text-sm text-amber-800">
+        Haftalik zorunlu feedback hedefin henuz tamamlanmadi.
+        Kalan: <strong>{{ weeklyProgress.remaining_count }}</strong>
+      </p>
+    </div>
+
+    <div v-if="weeklyAssignment" class="bg-indigo-50 rounded-xl p-5 border border-indigo-200">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">Haftalik Atama Akisi</p>
+          <h3 class="mt-1 text-lg font-bold text-slate-900">{{ getSlotTitle(weeklyAssignment.current_slot) }}</h3>
+          <p class="mt-2 text-sm text-slate-700">
+            {{ getSlotDescription(weeklyAssignment.current_slot) }}
+          </p>
+        </div>
+        <div v-if="weeklyAssignment.mandatory_assignment" class="rounded-xl border border-indigo-100 bg-white px-4 py-3 text-sm text-slate-700">
+          <p class="text-xs font-semibold text-indigo-700 mb-1">Sistemin bu hafta atadigi kisi</p>
+          <p class="font-semibold text-slate-900">{{ weeklyAssignment.mandatory_assignment.employee.user.full_name }}</p>
+          <p class="text-xs text-slate-500 mt-1">
+            {{ weeklyAssignment.mandatory_assignment.employee.department.name }} · {{ weeklyAssignment.mandatory_assignment.employee.position || 'Calisan' }}
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap gap-2">
+        <span
+          v-for="rule in weeklyAssignment.rules_summary"
+          :key="rule"
+          class="px-2.5 py-1 text-xs rounded-full bg-white text-slate-600 border border-indigo-100"
+        >
+          {{ rule }}
+        </span>
+      </div>
+    </div>
+
+    <div v-if="myNlpInsight" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-sm text-slate-500">Bu Haftaki NLP Ozetin</p>
+            <h3 class="text-lg font-bold text-slate-900 mt-1">Duygu ve risk sinyalleri</h3>
+          </div>
+          <span
+            class="px-3 py-1 rounded-full text-xs font-semibold border"
+            :class="getRiskBadgeClass(myNlpInsight.profile.flight_risk_level)"
+          >
+            Ucus riski: {{ getRiskLabel(myNlpInsight.profile.flight_risk_level) }}
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+          <div class="rounded-lg bg-slate-50 p-4 border border-slate-100">
+            <p class="text-xs text-slate-500">Motivasyon</p>
+            <p class="text-2xl font-bold text-slate-900">{{ formatScore(myNlpInsight.profile.avg_motivation_score) }}</p>
+          </div>
+          <div class="rounded-lg bg-slate-50 p-4 border border-slate-100">
+            <p class="text-xs text-slate-500">Psikolojik guven</p>
+            <p class="text-2xl font-bold text-slate-900">{{ formatScore(myNlpInsight.profile.avg_psychological_safety_score) }}</p>
+          </div>
+          <div class="rounded-lg bg-slate-50 p-4 border border-slate-100">
+            <p class="text-xs text-slate-500">Is birligi</p>
+            <p class="text-2xl font-bold text-slate-900">{{ formatScore(myNlpInsight.profile.avg_collaboration_score) }}</p>
+          </div>
+          <div class="rounded-lg bg-slate-50 p-4 border border-slate-100">
+            <p class="text-xs text-slate-500">Geri bildirim sayisi</p>
+            <p class="text-2xl font-bold text-slate-900">{{ myNlpInsight.profile.feedback_count }}</p>
+          </div>
+        </div>
+
+        <div v-if="myNlpInsight.profile.manager_summary" class="mt-5 rounded-lg bg-indigo-50 border border-indigo-100 p-4">
+          <p class="text-xs font-semibold text-indigo-700 mb-1">Kisa ozet</p>
+          <p class="text-sm text-slate-700">{{ myNlpInsight.profile.manager_summary }}</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+        <p class="text-sm text-slate-500">Odak Alanlari</p>
+        <div class="mt-4">
+          <p class="text-xs font-semibold text-slate-500 mb-2">Guclu yonler</p>
+          <div class="flex flex-wrap gap-2">
+            <span v-for="item in myNlpInsight.profile.top_strengths" :key="`strength-${item}`" class="px-2 py-1 text-xs rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              {{ item }}
+            </span>
+            <span v-if="!myNlpInsight.profile.top_strengths.length" class="text-sm text-slate-400">Henuz veri yok</span>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs font-semibold text-slate-500 mb-2">Destek ihtiyaclari</p>
+          <div class="flex flex-wrap gap-2">
+            <span v-for="item in myNlpInsight.profile.top_support_needs" :key="`support-${item}`" class="px-2 py-1 text-xs rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+              {{ item }}
+            </span>
+            <span v-if="!myNlpInsight.profile.top_support_needs.length" class="text-sm text-slate-400">Henuz veri yok</span>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs font-semibold text-slate-500 mb-2">Risk alanlari</p>
+          <div class="flex flex-wrap gap-2">
+            <span v-for="item in myNlpInsight.profile.top_risk_areas" :key="`risk-${item}`" class="px-2 py-1 text-xs rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+              {{ item }}
+            </span>
+            <span v-if="!myNlpInsight.profile.top_risk_areas.length" class="text-sm text-slate-400">Henuz veri yok</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Özet Kartlar -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <!-- Genel Ortalama -->
@@ -32,14 +153,20 @@
       <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
         <p class="text-sm text-slate-500 mb-3">Rozetlerim</p>
         <div v-if="summary?.badges?.length" class="flex flex-wrap gap-2">
-          <span
+          <div
             v-for="badge in summary.badges"
             :key="badge.id"
-            :class="getBadgeClass(badge.badge_level)"
-            class="px-2 py-1 rounded-full text-xs font-bold border"
+            class="flex items-center"
+            :title="getBadgeDescription(badge)"
           >
-            {{ getBadgeEmoji(badge.badge_type) }} {{ getBadgeLabel(badge.badge_type) }}
-          </span>
+            <BadgeMedal
+              :badge-type="badge.badge_type"
+              :badge-level="badge.badge_level"
+              size="xs"
+              show-label
+              :description="getBadgeDescription(badge)"
+            />
+          </div>
         </div>
         <p v-else class="text-sm text-slate-400">Henüz rozet kazanılmadı</p>
       </div>
@@ -169,146 +296,23 @@
       </div>
     </div>
 
-    <!-- ─────────────────────────────────────── -->
-    <!-- FEEDBACK VERME MODAL -->
-    <!-- ─────────────────────────────────────── -->
-    <div
-      v-if="showFeedbackForm"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      @click.self="showFeedbackForm = false"
-    >
-      <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div class="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white rounded-t-2xl">
-          <h3 class="text-lg font-bold text-slate-800">Geri Bildirim Ver</h3>
-          <button @click="showFeedbackForm = false" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
-        </div>
-
-        <div class="p-6 space-y-6">
-
-          <!-- Kişi Seç -->
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-2">Kişi Seç *</label>
-            <select
-              v-model="form.reviewee_id"
-              class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              <option value="">— Kişi seçin —</option>
-              <option v-for="emp in employees" :key="emp.id" :value="emp.id">
-                {{ emp.user.full_name }} · {{ emp.position ?? emp.department.name }}
-              </option>
-            </select>
-          </div>
-
-          <!-- Feedback Tipi -->
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-2">Geri Bildirim Türü *</label>
-            <div class="grid grid-cols-2 gap-2">
-              <button
-                v-for="type in feedbackTypes"
-                :key="type.value"
-                @click="form.feedback_type = type.value"
-                :class="form.feedback_type === type.value
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'"
-                class="px-3 py-2 rounded-lg border text-sm font-medium transition text-left"
-              >
-                {{ type.emoji }} {{ type.label }}
-              </button>
-            </div>
-          </div>
-
-          <!-- Dönem -->
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-2">Değerlendirme Dönemi *</label>
-            <input
-              v-model="form.period_date"
-              type="date"
-              class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            />
-          </div>
-
-          <!-- Skorlar -->
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-4">Yetkinlik Skorları <span class="text-slate-400 font-normal">(1–5, opsiyonel)</span></label>
-            <div class="space-y-3">
-              <div v-for="skill in formSkills" :key="skill.key" class="flex items-center gap-4">
-                <span class="w-36 text-sm text-slate-600 shrink-0">{{ skill.label }}</span>
-                <div class="flex gap-2">
-                  <button
-                    v-for="n in 5"
-                    :key="n"
-                    @click="setScore(skill.key, n)"
-                    :class="(form as any)[skill.key] >= n ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-400'"
-                    class="w-8 h-8 rounded-lg text-sm font-bold transition hover:bg-indigo-400 hover:text-white"
-                  >
-                    {{ n }}
-                  </button>
-                </div>
-                <span class="text-sm text-slate-500 w-4">{{ (form as any)[skill.key] ?? '—' }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Metin Alanları -->
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-emerald-700 mb-2">💪 En güçlü yönü nedir?</label>
-              <textarea
-                v-model="form.strength_text"
-                rows="2"
-                placeholder="Bu kişinin öne çıkan güçlü özelliklerini yazın..."
-                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-amber-700 mb-2">🎯 Geliştirebileceği alan?</label>
-              <textarea
-                v-model="form.improvement_text"
-                rows="2"
-                placeholder="Gelişim fırsatı olarak gördüğünüz alanı yazın..."
-                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-600 mb-2">💬 Genel yorum</label>
-              <textarea
-                v-model="form.general_comment"
-                rows="2"
-                placeholder="Eklemek istediğiniz genel bir yorum..."
-                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
-              />
-            </div>
-          </div>
-
-          <!-- Anonim seçeneği -->
-          <div class="flex items-center gap-3">
-            <input type="checkbox" id="anon" v-model="form.is_anonymous" class="w-4 h-4 text-indigo-600 rounded" />
-            <label for="anon" class="text-sm text-slate-600">Anonim olarak gönder</label>
-          </div>
-
-          <!-- Hata mesajı -->
-          <div v-if="formError" class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-            {{ formError }}
-          </div>
-
-          <!-- Gönder -->
-          <button
-            @click="submitFeedback"
-            :disabled="submitting"
-            class="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {{ submitting ? 'Gönderiliyor...' : 'Geri Bildirimi Gönder' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <FeedbackModal
+      :open="showFeedbackForm"
+      :candidates="feedbackCandidates"
+      :weekly-assignment="weeklyAssignment"
+      @close="showFeedbackForm = false"
+      @submitted="loadData"
+    />
 
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { feedbackApi, type FeedbackResponse, type FeedbackRequestResponse, type FeedbackSummary, type EmployeeForFeedback, type FeedbackType, type BadgeType, type BadgeLevel } from '@/services/api/feedback.api'
+import { useAuthStore } from '@/stores/auth'
+import { feedbackApi, type FeedbackResponse, type FeedbackRequestResponse, type FeedbackSummary, type EmployeeForFeedback, type WeeklyProgressResponse, type ClassicFeedbackType, type BadgeType, type BadgeLevel, type BadgeResponse, type WeeklyNLPInsightResponse, type NLPRiskLevel, type WeeklyAssignmentStateResponse } from '@/services/api/feedback.api'
+import FeedbackModal from '@/components/feedback/FeedbackModal.vue'
+import BadgeMedal from '@/components/common/BadgeMedal.vue'
 
 // ── State ──────────────────────────────────────
 const receivedFeedbacks  = ref<FeedbackResponse[]>([])
@@ -316,39 +320,10 @@ const incomingRequests   = ref<FeedbackRequestResponse[]>([])
 const summary            = ref<FeedbackSummary | null>(null)
 const employees          = ref<EmployeeForFeedback[]>([])
 const showFeedbackForm   = ref(false)
-const submitting         = ref(false)
-const formError          = ref('')
-
-const form = ref({
-  reviewee_id:           '' as number | '',
-  feedback_type:         'peer_to_peer' as FeedbackType,
-  period_date:           new Date().toISOString().split('T')[0],
-  score_communication:   null as number | null,
-  score_teamwork:        null as number | null,
-  score_problem_solving: null as number | null,
-  score_leadership:      null as number | null,
-  score_technical:       null as number | null,
-  strength_text:         '',
-  improvement_text:      '',
-  general_comment:       '',
-  is_anonymous:          false,
-})
-
-// ── Sabit veriler ──────────────────────────────
-const feedbackTypes = [
-  { value: 'peer_to_peer',        label: 'Eş Değerlendirme',    emoji: '🤝' },
-  { value: 'manager_to_employee', label: 'Yöneticiden Çalışana', emoji: '📋' },
-  { value: 'employee_to_manager', label: 'Çalışandan Yöneticiye',emoji: '⬆️' },
-  { value: 'self_assessment',     label: 'Öz Değerlendirme',     emoji: '🪞' },
-]
-
-const formSkills = [
-  { key: 'score_communication',   label: 'İletişim' },
-  { key: 'score_teamwork',        label: 'Takım Çalışması' },
-  { key: 'score_problem_solving', label: 'Problem Çözme' },
-  { key: 'score_leadership',      label: 'Liderlik' },
-  { key: 'score_technical',       label: 'Teknik Beceri' },
-]
+const weeklyProgress     = ref<WeeklyProgressResponse | null>(null)
+const weeklyAssignment   = ref<WeeklyAssignmentStateResponse | null>(null)
+const myNlpInsight       = ref<WeeklyNLPInsightResponse | null>(null)
+const authStore          = useAuthStore()
 
 const skillScores = computed(() => [
   { key: 'communication',   label: 'İletişim',         value: summary.value?.avg_communication },
@@ -358,11 +333,18 @@ const skillScores = computed(() => [
   { key: 'technical',       label: 'Teknik Beceri',    value: summary.value?.avg_technical },
 ])
 
-// ── Yardımcı fonksiyonlar ──────────────────────
-function setScore(key: string, value: number) {
-  ;(form.value as any)[key] = (form.value as any)[key] === value ? null : value
-}
+const feedbackCandidates = computed(() =>
+  (weeklyAssignment.value?.available_candidates || employees.value).filter(emp => emp.user_id !== authStore.user?.id)
+)
 
+const progressPercent = computed(() => {
+  if (!weeklyProgress.value) return 0
+  const { completed_count, required_count } = weeklyProgress.value
+  if (!required_count) return 0
+  return Math.min((completed_count / required_count) * 100, 100)
+})
+
+// ── Yardımcı fonksiyonlar ──────────────────────
 function getAvgScore(fb: FeedbackResponse): string | null {
   const scores = [fb.score_communication, fb.score_teamwork, fb.score_problem_solving, fb.score_leadership, fb.score_technical].filter(s => s != null) as number[]
   if (!scores.length) return null
@@ -384,8 +366,8 @@ function getScoreTextColor(val: string | null) {
   return 'text-red-500'
 }
 
-function getFeedbackTypeLabel(type: FeedbackType) {
-  const map: Record<FeedbackType, string> = {
+function getFeedbackTypeLabel(type: ClassicFeedbackType) {
+  const map: Record<ClassicFeedbackType, string> = {
     peer_to_peer:        'Eş Değerlendirme',
     manager_to_employee: 'Yöneticiden',
     employee_to_manager: 'Çalışandan Yöneticiye',
@@ -394,93 +376,84 @@ function getFeedbackTypeLabel(type: FeedbackType) {
   return map[type] ?? type
 }
 
-function getBadgeEmoji(type: BadgeType) {
-  const map: Record<BadgeType, string> = {
-    team_player:    '🤝',
-    problem_solver: '💡',
-    communicator:   '🗣️',
-    speed_champion: '⚡',
-    mentor:         '🎓',
-    innovator:      '🚀',
-    reliable:       '🔒',
-  }
-  return map[type] ?? '🏅'
+function getBadgeDescription(badge: BadgeResponse | { badge_type: BadgeType; source_feedback_ids?: number[] }) {
+  const baseMap = {
+    team_player: "Ekip enerjisini ve uyumu yukseltiyor.",
+    problem_solver: "Blokajlara hizli ve sogukkanli yaklasiyor.",
+    communicator: "Geri bildirimlerinde net ve ogretici bir cizgi var.",
+    speed_champion: "Yuksek tempo ve hizli adaptasyon sagliyor.",
+    mentor: "Bilgi paylasimi ve mentorlukta one cikiyor.",
+    innovator: "Gelisime acik ve cevik ilerliyor.",
+    reliable: "Teknik sahiplenme ve saglam uygulama disiplini gosteriyor.",
+  } as const
+  return baseMap[badge.badge_type] ?? "Bu ayin analizlerinde istikrarli bir guc sergiledi."
 }
 
-function getBadgeLabel(type: BadgeType) {
-  const map: Record<BadgeType, string> = {
-    team_player:    'Takım Kaptanı',
-    problem_solver: 'Problem Avcısı',
-    communicator:   'Kristal Konuşmacı',
-    speed_champion: 'Hız Şampiyonu',
-    mentor:         'Bilgi Aktarıcı',
-    innovator:      'Yenilikçi',
-    reliable:       'Güvenilir',
-  }
-  return map[type] ?? type
+function formatScore(value?: number | null) {
+  return value != null ? value.toFixed(1) : '—'
 }
 
-function getBadgeClass(level: BadgeLevel) {
-  const map: Record<BadgeLevel, string> = {
-    bronze: 'bg-amber-50 text-amber-700 border-amber-200',
-    silver: 'bg-slate-100 text-slate-700 border-slate-300',
-    gold:   'bg-yellow-50 text-yellow-700 border-yellow-300',
+function getRiskLabel(level?: NLPRiskLevel) {
+  const map: Record<NLPRiskLevel, string> = {
+    low: 'Dusuk',
+    medium: 'Orta',
+    high: 'Yuksek',
   }
-  return map[level]
+  return level ? map[level] : 'Belirsiz'
+}
+
+function getRiskBadgeClass(level?: NLPRiskLevel) {
+  if (level === 'high') return 'bg-rose-50 text-rose-700 border-rose-200'
+  if (level === 'medium') return 'bg-amber-50 text-amber-700 border-amber-200'
+  if (level === 'low') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  return 'bg-slate-50 text-slate-600 border-slate-200'
+}
+
+function getSlotTitle(slot?: WeeklyAssignmentStateResponse['current_slot']) {
+  const map = {
+    mandatory_random: '1. Slot · Zorunlu Sistem Atamasi',
+    department_internal: '2. Slot · Departman Ici Secim',
+    cross_functional: '3. Slot · Departman Ici Son Secim',
+    completed: 'Bu haftaki 3 feedback hakki tamamlandi',
+  }
+  return slot ? map[slot] : 'Haftalik atama'
+}
+
+function getSlotDescription(slot?: WeeklyAssignmentStateResponse['current_slot']) {
+  const map = {
+    mandatory_random: 'Oncelikle sistemin atadigi kisiye geri bildirim vererek haftalik akisi baslatman gerekiyor.',
+    department_internal: 'Simdi kendi departmanindan bir ekip arkadasini veya yoneticini secerek ikinci feedbackini tamamlayabilirsin.',
+    cross_functional: 'Ucuncu feedbackte de yalnizca kendi departmanindan birini secerek haftalik donguyu tamamlayabilirsin.',
+    completed: 'Haftalik zorunlu akisi tamamladin. Dilersen daha fazla geri bildirim vermeye devam edebilirsin.',
+  }
+  return slot ? map[slot] : ''
 }
 
 // ── API çağrıları ──────────────────────────────
 async function loadData() {
   try {
-    const [received, requests, sum, emps] = await Promise.all([
+    if (!authStore.user && authStore.token) {
+      await authStore.fetchCurrentUser()
+    }
+
+    const [received, requests, sum, emps, progress, assignment, nlpInsight] = await Promise.all([
       feedbackApi.getReceivedFeedbacks(),
       feedbackApi.getIncomingRequests(),
       feedbackApi.getMyFeedbackSummary(),
-      feedbackApi.getAllEmployees(),
+      feedbackApi.getFeedbackCandidates(),
+      feedbackApi.getWeeklyProgress(),
+      feedbackApi.getWeeklyAssignmentState().catch(() => null),
+      feedbackApi.getMyWeeklyNlpProfile().catch(() => null),
     ])
     receivedFeedbacks.value = received
     incomingRequests.value  = requests
     summary.value           = sum
     employees.value         = emps
+    weeklyProgress.value    = progress
+    weeklyAssignment.value  = assignment
+    myNlpInsight.value      = nlpInsight
   } catch (e) {
     console.error('Veri yüklenemedi:', e)
-  }
-}
-
-async function submitFeedback() {
-  formError.value = ''
-
-  if (!form.value.reviewee_id) {
-    formError.value = 'Lütfen bir kişi seçin'
-    return
-  }
-  if (!form.value.period_date) {
-    formError.value = 'Lütfen dönem tarihi girin'
-    return
-  }
-
-  submitting.value = true
-  try {
-    await feedbackApi.createFeedback({
-      reviewee_id:           form.value.reviewee_id as number,
-      feedback_type:         form.value.feedback_type,
-      period_date:           form.value.period_date,
-      score_communication:   form.value.score_communication ?? undefined,
-      score_teamwork:        form.value.score_teamwork ?? undefined,
-      score_problem_solving: form.value.score_problem_solving ?? undefined,
-      score_leadership:      form.value.score_leadership ?? undefined,
-      score_technical:       form.value.score_technical ?? undefined,
-      strength_text:         form.value.strength_text || undefined,
-      improvement_text:      form.value.improvement_text || undefined,
-      general_comment:       form.value.general_comment || undefined,
-      is_anonymous:          form.value.is_anonymous,
-    })
-    showFeedbackForm.value = false
-    await loadData()
-  } catch (e: any) {
-    formError.value = e.response?.data?.detail ?? 'Bir hata oluştu, tekrar deneyin'
-  } finally {
-    submitting.value = false
   }
 }
 
@@ -494,10 +467,9 @@ async function declineRequest(requestId: number) {
 }
 
 function acceptRequest(req: FeedbackRequestResponse) {
-  form.value.reviewee_id = req.requester_id
-  form.value.period_date = req.period_date
   showFeedbackForm.value = true
 }
 
 onMounted(loadData)
 </script>
+

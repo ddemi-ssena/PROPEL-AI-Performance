@@ -9,6 +9,7 @@ from datetime import date
 from app.db.session import get_db
 from app.db.models.user import User, UserRole
 from app.db.models.employee import Employee
+from app.schemas.employee import EmployeeResponse
 from app.schemas.feedback import (
     FeedbackCreate, FeedbackResponse, FeedbackDetailResponse,
     FeedbackRequestCreate, FeedbackRequestResponse, FeedbackRequestUpdate,
@@ -44,6 +45,23 @@ def create_feedback(
     - Metin alanları NLP analizi için kullanılacak
     """
     return FeedbackService.create_feedback(db, feedback_data, current_employee.id)
+
+
+@router.get(
+    "/candidates",
+    response_model=List[EmployeeResponse],
+    summary="Feedback verilebilecek çalışan listesi"
+)
+def get_feedback_candidates(
+    db: Session = Depends(get_db),
+    current_employee: Employee = Depends(get_current_employee_record)
+):
+    """
+    Kullanıcının feedback verebileceği kişileri listeler.
+    - Kendi kaydı hariç tutulur
+    - Kendi departmanındaki çalışanlar ve yöneticiler döner
+    """
+    return FeedbackService.get_feedback_candidates(db, current_employee.id)
 
 
 @router.get(

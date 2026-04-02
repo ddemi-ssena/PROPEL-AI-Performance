@@ -16,52 +16,59 @@ const router = createRouter({
       component: () => import('@/views/auth/RegisterView.vue'),
       meta: { requiresGuest: true },
     },
-    // Admin Routes
     {
       path: '/admin',
       component: () => import('@/layouts/AppLayout.vue'),
-      meta: { requiresAuth: true, title: 'Genel Müdür Paneli' },
+      meta: { requiresAuth: true, title: 'Genel Mudur Paneli' },
       children: [
         {
           path: '',
           name: 'admin-dashboard',
           component: () => import('@/views/admin/AdminDashboard.vue'),
         },
-        // Gelecekte eklenecek admin rotaları
-      ]
+      ],
     },
-    // Manager Routes
     {
       path: '/manager',
       component: () => import('@/layouts/AppLayout.vue'),
-      meta: { requiresAuth: true, title: 'Yazılım Geliştirme Yönetici Paneli' },
+      meta: { requiresAuth: true, title: 'Departman Yonetici Paneli' },
       children: [
         {
           path: '',
           name: 'manager-dashboard',
           component: () => import('@/views/manager/ManagerDashboard.vue'),
-        }
-      ]
+          meta: { title: 'Departman Performansi' },
+        },
+        {
+          path: 'feedback-reports/employees',
+          name: 'manager-employee-analysis',
+          component: () => import('@/views/manager/EmployeeAnalysisView.vue'),
+          meta: { title: 'Calisan Analizi' },
+        },
+        {
+          path: 'feedback-reports/department',
+          name: 'manager-department-analysis',
+          component: () => import('@/views/manager/DepartmentAnalysisView.vue'),
+          meta: { title: 'Departman Analizi' },
+        },
+      ],
     },
-    
-      // Feedback Routes
     {
       path: '/feedback',
       component: () => import('@/layouts/AppLayout.vue'),
-      meta: { requiresAuth: true, title: '360° Geri Bildirim Paneli' },
+      meta: { requiresAuth: true, title: '360 Derece Geri Bildirim Paneli' },
       children: [
         {
           path: '',
           name: 'feedback',
           component: () => import('@/views/feedback/FeedbackView.vue'),
-        }
-      ]
+        },
+      ],
     },
     {
       path: '/feedback-dashboard',
       redirect: '/feedback',
     },
-    // Employee Routes
     {
       path: '/employee',
       component: () => import('@/layouts/AppLayout.vue'),
@@ -71,10 +78,9 @@ const router = createRouter({
           path: '',
           name: 'employee-dashboard',
           component: () => import('@/views/employee/EmployeeDashboard.vue'),
-        }
-      ]
+        },
+      ],
     },
-    // Legacy/Default Fallback
     {
       path: '/dashboard',
       component: () => import('@/layouts/AppLayout.vue'),
@@ -83,10 +89,9 @@ const router = createRouter({
         {
           path: '',
           name: 'dashboard',
-          // Rol bazlı yönlendirme yapılana kadar geçici olarak admin'e
           component: () => import('@/views/admin/AdminDashboard.vue'),
-        }
-      ]
+        },
+      ],
     },
     {
       path: '/',
@@ -95,7 +100,6 @@ const router = createRouter({
   ],
 })
 
-// Auth Guard
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
 
