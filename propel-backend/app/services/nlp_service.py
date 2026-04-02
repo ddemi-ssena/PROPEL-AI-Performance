@@ -57,6 +57,19 @@ class NLPService:
             "min_matches": 2,
         },
     }
+
+    @staticmethod
+    def _get_latest_badge_period(
+        db: Session,
+        employee_id: int,
+    ) -> Optional[date]:
+        return (
+            db.query(EmployeeBadge.period_date)
+            .filter(EmployeeBadge.employee_id == employee_id)
+            .order_by(EmployeeBadge.period_date.desc())
+            .limit(1)
+            .scalar()
+        )
     @staticmethod
     def _raw_list_item(analysis: FeedbackNLPAnalysis, key: str) -> list[str]:
         raw_analysis = analysis.raw_analysis or {}
@@ -796,6 +809,13 @@ class NLPService:
             EmployeeBadge.employee_id == employee.id,
             EmployeeBadge.period_date == period_date,
         ).order_by(EmployeeBadge.created_at.desc()).all()
+        if not badges:
+            latest_period = NLPService._get_latest_badge_period(db, employee.id)
+            if latest_period:
+                badges = db.query(EmployeeBadge).filter(
+                    EmployeeBadge.employee_id == employee.id,
+                    EmployeeBadge.period_date == latest_period,
+                ).order_by(EmployeeBadge.created_at.desc()).all()
 
         return {
             "employee_id": employee.id,

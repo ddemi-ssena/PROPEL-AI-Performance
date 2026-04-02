@@ -52,6 +52,19 @@ class FeedbackService:
         "tebrikler",
     }
 
+    @staticmethod
+    def _get_latest_badge_period(
+        db: Session,
+        employee_id: int,
+    ) -> Optional[date]:
+        return (
+            db.query(EmployeeBadge.period_date)
+            .filter(EmployeeBadge.employee_id == employee_id)
+            .order_by(EmployeeBadge.period_date.desc())
+            .limit(1)
+            .scalar()
+        )
+
     # ──────────────────────────────────────────────
     # FEEDBACK — Geri Bildirim Oluştur
     # ──────────────────────────────────────────────
@@ -669,6 +682,13 @@ class FeedbackService:
             EmployeeBadge.employee_id == employee_id,
             EmployeeBadge.period_date == current_period,
         ).all()
+        if not badges:
+            latest_period = FeedbackService._get_latest_badge_period(db, employee_id)
+            if latest_period:
+                badges = db.query(EmployeeBadge).filter(
+                    EmployeeBadge.employee_id == employee_id,
+                    EmployeeBadge.period_date == latest_period,
+                ).all()
 
         return FeedbackSummary(
             employee_id         = employee_id,
@@ -790,9 +810,20 @@ class FeedbackService:
         """Bir çalışanın aktif aylık rozetleri"""
         today = datetime.utcnow().date()
         current_period = today.replace(day=1)
-        return db.query(EmployeeBadge).filter(
+        badges = db.query(EmployeeBadge).filter(
             EmployeeBadge.employee_id == employee_id,
             EmployeeBadge.period_date == current_period,
+        ).order_by(EmployeeBadge.created_at.desc()).all()
+        if badges:
+            return badges
+
+        latest_period = FeedbackService._get_latest_badge_period(db, employee_id)
+        if not latest_period:
+            return []
+
+        return db.query(EmployeeBadge).filter(
+            EmployeeBadge.employee_id == employee_id,
+            EmployeeBadge.period_date == latest_period,
         ).order_by(EmployeeBadge.created_at.desc()).all()
 
     @staticmethod
