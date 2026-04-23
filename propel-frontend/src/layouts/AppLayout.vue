@@ -163,6 +163,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import type { FunctionalComponent, HTMLAttributes, VNodeProps } from 'vue'
 import { ChatBubbleLeftRightIcon } from '@heroicons/vue/24/solid'
 import {
   HomeIcon,
@@ -201,7 +202,36 @@ const userRoleLabel = computed(() => {
 
 const pageTitle = computed(() => route.meta.title || 'KUTUP')
 
-const allNavigation = [
+type NavIcon = FunctionalComponent<HTMLAttributes & VNodeProps>
+
+type NavLeaf = {
+  name: string
+  to: string
+  icon: NavIcon
+  role?: string
+  type?: undefined
+  indent?: boolean
+}
+
+type NavSection = {
+  name: string
+  type: 'section'
+  role?: string
+}
+
+type NavGroupChild = NavLeaf | NavSection
+
+type NavGroup = {
+  name: string
+  type: 'group'
+  icon: NavIcon
+  role?: string
+  children: NavGroupChild[]
+}
+
+type NavigationItem = NavLeaf | NavSection | NavGroup
+
+const allNavigation: NavigationItem[] = [
   { name: 'Genel Bakis', to: '/admin', icon: HomeIcon, role: 'admin' },
   { name: 'Departman Yonetimi', to: '/admin/departments', icon: BuildingOfficeIcon, role: 'admin' },
   { name: 'Personel Yonetimi', to: '/admin/employees', icon: UsersIcon, role: 'admin' },
@@ -228,7 +258,7 @@ const allNavigation = [
 ]
 
 const navigation = computed(() =>
-  allNavigation.filter((item: any) => item.role === 'all' || item.role === userRole.value)
+  allNavigation.filter((item) => item.role === 'all' || item.role === userRole.value)
 )
 
 const openGroups = ref<string[]>(['360 Derece Feedback'])
@@ -250,8 +280,8 @@ const toggleGroup = (groupName: string) => {
   openGroups.value = [...openGroups.value, groupName]
 }
 
-const isGroupActive = (item: any) =>
-  item.children?.some((child: any) => child.to && isActiveRoute(child.to)) || false
+const isGroupActive = (item: NavGroup) =>
+  item.children.some((child) => 'to' in child && isActiveRoute(child.to))
 
 const handleLogout = () => {
   authStore.logout()

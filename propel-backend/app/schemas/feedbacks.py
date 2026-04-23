@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.db.models.feedback import FeedbackDirection
 from app.schemas.feedback import BadgeResponse
@@ -203,6 +203,8 @@ class DepartmentMonthlyDeepAnalysisResponse(BaseModel):
 
 
 class EmployeeMonthlyRAGReportResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     employee_id: int
     employee_name: str
     department_id: Optional[int] = None
@@ -225,6 +227,8 @@ class EmployeeMonthlyRAGReportResponse(BaseModel):
 
 
 class DepartmentMonthlyRAGReportResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     department_id: int
     department_name: str
     period_year: int

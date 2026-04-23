@@ -418,6 +418,7 @@ import BadgeMedal from '@/components/common/BadgeMedal.vue'
 import {
   feedbackApi,
   type BadgeResponse,
+  type BadgeType,
   type Employee360SummaryReportResponse,
   type EmployeeMonthlyDeepAnalysisResponse,
   type EmployeeMonthlyRAGReportResponse,
@@ -506,7 +507,7 @@ function renderText(value?: string | null) {
 
   let rendered = value
   for (const [from, to] of replacements) {
-    rendered = rendered.replaceAll(from, to)
+    rendered = rendered.split(from).join(to)
   }
   return rendered
 }
