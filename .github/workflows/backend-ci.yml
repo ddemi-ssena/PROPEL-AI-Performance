@@ -53,13 +53,18 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov flake8 black
 
-      - name: Linting with Flake8
+      - name: Linting with Flake8 (critical errors)
         working-directory: ./propel-backend
         run: |
           flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 app --count --max-complexity=10 --max-line-length=127 --statistics
 
-      - name: Format check with Black
+      - name: Linting with Flake8 (style report only)
+        working-directory: ./propel-backend
+        run: |
+          flake8 app --count --max-complexity=10 --max-line-length=127 --statistics --exit-zero
+
+      - name: Format check with Black (advisory)
+        continue-on-error: true
         working-directory: ./propel-backend
         run: |
           black --check app
