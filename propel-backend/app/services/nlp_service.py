@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime
+from datetime import date, datetime
 from math import ceil
 from typing import Any, Dict, Iterable, Optional
 
