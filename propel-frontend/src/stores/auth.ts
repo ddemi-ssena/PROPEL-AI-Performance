@@ -16,19 +16,25 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
 
+    const username = credentials.username.toLowerCase().trim()
+    const cleanCredentials = { ...credentials, username }
+
     try {
-      const response = await authApi.login(credentials)
+      const response = await authApi.login(cleanCredentials)
       token.value = response.access_token
       localStorage.setItem('token', response.access_token)
-
+      
       await fetchCurrentUser()
+      
+      if (user.value?.role) {
+        localStorage.setItem('role', user.value.role)
+      }
 
       return true
     } catch (err: any) {
       console.warn('Backend login failed, attempting mock login...', err)
 
-      // Mock Login Fallback
-      if (tryMockLogin(credentials)) {
+      if (tryMockLogin(cleanCredentials)) {
         return true
       }
 
@@ -135,6 +141,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     token.value = null
     localStorage.removeItem('token')
+    localStorage.removeItem('role')
   }
 
   return {

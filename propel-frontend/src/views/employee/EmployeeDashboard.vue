@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="pb-10">
     <!-- Stronger Header Section (Gradient Banner) -->
     <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 shadow-xl mb-8">

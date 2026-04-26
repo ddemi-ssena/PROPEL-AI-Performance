@@ -9,7 +9,8 @@ from app.schemas.survey_response import (
     SurveyResponseCreate, 
     SurveyResponseUpdate, 
     SurveyResponseResponse,
-    SurveyResponseDetailResponse
+    SurveyResponseDetailResponse,
+    WeeklyPulseCreate
 )
 from app.services.survey_service import SurveyService
 from app.api.dependencies import get_current_user
@@ -60,6 +61,129 @@ def create_survey_response(
             )
     
     return SurveyService.create_survey_response(db, survey_data)
+
+@router.post("/weekly-pulse", response_model=SurveyResponseDetailResponse, status_code=status.HTTP_201_CREATED)
+def create_weekly_pulse(
+    pulse_data: WeeklyPulseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Haftalık Nabız Anketi (Weekly Pulse) doldur.
+    ML Modeli (BERTürk) ile Zorluk, Başarı ve Öneri metinlerinden Motivasyon ve Ayrılma riski hesaplar (MTE & ARS).
+    Sadece Employee rolündekiler doldurabilir ve sadece kendilerine.
+    """
+    if current_user.role != UserRole.employee:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu anketi yalnızca çalışanlar doldurabilir"
+        )
+        
+    current_employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+    if not current_employee:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Size ait bir çalışan kaydı bulunamadı"
+        )
+        
+    # Güvenlik ve doğruluk için payload'ı asıl employee ID ile eziyoruz
+    pulse_data.employee_id = current_employee.id
+        
+    return SurveyService.create_weekly_pulse_response(db, pulse_data)
+
+@router.get("/analytics/insights")
+def get_survey_insights(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    ML verilerini (MTE, ARS) yorumlayarak ön yüzdeki Dashboard analitiklerini (Kpi, Risk, Öneriler) doldurur.
+    - Admin: Tüm veritabanı analizini çeker
+    - Manager: Tüm departmanının analizini çeker
+    """
+    if current_user.role == UserRole.admin:
+        responses = SurveyService.get_all_survey_responses(db, 0, 10000)
+    elif current_user.role == UserRole.department_manager:
+        emp = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+        if not emp:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Çalışan kaydınız bulunamadı")
+        responses = SurveyService.get_responses_by_department(db, emp.department_id)
+    else:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Yetkisiz erişim")
+        
+    low_risk = 0
+    med_risk = 0
+    high_risk = 0
+    total_mte = 0.0
+    total_ms = 0.0
+    
+    for s in responses:
+        ars = getattr(s, 'ars_score', None)
+        if ars is not None:
+            if ars >= 0.6:
+                high_risk += 1
+            elif ars >= 0.2:
+                med_risk += 1
+            else:
+                low_risk += 1
+        else:
+            low_risk += 1
+            
+        mte = getattr(s, 'mte_score', None)
+        if mte is not None:
+            total_mte += mte
+            
+        total_ms += s.score
+        
+    count = len(responses) if len(responses) > 0 else 1
+    avg_mte = total_mte / count
+    avg_ms = total_ms / count
+    
+    # Dinamik Tavsiyeler (Recommendations)
+    recs = []
+    if high_risk > 0:
+        recs.append({"title": "Tükenmişlik Riski Uyarısı", "description": f"{high_risk} çalışanda yüksek ayrılma ve tükenmişlik riski (ARS) tespit edildi. Acil görüşmeler planlayın.", "icon": "ExclamationCircleIcon"})
+    if avg_mte < -0.1:
+        recs.append({"title": "Genel Motivasyon Düşüşü", "description": "Açık uçlu anketlerden ekibin genel motivasyon trendinde (MTE) negatif eğilim gözlemleniyor. İş yükünü kontrol edin.", "icon": "ArrowTrendingDownIcon"})
+    if avg_ms >= 4.0:
+        recs.append({"title": "Yüksek Performans", "description": "Sayısal bağlılık skoru çok yüksek! Ekip uyumu harika durumda.", "icon": "MegaphoneIcon"})
+    if not recs:
+        recs.append({"title": "Stabil Gidişat", "description": "Ekip genel olarak dengeli ve stabil bir performans sergiliyor.", "icon": "LightBulbIcon"})
+        
+    return {
+        "kpis": [
+            {
+                "title": "Ortalama Bağlılık (MS)",
+                "value": f"{round(avg_ms, 1)}",
+                "trend": "Aktif",
+                "trendColor": "text-emerald-600",
+                "comparison": "5 üzerinden"
+            },
+            {
+                "title": "Motivasyon Eğilimi (MTE)",
+                "value": f"{round(avg_mte, 3)}",
+                "trend": "NLP Analizi",
+                "trendColor": "text-blue-500",
+                "comparison": "-1 ile +1 arası"
+            },
+            {
+                "title": "Düşük Riskli Çalışan",
+                "value": f"{low_risk}",
+                "trend": "Güvenli",
+                "trendColor": "text-emerald-600",
+                "comparison": "toplam"
+            },
+            {
+                "title": "Yüksek Riskli Çalışan",
+                "value": f"{high_risk}",
+                "trend": "Dikkat",
+                "trendColor": "text-red-600",
+                "comparison": "müdahale gerekli"
+            }
+        ],
+        "riskData": [low_risk, med_risk, high_risk],
+        "recommendations": recs
+    }
 
 @router.get("/", response_model=List[SurveyResponseDetailResponse])
 def list_survey_responses(

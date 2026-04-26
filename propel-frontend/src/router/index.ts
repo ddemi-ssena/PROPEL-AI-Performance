@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+﻿import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -50,6 +50,12 @@ const router = createRouter({
           component: () => import('@/views/admin/AIInsights.vue'),
           meta: { title: 'Yapay Zeka Icgoruleri' },
         },
+        {
+          path: 'survey-results',
+          name: 'admin-survey-results',
+          component: () => import('@/views/shared/SurveyResults.vue'),
+          meta: { title: 'Anket Sonuclari' },
+        },
       ],
     },
     {
@@ -80,6 +86,12 @@ const router = createRouter({
           name: 'manager-team',
           component: () => import('@/views/manager/TeamManagement.vue'),
           meta: { title: 'Ekibim' },
+        },
+        {
+          path: 'survey-results',
+          name: 'manager-survey-results',
+          component: () => import('@/views/shared/SurveyResults.vue'),
+          meta: { title: 'Anket Sonuclari' },
         },
       ],
     },
@@ -148,7 +160,11 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    next('/dashboard')
+    const role = authStore.userRole
+    if (role === 'admin') next('/admin')
+    else if (role === 'department_manager') next('/manager')
+    else if (role === 'employee') next('/employee')
+    else next('/dashboard')
   } else {
     next()
   }

@@ -5,12 +5,12 @@ from datetime import date
 
 from app.db.models.survey_response import SurveyResponse
 from app.db.models.employee import Employee
-from app.schemas.survey_response import SurveyResponseCreate, SurveyResponseUpdate
+from app.schemas.survey_response import SurveyResponseCreate, SurveyResponseUpdate, WeeklyPulseCreate
 
 class SurveyService:
     
     # İzin verilen anket tipleri
-    ALLOWED_SURVEY_TYPES = ["motivation", "satisfaction", "stress"]
+    ALLOWED_SURVEY_TYPES = ["motivation", "satisfaction", "stress", "weekly_pulse"]
     
     @staticmethod
     def create_survey_response(db: Session, survey_data: SurveyResponseCreate) -> SurveyResponse:
@@ -45,6 +45,58 @@ class SurveyService:
             )
         
         db_survey = SurveyResponse(**survey_data.dict())
+        db.add(db_survey)
+        db.commit()
+        db.refresh(db_survey)
+        return db_survey
+
+    @staticmethod
+    def create_weekly_pulse_response(db: Session, pulse_data: "WeeklyPulseCreate") -> SurveyResponse:
+        from app.ml.prediction_engine import prediction_engine
+        
+        # 1. Employee kontrolü
+        employee = db.query(Employee).filter(Employee.id == pulse_data.employee_id).first()
+        if not employee:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Çalışan bulunamadı (ID: {pulse_data.employee_id})"
+            )
+            
+        # 2. Aynı dönem için anket var mı?
+        existing = db.query(SurveyResponse).filter(
+            SurveyResponse.employee_id == pulse_data.employee_id,
+            SurveyResponse.survey_type == "weekly_pulse",
+            SurveyResponse.period_date == pulse_data.period_date
+        ).first()
+        
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bu hafta için zaten nabız anketi doldurdunuz."
+            )
+            
+        # 3. Sayısal hesaplamalar (MS)
+        ms_score = round((pulse_data.q1 + pulse_data.q2 + pulse_data.q3) / 3, 2)
+        
+        # 4. ML Duygu Analizi (MTE, ARS)
+        ml_results = prediction_engine.analyze_pulse_survey(
+            q4_diff=pulse_data.q4,
+            q5_succ=pulse_data.q5,
+            q6_sugg=pulse_data.q6
+        )
+        
+        # 5. DB'ye kaydet
+        db_survey = SurveyResponse(
+            employee_id=pulse_data.employee_id,
+            survey_type="weekly_pulse",
+            score=ms_score,
+            period_date=pulse_data.period_date,
+            comments="Weekly pulse open-ended answers stored in raw_data",
+            raw_data=pulse_data.model_dump(mode='json'),
+            mte_score=ml_results.get("mte_score"),
+            ars_score=ml_results.get("ars_score")
+        )
+        
         db.add(db_survey)
         db.commit()
         db.refresh(db_survey)

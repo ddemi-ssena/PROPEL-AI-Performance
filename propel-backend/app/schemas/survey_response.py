@@ -7,6 +7,7 @@ class EmployeeInSurvey(BaseModel):
     id: int
     position: Optional[str]
     user_id: int
+    full_name: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -40,5 +41,23 @@ class SurveyResponseDetailResponse(SurveyResponseBase):
     updated_at: datetime
     employee: EmployeeInSurvey
     
+    # KUTUP Pulse AI fields
+    raw_data: Optional[dict] = None
+    mte_score: Optional[float] = None
+    ars_score: Optional[float] = None
+    
     class Config:
         from_attributes = True
+
+# Weekly Pulse Gelen İstek Şeması
+class WeeklyPulseCreate(BaseModel):
+    employee_id: int
+    period_date: date
+    # Sayısal Değerlendirme (1-5)
+    q1: int = Field(..., ge=1, le=5)
+    q2: int = Field(..., ge=1, le=5)
+    q3: int = Field(..., ge=1, le=5)
+    # Açık Uçlu NLP Değerlendirmesi
+    q4: str = Field(...)
+    q5: str = Field(...)
+    q6: str = Field(...)

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="space-y-8 pb-10">
     <section class="rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(79,70,229,0.18),_transparent_35%),linear-gradient(135deg,_#ffffff,_#eef2ff)] p-8 shadow-sm">
       <div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-6">

@@ -41,6 +41,12 @@ class EmployeeResponse(EmployeeBase):
     user: UserInEmployee
     department: DepartmentInEmployee
     
+    # ML & Pulse Survey Analytics
+    latest_mte: Optional[float] = None
+    latest_ars: Optional[float] = None
+    latest_ms: Optional[float] = None
+    risk_level: Optional[str] = "Low"
+    
     class Config:
         from_attributes = True
 
