@@ -133,6 +133,12 @@ const router = createRouter({
           name: 'employee-dashboard',
           component: () => import('@/views/employee/EmployeeDashboard.vue'),
         },
+        {
+          path: 'pulse',
+          name: 'employee-pulse',
+          component: () => import('@/views/employee/EmployeePulseView.vue'),
+          meta: { title: 'Nabiz Anketi' },
+        },
       ],
     },
     {

@@ -1,7 +1,6 @@
 import os
 import csv
 import json
-import pandas as pd
 from typing import List, Optional
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
@@ -69,6 +68,13 @@ class UploadService:
                     reader = csv.reader(f)
                     record_count = sum(1 for row in reader) - 1 # Exclude header
             elif ext == '.xlsx':
+                try:
+                    import pandas as pd
+                except ImportError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Excel yuklemeleri icin gerekli pandas kutuphanesi backend ortaminda kurulu degil."
+                    ) from exc
                 df = pd.read_excel(file_path)
                 record_count = len(df)
             elif ext == '.json':

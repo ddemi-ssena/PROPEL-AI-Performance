@@ -271,6 +271,7 @@ const allNavigation: NavigationItem[] = [
     ],
   },
   { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'employee' },
+  { name: 'Nabiz Anketi', to: '/employee/pulse', icon: HeartIcon, role: 'employee' },
   { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'admin' },
   { name: 'Kisisel Gelisim', to: '/employee', icon: UserIcon, role: 'employee' },
   { name: 'Ayarlar', to: '/settings', icon: Cog6ToothIcon, role: 'all' },
