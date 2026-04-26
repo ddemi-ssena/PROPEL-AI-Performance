@@ -45,9 +45,38 @@ class EmployeeService:
         return db_employee
     
     @staticmethod
+    def _attach_latest_surveys(employees: List[Employee]) -> List[Employee]:
+        for emp in employees:
+            if getattr(emp, 'survey_responses', None) and len(emp.survey_responses) > 0:
+                # Sort by period_date descending
+                latest = sorted(emp.survey_responses, key=lambda x: x.period_date, reverse=True)[0]
+                setattr(emp, 'latest_ms', latest.score)
+                setattr(emp, 'latest_mte', getattr(latest, 'mte_score', None))
+                setattr(emp, 'latest_ars', getattr(latest, 'ars_score', None))
+                
+                # Assign Risk Level
+                ars = getattr(latest, 'ars_score', None)
+                if ars is not None:
+                    if ars >= 0.6:
+                        setattr(emp, 'risk_level', "High")
+                    elif ars >= 0.2:
+                        setattr(emp, 'risk_level', "Medium")
+                    else:
+                        setattr(emp, 'risk_level', "Low")
+                else:
+                    setattr(emp, 'risk_level', "Low")
+            else:
+                setattr(emp, 'latest_ms', None)
+                setattr(emp, 'latest_mte', None)
+                setattr(emp, 'latest_ars', None)
+                setattr(emp, 'risk_level', "Low")
+        return employees
+
+    @staticmethod
     def get_all_employees(db: Session, skip: int = 0, limit: int = 100) -> List[Employee]:
         """Tüm çalışanları listele"""
-        return db.query(Employee).offset(skip).limit(limit).all()
+        employees = db.query(Employee).offset(skip).limit(limit).all()
+        return EmployeeService._attach_latest_surveys(employees)
     
     @staticmethod
     def get_employee_by_id(db: Session, emp_id: int) -> Employee:
@@ -58,7 +87,7 @@ class EmployeeService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Çalışan bulunamadı (ID: {emp_id})"
             )
-        return employee
+        return EmployeeService._attach_latest_surveys([employee])[0]
     
     @staticmethod
     def get_employees_by_department(db: Session, dept_id: int) -> List[Employee]:
@@ -71,7 +100,8 @@ class EmployeeService:
                 detail=f"Departman bulunamadı (ID: {dept_id})"
             )
         
-        return db.query(Employee).filter(Employee.department_id == dept_id).all()
+        employees = db.query(Employee).filter(Employee.department_id == dept_id).all()
+        return EmployeeService._attach_latest_surveys(employees)
     
     @staticmethod
     def update_employee(db: Session, emp_id: int, emp_data: EmployeeUpdate) -> Employee:

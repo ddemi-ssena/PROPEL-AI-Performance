@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="min-h-screen bg-gray-50 flex font-sans text-slate-800">
     <aside class="w-72 bg-slate-900 border-r border-slate-800 hidden md:flex flex-col shadow-xl z-20">
       <div class="p-6 border-b border-slate-800 flex items-center gap-3">
@@ -145,6 +145,15 @@
           </div>
         </div>
         <div class="flex items-center gap-4">
+          <button
+            v-if="userRole === 'employee'"
+            @click="isWeeklyPulseModalOpen = true"
+            class="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-bold border border-indigo-100 hover:bg-indigo-100 transition-all shadow-sm"
+          >
+            <HeartIcon class="w-4 h-4" />
+            <span>Nabiz Anketi</span>
+          </button>
+          <div v-if="userRole === 'employee'" class="w-px h-6 bg-slate-200 mx-1"></div>
           <button class="p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50 transition-all relative">
             <BellIcon class="w-6 h-6" />
             <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
@@ -155,6 +164,12 @@
       <div class="p-6">
         <router-view />
       </div>
+
+      <WeeklyPulseModal
+        :is-open="isWeeklyPulseModalOpen"
+        @close="isWeeklyPulseModalOpen = false"
+        @submit="handlePulseSubmit"
+      />
     </main>
   </div>
 </template>
@@ -162,27 +177,30 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import type { FunctionalComponent, HTMLAttributes, VNodeProps } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import WeeklyPulseModal from '@/components/dashboard/WeeklyPulseModal.vue'
+import { employeeApi } from '@/services/api/employee.api'
 import { ChatBubbleLeftRightIcon } from '@heroicons/vue/24/solid'
 import {
-  HomeIcon,
-  UsersIcon,
-  BuildingOfficeIcon,
-  ChartBarIcon,
-  UserIcon,
+  ArrowLeftIcon,
   ArrowRightOnRectangleIcon,
   BellIcon,
-  ArrowLeftIcon,
-  Cog6ToothIcon,
-  DocumentTextIcon,
+  ChartBarIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  Cog6ToothIcon,
+  DocumentTextIcon,
+  HeartIcon,
+  HomeIcon,
+  UserIcon,
+  UsersIcon,
 } from '@heroicons/vue/24/outline'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const isWeeklyPulseModalOpen = ref(false)
 
 const userRole = computed(() => authStore.user?.role || localStorage.getItem('role') || 'employee')
 const userName = computed(() => authStore.user?.full_name || 'Kullanici')
@@ -233,11 +251,13 @@ type NavigationItem = NavLeaf | NavSection | NavGroup
 
 const allNavigation: NavigationItem[] = [
   { name: 'Genel Bakis', to: '/admin', icon: HomeIcon, role: 'admin' },
-  { name: 'Departman Yonetimi', to: '/admin/departments', icon: BuildingOfficeIcon, role: 'admin' },
   { name: 'Personel Yonetimi', to: '/admin/employees', icon: UsersIcon, role: 'admin' },
-  { name: 'Yapay Zeka Icgoruleri', to: '/admin/ai-insights', icon: ChartBarIcon, role: 'admin' },
   { name: 'Veri Yonetimi', to: '/admin/data-management', icon: DocumentTextIcon, role: 'admin' },
+  { name: 'Yapay Zeka Icgoruleri', to: '/admin/ai-insights', icon: ChartBarIcon, role: 'admin' },
+  { name: 'Anket Sonuclari', to: '/admin/survey-results', icon: DocumentTextIcon, role: 'admin' },
   { name: 'Departman Performansi', to: '/manager', icon: ChartBarIcon, role: 'department_manager' },
+  { name: 'Ekibim', to: '/manager/team', icon: UsersIcon, role: 'department_manager' },
+  { name: 'Anket Sonuclari', to: '/manager/survey-results', icon: DocumentTextIcon, role: 'department_manager' },
   {
     name: '360 Derece Feedback',
     type: 'group',
@@ -251,9 +271,9 @@ const allNavigation: NavigationItem[] = [
     ],
   },
   { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'employee' },
+  { name: 'Nabiz Anketi', to: '/employee/pulse', icon: HeartIcon, role: 'employee' },
   { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'admin' },
   { name: 'Kisisel Gelisim', to: '/employee', icon: UserIcon, role: 'employee' },
-  { name: 'Performansim', to: '/employee/performance', icon: ChartBarIcon, role: 'employee' },
   { name: 'Ayarlar', to: '/settings', icon: Cog6ToothIcon, role: 'all' },
 ]
 
@@ -264,7 +284,7 @@ const navigation = computed(() =>
 const openGroups = ref<string[]>(['360 Derece Feedback'])
 
 const isActiveRoute = (target: string) => {
-  if (target === '/manager' || target === '/admin' || target === '/employee' || target === '/feedback' || target === '/settings') {
+  if (['/manager', '/admin', '/employee', '/feedback', '/settings'].includes(target)) {
     return route.path === target
   }
   return route.path === target || route.path.startsWith(`${target}/`)
@@ -280,8 +300,26 @@ const toggleGroup = (groupName: string) => {
   openGroups.value = [...openGroups.value, groupName]
 }
 
-const isGroupActive = (item: NavGroup) =>
-  item.children.some((child) => 'to' in child && isActiveRoute(child.to))
+const isGroupActive = (item: NavGroup) => item.children.some((child) => 'to' in child && isActiveRoute(child.to))
+
+const handlePulseSubmit = async (data: any) => {
+  try {
+    const payload = {
+      employee_id: authStore.user?.id || 1,
+      period_date: new Date().toISOString().split('T')[0],
+      ...data,
+    }
+    await employeeApi.submitWeeklyPulse(payload)
+    isWeeklyPulseModalOpen.value = false
+    alert('Anketiniz basariyla kaydedildi. Motivasyon analiziniz guncellendi.')
+  } catch (error: any) {
+    if (error.response?.data?.detail) {
+      alert(error.response.data.detail)
+      return
+    }
+    alert('Anket gonderilirken bir hata olustu.')
+  }
+}
 
 const handleLogout = () => {
   authStore.logout()

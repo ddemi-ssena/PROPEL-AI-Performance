@@ -88,3 +88,64 @@ def ensure_pgvector_support(engine) -> bool:
     except Exception as exc:
         print(f"pgvector setup skipped: {exc}")
         return False
+
+
+def ensure_weekly_pulse_columns(engine) -> bool:
+    """
+    Adds weekly pulse columns to survey_responses for existing databases that
+    were created before raw NLP fields were introduced.
+    """
+    if engine.dialect.name != "postgresql":
+        return False
+
+    try:
+        with engine.begin() as conn:
+            table_exists = conn.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.tables
+                        WHERE table_name = 'survey_responses'
+                    )
+                    """
+                )
+            ).scalar()
+
+            if not table_exists:
+                return True
+
+            columns = {
+                "raw_data": "JSONB",
+                "mte_score": "DOUBLE PRECISION",
+                "ars_score": "DOUBLE PRECISION",
+            }
+
+            for column_name, column_type in columns.items():
+                column_exists = conn.execute(
+                    text(
+                        """
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM information_schema.columns
+                            WHERE table_name = 'survey_responses'
+                              AND column_name = :column_name
+                        )
+                        """
+                    ),
+                    {"column_name": column_name},
+                ).scalar()
+
+                if not column_exists:
+                    conn.execute(
+                        text(
+                            f"""
+                            ALTER TABLE survey_responses
+                            ADD COLUMN {column_name} {column_type}
+                            """
+                        )
+                    )
+        return True
+    except Exception as exc:
+        print(f"weekly pulse schema setup skipped: {exc}")
+        return False

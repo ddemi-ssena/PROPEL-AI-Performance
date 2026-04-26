@@ -4,7 +4,7 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
       <StatCard
         title="Toplam Personel"
-        value="48"
+        :value="stats.totalEmployees"
         change="+12%"
         changeType="increase"
         :icon="UsersIcon"
@@ -12,23 +12,23 @@
       />
       <StatCard
         title="Departmanlar"
-        value="6"
+        :value="stats.totalDepartments"
         change="0%"
         changeType="neutral"
         :icon="BuildingOfficeIcon"
         color="slate"
       />
       <StatCard
-        title="Ortalama Skor"
-        value="8.4"
+        title="Ortalama Bağlılık"
+        :value="stats.avgScore"
         change="+2.1%"
         changeType="increase"
         :icon="ChartBarIcon"
         color="emerald"
       />
       <StatCard
-        title="Riskli Personel"
-        value="3"
+        title="Yüksek Riskli Personel"
+        :value="stats.highRiskCount"
         change="-1"
         changeType="decrease"
         :icon="ExclamationTriangleIcon"
@@ -198,19 +198,67 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { UsersIcon, BuildingOfficeIcon, ChartBarIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import StatCard from '@/components/dashboard/StatCard.vue'
+import { employeeApi } from '@/services/api/employee.api'
+import { dashboardApi } from '@/services/api/dashboard.api'
 
-const departments = [
-  { id: 1, name: 'Yazılım Geliştirme', manager: 'Ahmet Yılmaz', managerInitials: 'AY', employees: 15, score: 8.9 },
-  { id: 2, name: 'Satış', manager: 'Ayşe Kaya', managerInitials: 'AK', employees: 22, score: 9.2 },
-  { id: 3, name: 'Pazarlama', manager: 'Mehmet Demir', managerInitials: 'MD', employees: 8, score: 7.5 },
-  { id: 4, name: 'İnsan Kaynakları', manager: 'Zeynep Çelik', managerInitials: 'ZÇ', employees: 5, score: 7.9 },
-]
+const stats = ref({
+  totalEmployees: '0',
+  totalDepartments: '0',
+  avgScore: '0',
+  highRiskCount: '0'
+})
+
+const departments = ref<any[]>([])
+
+const fetchDashboardData = async () => {
+    try {
+        const [empData, insightData] = await Promise.all([
+            employeeApi.getEmployees(),
+            dashboardApi.getInsights()
+        ])
+        
+        stats.value.totalEmployees = empData.length.toString()
+        
+        // Count departments
+        const depts = new Set(empData.map((e: any) => e.department_name))
+        stats.value.totalDepartments = depts.size.toString()
+        
+        // Stats from insights
+        const scoreKpi = insightData.kpis.find((k: any) => k.title.includes('Bağlılık') || k.title.includes('Ortalama'))
+        stats.value.avgScore = scoreKpi ? scoreKpi.value : '0'
+        stats.value.highRiskCount = insightData.riskData[2].toString()
+        
+        // Populate departments table (mock or real if API exists)
+        // For now using mock departments but updating with real count logic if needed
+        departments.value = Array.from(depts).map((name, index) => {
+            const deptEmps = empData.filter((e: any) => e.department_name === name)
+            const avgDeptScore = (deptEmps.reduce((acc: number, curr: any) => acc + (curr.latest_ms || 0), 0) / (deptEmps.length || 1)).toFixed(1)
+            
+            return {
+                id: index + 1,
+                name: name,
+                manager: 'Yönetici Atanmadı',
+                managerInitials: 'YA',
+                employees: deptEmps.length,
+                score: parseFloat(avgDeptScore)
+            }
+        })
+
+    } catch (e) {
+        console.error("Dashboard data fetch failed", e)
+    }
+}
+
+onMounted(() => {
+    fetchDashboardData()
+})
 
 const getScoreBadgeClass = (score: number) => {
-  if (score >= 8.5) return 'bg-emerald-50 text-emerald-700 border-emerald-100'
-  if (score >= 7.0) return 'bg-amber-50 text-amber-700 border-amber-100'
+  if (score >= 4.0) return 'bg-emerald-50 text-emerald-700 border-emerald-100'
+  if (score >= 3.0) return 'bg-amber-50 text-amber-700 border-amber-100'
   return 'bg-rose-50 text-rose-700 border-rose-100'
 }
 </script>

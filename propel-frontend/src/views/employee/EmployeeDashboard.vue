@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="pb-10">
     <!-- Stronger Header Section (Gradient Banner) -->
     <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 shadow-xl mb-8">
@@ -130,6 +130,21 @@
                  </div>
                  <span class="text-[10px] uppercase font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded border border-slate-200">Anonim</span>
             </div>
+
+            <div class="mb-5 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-800">Bu haftaki nabız anketini doldur</p>
+                        <p class="mt-1 text-xs text-slate-500">Yanıtların motivasyon ve risk analizlerinde kullanılır.</p>
+                    </div>
+                    <button
+                        @click="isWeeklyPulseModalOpen = true"
+                        class="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500"
+                    >
+                        Ankete Cevap Ver
+                    </button>
+                </div>
+            </div>
             
             <div class="grid grid-cols-4 gap-4">
                 <button class="group flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-slate-50 bg-slate-50/50 hover:border-rose-200 hover:bg-rose-50 transition-all active:scale-95">
@@ -214,6 +229,12 @@
             </div>
         </div>
     </div>
+
+    <WeeklyPulseModal
+      :is-open="isWeeklyPulseModalOpen"
+      @close="isWeeklyPulseModalOpen = false"
+      @submit="handlePulseSubmit"
+    />
   </div>
 </template>
 
@@ -229,11 +250,14 @@ import {
 import { onMounted, ref } from 'vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
 import LineChart from '@/components/dashboard/LineChart.vue'
+import WeeklyPulseModal from '@/components/dashboard/WeeklyPulseModal.vue'
 import { useAuthStore } from '@/stores/auth'
 import BadgeMedal from '@/components/common/BadgeMedal.vue'
 import { feedbackApi, type BadgeResponse, type BadgeType } from '@/services/api/feedback.api'
+import { employeeApi } from '@/services/api/employee.api'
 const userStore = useAuthStore()
 const badges = ref<BadgeResponse[]>([])
+const isWeeklyPulseModalOpen = ref(false)
 
 function getBadgeDescription(badge: BadgeResponse | { badge_type: BadgeType; source_feedback_ids?: number[] }) {
   const baseMap = {
@@ -256,5 +280,24 @@ onMounted(async () => {
     badges.value = []
   }
 })
+
+const handlePulseSubmit = async (data: any) => {
+  try {
+    const payload = {
+      employee_id: userStore.user?.id || 1,
+      period_date: new Date().toISOString().split('T')[0],
+      ...data,
+    }
+    await employeeApi.submitWeeklyPulse(payload)
+    isWeeklyPulseModalOpen.value = false
+    alert('Anketiniz basariyla kaydedildi. Motivasyon analiziniz guncellendi.')
+  } catch (error: any) {
+    if (error.response?.data?.detail) {
+      alert(error.response.data.detail)
+      return
+    }
+    alert('Anket gonderilirken bir hata olustu.')
+  }
+}
 </script>
 
