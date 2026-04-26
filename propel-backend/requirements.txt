@@ -11,6 +11,7 @@ python-multipart==0.0.6
 alembic==1.12.1
 email-validator
 requests==2.32.3
+httpx==0.25.2
 
 # Faker for seed data
 faker==18.10.0
