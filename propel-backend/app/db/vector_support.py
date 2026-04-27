@@ -149,3 +149,82 @@ def ensure_weekly_pulse_columns(engine) -> bool:
     except Exception as exc:
         print(f"weekly pulse schema setup skipped: {exc}")
         return False
+
+
+def ensure_employee_profile_columns(engine) -> bool:
+    """
+    Adds employee profile fields needed for team-aware analytics on databases
+    that were created before the new employee contract existed.
+    """
+    if engine.dialect.name != "postgresql":
+        return False
+
+    try:
+        with engine.begin() as conn:
+            table_exists = conn.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.tables
+                        WHERE table_name = 'employees'
+                    )
+                    """
+                )
+            ).scalar()
+
+            if not table_exists:
+                return True
+
+            columns = {
+                "external_employee_code": "VARCHAR(50)",
+                "team": "VARCHAR(100)",
+                "experience_years": "DOUBLE PRECISION",
+            }
+
+            for column_name, column_type in columns.items():
+                column_exists = conn.execute(
+                    text(
+                        """
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM information_schema.columns
+                            WHERE table_name = 'employees'
+                              AND column_name = :column_name
+                        )
+                        """
+                    ),
+                    {"column_name": column_name},
+                ).scalar()
+
+                if not column_exists:
+                    conn.execute(
+                        text(
+                            f"""
+                            ALTER TABLE employees
+                            ADD COLUMN {column_name} {column_type}
+                            """
+                        )
+                    )
+
+            conn.execute(
+                text(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS ix_employees_external_employee_code
+                    ON employees (external_employee_code)
+                    WHERE external_employee_code IS NOT NULL
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_employees_team
+                    ON employees (team)
+                    """
+                )
+            )
+        return True
+    except Exception as exc:
+        print(f"employee profile schema setup skipped: {exc}")
+        return False

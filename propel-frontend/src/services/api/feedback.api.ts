@@ -117,7 +117,10 @@ export interface FeedbackSummary {
 
 export interface EmployeeForFeedback {
   id: number
+  external_employee_code?: string
+  team?: string
   position?: string
+  experience_years?: number
   user_id: number
   department: { id: number; name: string }
   user: { id: number; email: string; full_name: string; role: string }
@@ -275,6 +278,7 @@ export interface Employee360SummaryReportResponse {
   employee_name: string
   department_id?: number
   department_name?: string
+  team?: string
   position?: string
   period_year: number
   period_month: number
@@ -365,6 +369,7 @@ export interface EmployeeMonthlyRAGReportResponse {
   employee_name: string
   department_id?: number | null
   department_name?: string | null
+  team?: string | null
   period_year: number
   period_month: number
   report_summary: string

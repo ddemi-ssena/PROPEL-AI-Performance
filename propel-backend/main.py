@@ -1,4 +1,4 @@
-﻿from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,13 +7,18 @@ from app.api.routers import admin_uploads, auth, departments, employees, feedbac
 from app.core.config import settings
 from app.db.models import Base
 from app.db.session import engine
-from app.db.vector_support import ensure_pgvector_support, ensure_weekly_pulse_columns
+from app.db.vector_support import (
+    ensure_employee_profile_columns,
+    ensure_pgvector_support,
+    ensure_weekly_pulse_columns,
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting API... Creating tables...")
     Base.metadata.create_all(bind=engine)
+    ensure_employee_profile_columns(engine)
     ensure_weekly_pulse_columns(engine)
     ensure_pgvector_support(engine)
     yield

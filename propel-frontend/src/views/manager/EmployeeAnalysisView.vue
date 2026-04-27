@@ -51,7 +51,15 @@
                     </span>
                   </div>
                 </div>
-                <p class="mt-1 text-sm text-slate-500">{{ employee.position || 'Çalışan' }}</p>
+                <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                  <span>{{ employee.position || 'Calisan' }}</span>
+                  <span
+                    v-if="employee.team"
+                    class="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700"
+                  >
+                    {{ employee.team }}
+                  </span>
+                </div>
               </div>
               <span
                 class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
@@ -85,6 +93,11 @@
                 {{ selectedEmployeeReport.position || 'Çalışan' }}
                 <span v-if="selectedEmployeeReport.department_name"> - {{ selectedEmployeeReport.department_name }}</span>
               </p>
+              <div v-if="selectedEmployeeReport.team" class="mt-3">
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                  {{ selectedEmployeeReport.team }} Takimi
+                </span>
+              </div>
               <div v-if="selectedEmployeeReport.badges?.length" class="mt-4 flex flex-wrap gap-3">
                 <div
                   v-for="badge in selectedEmployeeReport.badges"
@@ -653,4 +666,6 @@ onMounted(async () => {
   }
 })
 </script>
+
+
 
