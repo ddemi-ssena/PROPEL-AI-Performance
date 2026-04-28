@@ -1,17 +1,21 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import random
 
 from app.core.security import get_password_hash
 from app.db.models import Base
+from app.db.models.data_upload import DataUpload
 from app.db.models.department import Department
 from app.db.models.employee import Employee
-from app.db.models.feedback import FeedbackDirection, FeedbackQuestion
+from app.db.models.feedback import FeedbackDirection, FeedbackQuestion, FeedbackResponse
 from app.db.models.kpi import KPI, KPIRecord, KPIUnit
 from app.db.models.survey_response import SurveyResponse
 from app.db.models.user import User, UserRole
 from app.db.session import SessionLocal
+from app.services.ai_service import AIService
+from app.services.nlp_service import NLPService
+from app.services.rag_service import RAGService
 
 
 db = SessionLocal()
@@ -99,6 +103,12 @@ TEAM_MEETING_FACTOR = {
 }
 
 
+def employee_login_email(spec: dict) -> str:
+    if spec["code"] == "SE-001":
+        return "developer1@propel.com"
+    return f"{spec['code'].lower()}@propel.com"
+
+
 def clamp(value: float, lower: float, upper: float, digits: int = 2) -> float:
     return round(max(lower, min(upper, value)), digits)
 
@@ -136,10 +146,12 @@ def create_users() -> list[User]:
     ]
 
     for spec in EMPLOYEE_SPECS:
+        login_email = employee_login_email(spec)
+        login_password = "dev123" if spec["code"] == "SE-001" else "employee123"
         users.append(
             User(
-                email=f"{spec['code'].lower()}@propel.com",
-                hashed_password=get_password_hash("employee123"),
+                email=login_email,
+                hashed_password=get_password_hash(login_password),
                 full_name=spec["name"],
                 role=UserRole.employee,
                 is_active=True,
@@ -184,7 +196,7 @@ def create_employees(users: list[User], departments: list[Department]) -> list[E
     ]
 
     for index, spec in enumerate(EMPLOYEE_SPECS, start=1):
-        email = f"{spec['code'].lower()}@propel.com"
+        email = employee_login_email(spec)
         employees.append(
             Employee(
                 user_id=user_map[email].id,
@@ -388,6 +400,13 @@ def create_feedback_questions(departments: list[Department]) -> list[FeedbackQue
         ),
         FeedbackQuestion(
             week_number=4,
+            direction=FeedbackDirection.peer_to_peer,
+            question_text="Bu hafta ekip ici iletisim, yardimlasma ve sahiplenme davranisi nasil gorundu?",
+            category="Iletisim ve Sahiplenme",
+            department_id=software_department.id,
+        ),
+        FeedbackQuestion(
+            week_number=4,
             direction=FeedbackDirection.employee_to_manager,
             question_text="Bu ay yonetsel destek, teknik mentorluk ve surec netligi acisindan neler iyi gitti?",
             category="Yonetsel Destek",
@@ -401,16 +420,202 @@ def create_feedback_questions(departments: list[Department]) -> list[FeedbackQue
     return questions
 
 
-def main() -> None:
-    print("Software analytics seed baslatiliyor...\n")
-    clear_all_data()
-    users = create_users()
-    departments = create_departments()
-    employees = create_employees(users, departments)
-    kpis, kpi_map = create_kpis(departments)
-    kpi_records = create_kpi_records(employees, kpi_map)
-    survey_responses = create_survey_responses(employees)
-    feedback_questions = create_feedback_questions(departments)
+def get_feedback_anchor_dates() -> dict[int, date]:
+    today = date.today()
+    return {
+        1: today.replace(day=3),
+        2: today.replace(day=10),
+        3: today.replace(day=17),
+        4: today.replace(day=24),
+    }
+
+
+def get_feedback_question_map(questions: list[FeedbackQuestion]) -> dict[tuple[int, FeedbackDirection], FeedbackQuestion]:
+    return {
+        (question.week_number, question.direction): question
+        for question in questions
+    }
+
+
+def classify_employee_signal(employee: Employee) -> str:
+    code = employee.external_employee_code or ""
+    if code in {"SE-003", "SE-009", "SE-023", "SE-029"}:
+        return "watch"
+    if code in {"SE-001", "SE-004", "SE-012", "SE-019", "SE-026"}:
+        return "strong"
+    return "steady"
+
+
+def build_feedback_payload(employee: Employee, week_number: int, signal: str) -> tuple[str, tuple[int, int, int, int]]:
+    team = employee.team or "ekip"
+    role = get_role_bucket(employee.position or "Mid")
+
+    if signal == "strong":
+        text_map = {
+            1: f"Bu hafta {team} akisinda blokaj gordugunde sakin kaldi ve cozum uretmek icin hizla sorumluluk aldi. Teknik kaliteyi korurken ekibin guvenini yuksek tuttu.",
+            2: f"Teslimat ve kalite tarafinda {role.lower()} seviyesine uygun sekilde guven verdi. Kod duzeni, review disiplini ve takip konusunda istikrarli bir profil sergiledi.",
+            3: f"Bu hafta hedefleri netlestirme, riskleri erken gorme ve onceliklendirme konusunda guclu bir etki yaratti. Takimi hizlandiran ve guven veren bir calisma bicimi vardi.",
+            4: f"Ekip ici iletisimde acikti, yardim istendiginde hizli donus sagladi ve sahiplenme seviyesi yuksekti. Pozitif enerjisi takim uyumunu destekledi.",
+        }
+        score_map = {
+            1: (5, 5, 4, 5),
+            2: (4, 5, 4, 5),
+            3: (4, 4, 5, 5),
+            4: (5, 5, 4, 4),
+        }
+    elif signal == "watch":
+        text_map = {
+            1: f"Bu hafta {team} akisinda blokajlar uzadiginda kolay yoruldu ve sahiplenme seviyesi dalgalandi. Cozum ararken motivasyonunun hizla dustugu goruldu.",
+            2: f"Teslimat ve kalite tarafinda dikkat daginikligi yasadi. Review yorumlarini uygulamakta ve isleri zamaninda kapatmakta zorlandigi anlar oldu.",
+            3: f"Risk takibi ve onceliklendirme konusunda destege ihtiyac duydu. Belirsizlik anlarinda geri cekilme davranisi ekip uzerinde baski yaratti.",
+            4: f"Iletisimde zaman zaman kapanik kaldi ve yardim istemeyi geciktirdi. Ekip uyumu gecen haftalara gore kirilgan gorundu.",
+        }
+        score_map = {
+            1: (2, 2, 2, 2),
+            2: (2, 2, 2, 3),
+            3: (2, 2, 2, 2),
+            4: (2, 2, 2, 2),
+        }
+    else:
+        text_map = {
+            1: f"Bu hafta {team} akisinda genel olarak sorumluluk aldi ancak bazi blokajlarda yonlendirmeye ihtiyac duydu. Geri bildirim aldiginda toparlanmaya acik bir tavir sergiledi.",
+            2: f"Teslimat ve kalite dengesinde genelde istikrarliydi. Bazi detaylarda daha fazla kontrol gerekse de ekip icinde guven veren bir katkisi oldu.",
+            3: f"Onceliklendirme ve risk takibinde orta seviyede tutarliydi. Yogun anlarda destegi kabul ettiginde verimi belirgin sekilde artti.",
+            4: f"Ekip ici iletisimde daha seffaf olmaya basladi ve yardimlasma davranisi guclendi. Sahiplenme seviyesi haftanin ikinci yarisinda daha olumlu gorundu.",
+        }
+        score_map = {
+            1: (3, 3, 3, 4),
+            2: (3, 4, 3, 4),
+            3: (3, 3, 4, 4),
+            4: (4, 4, 3, 4),
+        }
+
+    return text_map[week_number], score_map[week_number]
+
+
+def get_peer_sender(employee: Employee, team_members: list[Employee], week_number: int) -> Employee:
+    ordered = sorted(team_members, key=lambda item: item.external_employee_code or "")
+    index = next(i for i, member in enumerate(ordered) if member.id == employee.id)
+    offset = -1 if week_number in {1, 4} else 1
+    return ordered[(index + offset) % len(ordered)]
+
+
+def create_weekly_feedback_history(employees: list[Employee], questions: list[FeedbackQuestion]) -> list[FeedbackResponse]:
+    print("Haftalik 360 feedback kayitlari olusturuluyor...")
+    software_employees = [employee for employee in employees if employee.team != "Yonetim"]
+    manager = next(employee for employee in employees if employee.team == "Yonetim")
+    team_map: dict[str, list[Employee]] = {}
+    for employee in software_employees:
+        team_map.setdefault(employee.team or "Genel", []).append(employee)
+
+    question_map = get_feedback_question_map(questions)
+    anchor_dates = get_feedback_anchor_dates()
+    created_rows: list[FeedbackResponse] = []
+
+    for week_number in range(1, 5):
+        for employee in software_employees:
+            if week_number == 3:
+                sender = manager
+                direction = FeedbackDirection.manager_to_employee
+            else:
+                sender = get_peer_sender(employee, team_map[employee.team or "Genel"], week_number)
+                direction = FeedbackDirection.peer_to_peer
+
+            question = question_map[(week_number, direction)]
+            response_text, scores = build_feedback_payload(
+                employee,
+                week_number,
+                classify_employee_signal(employee),
+            )
+            created_at = datetime.combine(anchor_dates[week_number], datetime.min.time()).replace(
+                hour=9 + (employee.id % 6),
+                minute=(employee.id * 7) % 50,
+            )
+
+            row = FeedbackResponse(
+                sender_id=sender.id,
+                receiver_id=employee.id,
+                question_id=question.id,
+                response_text=response_text,
+                score_communication=scores[0],
+                score_teamwork=scores[1],
+                score_leadership=scores[2],
+                score_technical=scores[3],
+                period_week=week_number,
+                period_month=created_at.month,
+                period_year=created_at.year,
+                nlp_analysis=None,
+                created_at=created_at,
+                updated_at=created_at,
+            )
+            db.add(row)
+            db.flush()
+
+            analysis_payload = AIService._fallback_weekly_analysis(
+                dept_name=employee.department.name if employee.department else SOFTWARE_DEPARTMENT_NAME,
+                question_text=question.question_text,
+                response_text=row.response_text,
+                score_communication=float(row.score_communication),
+                score_teamwork=float(row.score_teamwork),
+                score_leadership=float(row.score_leadership),
+                score_technical=float(row.score_technical),
+            )
+            provider = "heuristic"
+            model_name = "seed-local-fallback-v1"
+
+            analysis = NLPService.save_weekly_analysis(
+                db,
+                feedback_response=row,
+                analysis_payload=analysis_payload,
+                analysis_version="seed-v1",
+                model_provider=provider,
+                model_name=model_name,
+            )
+            analysis.created_at = created_at
+            analysis.updated_at = created_at
+
+            memory = RAGService.upsert_weekly_feedback_memory(
+                db,
+                feedback_response=row,
+                analysis_payload=analysis_payload,
+            )
+            memory.created_at = created_at
+            memory.updated_at = created_at
+            created_rows.append(row)
+
+    db.commit()
+
+    current_year = date.today().year
+    current_month = date.today().month
+    for employee in software_employees:
+        NLPService.refresh_employee_monthly_badges(
+            db,
+            employee_id=employee.id,
+            period_year=current_year,
+            period_month=current_month,
+        )
+
+    db.commit()
+    print(f"{len(created_rows)} haftalik feedback kaydi olusturuldu.")
+    return created_rows
+
+
+def print_seed_summary(
+    *,
+    users: list[User],
+    departments: list[Department],
+    employees: list[Employee],
+    kpis: list[KPI],
+    kpi_records: list[KPIRecord],
+    survey_responses: list[SurveyResponse],
+    feedback_questions: list[FeedbackQuestion],
+    feedback_responses: list[FeedbackResponse] | None = None,
+) -> None:
+    feedback_count_line = (
+        f"- {len(feedback_responses)} haftalik feedback kaydi"
+        if feedback_responses is not None
+        else "- Haftalik feedback kaydi yuklenmedi"
+    )
 
     print("\nSeed tamamlandi!")
     print(
@@ -420,14 +625,67 @@ def main() -> None:
         f"- {len(kpis)} KPI tanimi\n"
         f"- {len(kpi_records)} KPI kaydi\n"
         f"- {len(survey_responses)} anket cevabi\n"
-        f"- {len(feedback_questions)} feedback sorusu"
+        f"- {len(feedback_questions)} feedback sorusu\n"
+        f"{feedback_count_line}"
     )
     print("\nTest hesaplari:")
     print("Admin: admin@propel.com / admin123")
     print("Yazilim Manager: manager.yazilim@propel.com / manager123")
-    print("Ornek Calisan: se001@propel.com / employee123")
+    print("Ornek Calisan: developer1@propel.com / dev123")
+
+
+def run_core_seed() -> dict[str, object]:
+    print("Software core seed baslatiliyor...\n")
+    clear_all_data()
+    users = create_users()
+    departments = create_departments()
+    employees = create_employees(users, departments)
+    kpis, kpi_map = create_kpis(departments)
+    kpi_records = create_kpi_records(employees, kpi_map)
+    survey_responses = create_survey_responses(employees)
+    feedback_questions = create_feedback_questions(departments)
+    payload = {
+        "users": users,
+        "departments": departments,
+        "employees": employees,
+        "kpis": kpis,
+        "kpi_map": kpi_map,
+        "kpi_records": kpi_records,
+        "survey_responses": survey_responses,
+        "feedback_questions": feedback_questions,
+    }
+    print_seed_summary(
+        users=users,
+        departments=departments,
+        employees=employees,
+        kpis=kpis,
+        kpi_records=kpi_records,
+        survey_responses=survey_responses,
+        feedback_questions=feedback_questions,
+    )
+    return payload
+
+
+def run_analytics_seed() -> dict[str, object]:
+    payload = run_core_seed()
+    feedback_responses = create_weekly_feedback_history(
+        payload["employees"],
+        payload["feedback_questions"],
+    )
+    payload["feedback_responses"] = feedback_responses
+    print_seed_summary(
+        users=payload["users"],
+        departments=payload["departments"],
+        employees=payload["employees"],
+        kpis=payload["kpis"],
+        kpi_records=payload["kpi_records"],
+        survey_responses=payload["survey_responses"],
+        feedback_questions=payload["feedback_questions"],
+        feedback_responses=feedback_responses,
+    )
+    return payload
 
 
 if __name__ == "__main__":
-    main()
+    run_core_seed()
     db.close()

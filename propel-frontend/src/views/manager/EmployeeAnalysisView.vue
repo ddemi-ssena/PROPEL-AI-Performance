@@ -7,8 +7,19 @@
           Ekipteki çalışanların 360 derece geri bildirim raporlarını, skorlarını ve yönetici özetlerini ayrı ayrı inceleyin.
         </p>
       </div>
-      <div class="rounded-full border border-indigo-100 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700">
-        {{ teamMembers.length }} çalışan listeleniyor
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <select
+          v-model="selectedTeam"
+          class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
+        >
+          <option value="all">Tum Takimlar</option>
+          <option v-for="team in teamOptions" :key="team" :value="team">
+            {{ team }}
+          </option>
+        </select>
+        <div class="rounded-full border border-indigo-100 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700">
+          {{ filteredTeamMembers.length }} calisan listeleniyor
+        </div>
       </div>
     </div>
 
@@ -19,9 +30,9 @@
           <h3 class="mt-1 text-lg font-bold text-slate-900">Rapor seçimi</h3>
         </div>
 
-        <div v-if="teamMembers.length" class="max-h-[720px] overflow-y-auto p-3 space-y-3">
+        <div v-if="filteredTeamMembers.length" class="max-h-[720px] overflow-y-auto p-3 space-y-3">
           <button
-            v-for="employee in teamMembers"
+            v-for="employee in filteredTeamMembers"
             :key="employee.id"
             type="button"
             class="w-full rounded-2xl border p-4 text-left transition-all"
@@ -77,7 +88,7 @@
         </div>
 
         <div v-else class="p-6 text-sm text-slate-400">
-          Bu yönetici için listelenecek çalışan bulunamadı.
+          Secili takim icin listelenecek calisan bulunamadi.
         </div>
       </aside>
 
@@ -440,6 +451,7 @@ import {
 } from '@/services/api/feedback.api'
 
 const teamMembers = ref<EmployeeForFeedback[]>([])
+const selectedTeam = ref<string>('all')
 const selectedEmployeeId = ref<number | null>(null)
 const selectedEmployeeReport = ref<Employee360SummaryReportResponse | null>(null)
 const monthlyDeepAnalysis = ref<EmployeeMonthlyDeepAnalysisResponse | null>(null)
@@ -467,6 +479,17 @@ const monthOptions = [
 const yearOptions = computed(() => {
   const baseYear = today.getFullYear()
   return [baseYear - 1, baseYear, baseYear + 1]
+})
+
+const teamOptions = computed(() => {
+  return [...new Set(teamMembers.value.map((employee) => employee.team).filter((team): team is string => Boolean(team)))].sort()
+})
+
+const filteredTeamMembers = computed(() => {
+  if (selectedTeam.value === 'all') {
+    return teamMembers.value
+  }
+  return teamMembers.value.filter((employee) => employee.team === selectedTeam.value)
 })
 
 function formatRiskLabel(value?: string | null) {
@@ -652,6 +675,11 @@ watch(selectedEmployeeId, (value) => {
   }
 })
 
+watch(selectedTeam, () => {
+  const firstVisibleEmployee = filteredTeamMembers.value[0]
+  selectedEmployeeId.value = firstVisibleEmployee ? firstVisibleEmployee.id : null
+})
+
 watch([selectedMonth, selectedYear], () => {
   if (typeof selectedEmployeeId.value === 'number') {
     void loadMonthlyDeepAnalysis(selectedEmployeeId.value)
@@ -666,6 +694,8 @@ onMounted(async () => {
   }
 })
 </script>
+
+
 
 
 

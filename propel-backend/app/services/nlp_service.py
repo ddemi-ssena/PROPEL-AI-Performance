@@ -599,6 +599,24 @@ class NLPService:
         ).order_by(FeedbackNLPAnalysis.created_at.desc()).limit(limit).all()
 
     @staticmethod
+    def _filter_employees_by_team(
+        employees: list[Employee],
+        team: Optional[str] = None,
+    ) -> list[Employee]:
+        if not team:
+            return employees
+        normalized = team.strip().lower()
+        return [
+            employee
+            for employee in employees
+            if (employee.team or "").strip().lower() == normalized
+        ]
+
+    @staticmethod
+    def _team_scope_label(team: Optional[str]) -> str:
+        return f"{team} Takimi" if team else "Departman"
+
+    @staticmethod
     def get_department_weekly_summary(
         db: Session,
         *,
@@ -606,8 +624,10 @@ class NLPService:
         period_year: int,
         period_month: int,
         period_week: int,
+        team: Optional[str] = None,
     ) -> dict:
         employees = db.query(Employee).filter(Employee.department_id == department_id).all()
+        employees = NLPService._filter_employees_by_team(employees, team)
         profiles = [
             NLPService.get_or_build_employee_profile(
                 db,
@@ -639,11 +659,11 @@ class NLPService:
         flight_high = risk_count("flight_risk_level", RiskLevel.high)
 
         if burnout_high or flight_high:
-            headline = "Departmanda dikkat isteyen risk sinyalleri var."
+            headline = f"{NLPService._team_scope_label(team)} icin dikkat isteyen risk sinyalleri var."
         elif active_profiles:
-            headline = "Departmanin haftalik duygu ve risk gorunumu dengeli."
+            headline = f"{NLPService._team_scope_label(team)} haftalik duygu ve risk gorunumu dengeli."
         else:
-            headline = "Bu hafta departman icin yeterli NLP verisi olusmadi."
+            headline = f"Bu hafta {NLPService._team_scope_label(team).lower()} icin yeterli NLP verisi olusmadi."
 
         recommended_action = top_support_needs[0] if top_support_needs else None
 
@@ -666,6 +686,7 @@ class NLPService:
             "top_support_needs": top_support_needs,
             "headline": headline,
             "recommended_action": recommended_action,
+            "team": team,
         }
 
     @staticmethod
@@ -843,6 +864,7 @@ class NLPService:
         period_year: int,
         period_month: int,
         period_week: int,
+        team: Optional[str] = None,
     ) -> dict:
         department = db.query(Department).filter(Department.id == department_id).first()
         if not department:
@@ -854,7 +876,15 @@ class NLPService:
             period_year=period_year,
             period_month=period_month,
             period_week=period_week,
+            team=team,
         )
+        team_employee_ids = {
+            employee.id
+            for employee in NLPService._filter_employees_by_team(
+                db.query(Employee).filter(Employee.department_id == department_id).all(),
+                team,
+            )
+        }
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
             FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
@@ -864,6 +894,7 @@ class NLPService:
             if item.created_at.year == period_year
             and item.created_at.month == period_month
             and NLPService._week_of_month_from_datetime(item.created_at) == period_week
+            and (not team_employee_ids or item.employee_id in team_employee_ids)
         ]
         low_quality_count = sum(1 for item in analyses if NLPService._quality_signal(item).get("is_low_quality"))
         bias_count = sum(1 for item in analyses if NLPService._reciprocity_signal(item).get("reciprocity_bias_suspected"))
@@ -930,8 +961,9 @@ class NLPService:
                 "items": [f"{bias_count} kayitta karsilikli puanlama supheleri izlendi."] + bias_topics,
             })
 
+        scope_label = f"{department.name} / {team}" if team else f"{department.name} departmani"
         summary = (
-            f"{department.name} departmani icin haftalik 360 feedback raporu: "
+            f"{scope_label} icin haftalik 360 feedback raporu: "
             f"{snapshot['headline']} "
             f"Analiz edilen {snapshot['analyzed_employee_count']} calisan icinde "
             f"{snapshot['high_flight_risk_count']} kiside yuksek flight risk, "
@@ -962,12 +994,14 @@ class NLPService:
         department_id: int,
         period_year: int,
         period_month: int,
+        team: Optional[str] = None,
     ) -> dict:
         department = db.query(Department).filter(Department.id == department_id).first()
         if not department:
             raise ValueError("Department not found")
 
         employees = db.query(Employee).filter(Employee.department_id == department_id).all()
+        employees = NLPService._filter_employees_by_team(employees, team)
         employee_ids = [employee.id for employee in employees]
 
         motivation_trend = []
@@ -1028,6 +1062,7 @@ class NLPService:
         risk_analyses = [
             analysis for analysis in risk_analyses
             if analysis.created_at.year == period_year and analysis.created_at.month == period_month
+            and analysis.employee_id in employee_ids
         ]
         risk_counter = Counter()
         for analysis in risk_analyses:
@@ -1140,11 +1175,19 @@ class NLPService:
         department_id: int,
         period_year: int,
         period_month: int,
+        team: Optional[str] = None,
     ) -> dict:
         department = db.query(Department).filter(Department.id == department_id).first()
         if not department:
             raise ValueError("Department not found")
 
+        team_employee_ids = {
+            employee.id
+            for employee in NLPService._filter_employees_by_team(
+                db.query(Employee).filter(Employee.department_id == department_id).all(),
+                team,
+            )
+        }
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
             FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
@@ -1152,6 +1195,7 @@ class NLPService:
         analyses = [
             item for item in analyses
             if item.created_at.year == period_year and item.created_at.month == period_month
+            and (not team_employee_ids or item.employee_id in team_employee_ids)
         ]
         analyses.sort(key=lambda item: item.created_at)
         trusted_analyses = NLPService._trusted_analyses(analyses)
@@ -1296,6 +1340,7 @@ class NLPService:
         department_id: int,
         period_year: int,
         period_month: int,
+        team: Optional[str] = None,
     ) -> dict:
         department = db.query(Department).filter(Department.id == department_id).first()
         if not department:
@@ -1306,7 +1351,15 @@ class NLPService:
             department_id=department_id,
             period_year=period_year,
             period_month=period_month,
+            team=team,
         )
+        team_employee_ids = {
+            employee.id
+            for employee in NLPService._filter_employees_by_team(
+                db.query(Employee).filter(Employee.department_id == department_id).all(),
+                team,
+            )
+        }
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
             FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
@@ -1314,6 +1367,7 @@ class NLPService:
         analyses = [
             item for item in analyses
             if item.created_at.year == period_year and item.created_at.month == period_month
+            and (not team_employee_ids or item.employee_id in team_employee_ids)
         ]
         quality_context = NLPService._rag_quality_context(analyses)
         deep_analysis["quality_context"] = quality_context
