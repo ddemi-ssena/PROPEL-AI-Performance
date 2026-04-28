@@ -27,6 +27,17 @@
                  </select>
              </div>
 
+             <div v-if="selectedDataType === 'Performans Metrikleri (KPI)'" class="mb-4">
+                 <label class="block text-sm font-medium text-slate-700 mb-1">Departman</label>
+                 <select v-model="selectedDepartmentKey" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                     <option value="software">Yazilim</option>
+                     <option value="sales">Satis</option>
+                 </select>
+                 <p class="mt-2 text-xs text-slate-500">
+                   Yazilim importer'i canli, satis importer'i ise ayni analytics omurgasina baglanmaya hazir placeholder modunda.
+                 </p>
+             </div>
+
              <div 
                 class="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50 transition-colors cursor-pointer"
                 @click="triggerFileInput"
@@ -96,7 +107,12 @@
                       <tr v-for="item in uploadHistory" :key="item.id" class="hover:bg-slate-50">
                           <td class="px-6 py-3 text-sm text-slate-600">#{{ item.id }}</td>
                           <td class="px-6 py-3 text-sm text-slate-600">{{ formatDate(item.upload_date) }}</td>
-                          <td class="px-6 py-3 text-sm font-medium text-slate-900">{{ item.file_name }}</td>
+                          <td class="px-6 py-3 text-sm font-medium text-slate-900">
+                            <div>{{ item.file_name }}</div>
+                            <div v-if="item.raw_info?.department_key" class="mt-1 text-xs font-medium text-slate-500">
+                              {{ item.raw_info.department_key }}
+                            </div>
+                          </td>
                           <td class="px-6 py-3 text-sm text-slate-600">{{ item.record_count }}</td>
                           <td class="px-6 py-3">
                               <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" 
@@ -129,6 +145,7 @@ import { adminUploadApi } from '@/services/api/admin_upload.api'
 
 const uploadHistory = ref<any[]>([])
 const selectedDataType = ref('Performans Metrikleri (KPI)')
+const selectedDepartmentKey = ref('software')
 const fileInput = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
 const isDragging = ref(false)
@@ -176,7 +193,11 @@ const startUpload = async () => {
     
     isUploading.value = true
     try {
-        await adminUploadApi.uploadFile(selectedFile.value, selectedDataType.value)
+        await adminUploadApi.uploadFile(
+          selectedFile.value,
+          selectedDataType.value,
+          selectedDataType.value === 'Performans Metrikleri (KPI)' ? selectedDepartmentKey.value : undefined
+        )
         selectedFile.value = null
         await fetchHistory()
     } catch (e: any) {

@@ -8,6 +8,7 @@ class DataUploadBase(BaseModel):
     record_count: int = 0
     status: str = "Processing"
     error_message: Optional[str] = None
+    raw_info: Optional[dict] = None
 
 class DataUploadCreate(DataUploadBase):
     uploaded_by_id: int

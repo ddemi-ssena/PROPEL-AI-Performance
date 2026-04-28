@@ -82,6 +82,12 @@ const router = createRouter({
           meta: { title: 'Departman Analizi' },
         },
         {
+          path: 'kpi-ml-analysis',
+          name: 'manager-kpi-ml-analysis',
+          component: () => import('@/views/manager/ManagerAnalyticsView.vue'),
+          meta: { title: 'KPI & ML Analizi' },
+        },
+        {
           path: 'team',
           name: 'manager-team',
           component: () => import('@/views/manager/TeamManagement.vue'),

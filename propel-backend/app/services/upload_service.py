@@ -4,6 +4,7 @@ import json
 from typing import List, Optional
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
+from app.services.analytics_ingestion_service import AnalyticsIngestionService
 from app.db.models.data_upload import DataUpload
 from app.db.models.user import User
 
@@ -19,7 +20,8 @@ class UploadService:
         db: Session, 
         file: UploadFile, 
         file_type: str, 
-        user: User
+        user: User,
+        department_key: Optional[str] = None,
     ) -> DataUpload:
         # Validate extension
         ext = os.path.splitext(file.filename)[1].lower()
@@ -44,7 +46,8 @@ class UploadService:
             file_name=file.filename,
             file_type=file_type,
             uploaded_by_id=user.id,
-            status="Processing"
+            status="Processing",
+            raw_info={"department_key": department_key} if department_key else None,
         )
         db.add(db_upload)
         db.commit()
@@ -61,9 +64,19 @@ class UploadService:
             with open(file_path, "wb") as f:
                 f.write(await file.read())
 
-            # Parse for record count
+            # Parse for record count / analytics import
             record_count = 0
-            if ext == '.csv':
+            import_info = None
+            if file_type == "Performans Metrikleri (KPI)" and department_key:
+                file.file.seek(0)
+                file.filename = os.path.basename(file_path)
+                import_info = await AnalyticsIngestionService.import_kpi_dataset(
+                    db=db,
+                    file=file,
+                    department_key=department_key,
+                )
+                record_count = int(import_info.get("record_count", 0))
+            elif ext == '.csv':
                 with open(file_path, 'r', encoding='utf-8') as f:
                     reader = csv.reader(f)
                     record_count = sum(1 for row in reader) - 1 # Exclude header
@@ -88,6 +101,11 @@ class UploadService:
             # Update record
             db_upload.record_count = max(0, record_count)
             db_upload.status = "Success"
+            if import_info:
+                db_upload.raw_info = {
+                    **(db_upload.raw_info or {}),
+                    "import_info": import_info,
+                }
             db.commit()
 
         except Exception as e:
