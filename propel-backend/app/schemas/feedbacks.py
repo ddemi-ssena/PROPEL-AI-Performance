@@ -117,6 +117,7 @@ class Employee360SummaryReportResponse(BaseModel):
     employee_name: str
     department_id: Optional[int] = None
     department_name: Optional[str] = None
+    team: Optional[str] = None
     position: Optional[str] = None
     period_year: int
     period_month: int
@@ -209,6 +210,7 @@ class EmployeeMonthlyRAGReportResponse(BaseModel):
     employee_name: str
     department_id: Optional[int] = None
     department_name: Optional[str] = None
+    team: Optional[str] = None
     period_year: int
     period_month: int
     report_summary: str

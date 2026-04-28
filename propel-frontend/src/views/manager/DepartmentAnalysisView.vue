@@ -5,9 +5,20 @@
         <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Departman Analizi</h2>
         <p class="text-slate-500 mt-1">Departmana ait yalnızca enerji, motivasyon ve NLP sinyallerini gösterir</p>
       </div>
-      <button class="px-4 py-2 bg-white border border-gray-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
-        Rapor İndir
-      </button>
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <select
+          v-model="selectedTeam"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
+        >
+          <option value="all">Tum Takimlar</option>
+          <option v-for="team in teamOptions" :key="team" :value="team">
+            {{ team }}
+          </option>
+        </select>
+        <button class="px-4 py-2 bg-white border border-gray-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
+          Rapor İndir
+        </button>
+      </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -380,6 +391,7 @@ const monthlyRagReport = ref<DepartmentMonthlyRAGReportResponse | null>(null)
 const today = new Date()
 const selectedMonth = ref<number>(today.getMonth() + 1)
 const selectedYear = ref<number>(today.getFullYear())
+const selectedTeam = ref<string>('all')
 
 const monthOptions = [
   { value: 1, label: 'Ocak' },
@@ -400,6 +412,12 @@ const yearOptions = computed(() => {
   const baseYear = today.getFullYear()
   return [baseYear - 1, baseYear, baseYear + 1]
 })
+
+const teamOptions = ['Backend', 'Frontend', 'DevOps', 'QA']
+
+function currentTeamParam() {
+  return selectedTeam.value === 'all' ? undefined : selectedTeam.value
+}
 
 function getMetric(report: { metrics: SummaryMetric[] } | null, label: string) {
   return report?.metrics.find((metric) => metric.label === label) ?? null
@@ -530,7 +548,7 @@ const riskThemeValues = computed(() => departmentCharts.value?.top_risk_themes.m
 
 async function loadDepartmentReport() {
   try {
-    departmentReport.value = await feedbackApi.getDepartment360SummaryReport()
+    departmentReport.value = await feedbackApi.getDepartment360SummaryReport({ team: currentTeamParam() })
   } catch (error) {
     console.error('Departman 360 raporu yuklenemedi:', error)
     departmentReport.value = null
@@ -539,7 +557,7 @@ async function loadDepartmentReport() {
 
 async function loadDepartmentCharts() {
   try {
-    departmentCharts.value = await feedbackApi.getDepartmentNlpCharts()
+    departmentCharts.value = await feedbackApi.getDepartmentNlpCharts({ team: currentTeamParam() })
   } catch (error) {
     console.error('Departman NLP grafikleri yuklenemedi:', error)
     departmentCharts.value = null
@@ -549,10 +567,12 @@ async function loadDepartmentCharts() {
 async function loadMonthlyDeepAnalysis() {
   try {
     monthlyDeepAnalysis.value = await feedbackApi.getDepartmentMonthlyDeepAnalysis({
+      team: currentTeamParam(),
       year: selectedYear.value,
       month: selectedMonth.value,
     })
     monthlyRagReport.value = await feedbackApi.getDepartmentMonthlyRagReport({
+      team: currentTeamParam(),
       year: selectedYear.value,
       month: selectedMonth.value,
     })
@@ -563,8 +583,10 @@ async function loadMonthlyDeepAnalysis() {
   }
 }
 
-watch([selectedMonth, selectedYear], () => {
-  void loadMonthlyDeepAnalysis()
+watch([selectedMonth, selectedYear, selectedTeam], async () => {
+  await loadDepartmentReport()
+  await loadDepartmentCharts()
+  await loadMonthlyDeepAnalysis()
 })
 
 onMounted(async () => {
@@ -573,3 +595,6 @@ onMounted(async () => {
   await loadMonthlyDeepAnalysis()
 })
 </script>
+
+
+

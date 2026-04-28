@@ -323,6 +323,7 @@ def get_employee_monthly_rag_report(
 @router.get("/reports/department", response_model=Department360SummaryReportResponse)
 def get_department_360_summary_report(
     department_id: int | None = None,
+    team: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -349,6 +350,7 @@ def get_department_360_summary_report(
         period_year=now.year,
         period_month=now.month,
         period_week=week_number,
+        team=team,
     )
     return Department360SummaryReportResponse(**report)
 
@@ -356,6 +358,7 @@ def get_department_360_summary_report(
 @router.get("/reports/department/monthly-deep", response_model=DepartmentMonthlyDeepAnalysisResponse)
 def get_department_monthly_deep_analysis(
     department_id: int | None = None,
+    team: str | None = None,
     year: int | None = None,
     month: int | None = None,
     db: Session = Depends(get_db),
@@ -388,6 +391,7 @@ def get_department_monthly_deep_analysis(
         department_id=target_department_id,
         period_year=target_year,
         period_month=target_month,
+        team=team,
     )
     return DepartmentMonthlyDeepAnalysisResponse(**report)
 
@@ -395,6 +399,7 @@ def get_department_monthly_deep_analysis(
 @router.get("/reports/department/monthly-rag", response_model=DepartmentMonthlyRAGReportResponse)
 def get_department_monthly_rag_report(
     department_id: int | None = None,
+    team: str | None = None,
     year: int | None = None,
     month: int | None = None,
     db: Session = Depends(get_db),
@@ -426,6 +431,7 @@ def get_department_monthly_rag_report(
         department_id=target_department_id,
         period_year=target_year,
         period_month=target_month,
+        team=team,
     )
     return DepartmentMonthlyRAGReportResponse(**report)
 
@@ -433,6 +439,7 @@ def get_department_monthly_rag_report(
 @router.get("/charts/department", response_model=DepartmentNLPChartsResponse)
 def get_department_nlp_charts(
     department_id: int | None = None,
+    team: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -457,5 +464,6 @@ def get_department_nlp_charts(
         department_id=target_department_id,
         period_year=now.year,
         period_month=now.month,
+        team=team,
     )
     return DepartmentNLPChartsResponse(**charts)

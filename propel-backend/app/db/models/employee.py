@@ -1,4 +1,4 @@
-﻿from sqlalchemy import Column, Integer, String, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, Float, ForeignKey
 from sqlalchemy.orm import relationship
 from ..base_class import BaseModel
 
@@ -8,7 +8,10 @@ class Employee(BaseModel):
 
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    external_employee_code = Column(String(50), unique=True, nullable=True, index=True)
+    team = Column(String(100), nullable=True, index=True)
     position = Column(String(255), nullable=True)
+    experience_years = Column(Float, nullable=True)
     hire_date = Column(Date, nullable=True)
 
     user = relationship("User", back_populates="employee")
