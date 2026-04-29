@@ -16,34 +16,11 @@ from app.analytics.contracts import (
     TeamAnalyticsSnapshot,
 )
 from app.analytics.departments.base import DepartmentAnalyticsAdapter
+from app.analytics.kpi_registry import get_software_kpi_definition
 from app.db.models.department import Department
 from app.db.models.employee import Employee
 from app.db.models.kpi import KPIRecord
 from app.db.models.user import User, UserRole
-
-
-SOFTWARE_KPI_META = {
-    "KPI-1 GTO": {"category": "Teslimat", "higher_is_better": True},
-    "KPI-2 ZTO": {"category": "Teslimat", "higher_is_better": True},
-    "KPI-3 GKE": {"category": "Teslimat", "higher_is_better": True},
-    "KPI-4 KKE": {"category": "Kalite", "higher_is_better": True},
-    "KPI-5 BO": {"category": "Kalite", "higher_is_better": False},
-    "KPI-6 KBO": {"category": "Kalite", "higher_is_better": False},
-    "KPI-7 EKO": {"category": "Kalite", "higher_is_better": True},
-    "KPI-8 UPDS": {"category": "Kalite", "higher_is_better": True},
-    "KPI-9 IYE": {"category": "Sürdürülebilirlik", "higher_is_better": False},
-    "KPI-10 AIYS": {"category": "Sürdürülebilirlik", "higher_is_better": False},
-    "KPI-11 TTY": {"category": "İş Birliği", "higher_is_better": True},
-    "KPI-12 EKS": {"category": "İş Birliği", "higher_is_better": True},
-    "KPI-13 360-GBS": {"category": "İş Birliği", "higher_is_better": True},
-    "KPI-14 OMS": {"category": "İş Birliği", "higher_is_better": True},
-    "KPI-15 MS": {"category": "Duygu", "higher_is_better": True},
-    "KPI-16 MTE": {"category": "Duygu", "higher_is_better": True},
-    "KPI-17 GKS": {"category": "Gelişim", "higher_is_better": True},
-    "KPI-18 GPS": {"category": "Bileşik", "higher_is_better": True},
-    "KPI-19 ARS": {"category": "Risk", "higher_is_better": False},
-    "KPI-20 PPE": {"category": "Potansiyel", "higher_is_better": True},
-}
 
 
 class SoftwareAnalyticsAdapter(DepartmentAnalyticsAdapter):
@@ -81,8 +58,8 @@ class SoftwareAnalyticsAdapter(DepartmentAnalyticsAdapter):
         if not record.kpi or record.kpi.target_value in (None, 0):
             return None
 
-        metric = SOFTWARE_KPI_META.get(SoftwareAnalyticsAdapter._metric_code(record), {})
-        higher_is_better = metric.get("higher_is_better", True)
+        metric = get_software_kpi_definition(SoftwareAnalyticsAdapter._metric_code(record))
+        higher_is_better = metric.higher_is_better if metric else True
         target = float(record.kpi.target_value)
         value = float(record.value)
 
@@ -137,7 +114,8 @@ class SoftwareAnalyticsAdapter(DepartmentAnalyticsAdapter):
             if score is None:
                 continue
             latest_scores.append(score)
-            category = SOFTWARE_KPI_META.get(SoftwareAnalyticsAdapter._metric_code(record), {}).get("category", "Diger")
+            metric = get_software_kpi_definition(SoftwareAnalyticsAdapter._metric_code(record))
+            category = metric.category if metric else "Diger"
             category_scores[category].append(score)
 
         for record in previous_records:

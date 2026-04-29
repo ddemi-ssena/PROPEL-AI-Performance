@@ -4,7 +4,13 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_user
 from app.db.models.user import User
 from app.db.session import get_db
-from app.schemas.analytics import DepartmentAnalyticsConfigResponse, DepartmentAnalyticsOverviewResponse
+from app.schemas.analytics import (
+    DepartmentAnalyticsConfigResponse,
+    DepartmentAnalyticsOverviewResponse,
+    SoftwareModelTrainRequest,
+    SoftwareModelTrainResponse,
+    SoftwarePredictionResponse,
+)
 from app.services.analytics_service import AnalyticsService
 
 router = APIRouter()
@@ -31,4 +37,39 @@ def get_department_analytics_overview(
         department_key=department_key,
         team=team,
         employee_id=employee_id,
+    )
+
+
+@router.post("/departments/software/models/train", response_model=SoftwareModelTrainResponse)
+def train_software_model(
+    payload: SoftwareModelTrainRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.software_ml_service import SoftwareMLService
+
+    return SoftwareMLService.train_from_upload(
+        db=db,
+        upload_id=payload.upload_id,
+        target_column=payload.target_column,
+        model_name=payload.model_name,
+        test_period_count=payload.test_period_count,
+    )
+
+
+@router.get("/departments/software/predictions/latest", response_model=SoftwarePredictionResponse)
+def get_latest_software_prediction(
+    upload_id: int,
+    employee_id: int,
+    target_column: str = "performance_band",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.software_ml_service import SoftwareMLService
+
+    return SoftwareMLService.predict_latest_from_upload(
+        db=db,
+        upload_id=upload_id,
+        employee_id=employee_id,
+        target_column=target_column,
     )

@@ -7,29 +7,14 @@ from typing import Any
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.analytics.kpi_registry import (
+    KPIDefinition,
+    SOFTWARE_KPI_REGISTRY,
+    get_software_kpi_definition,
+)
 from app.db.models.department import Department
 from app.db.models.employee import Employee
 from app.db.models.kpi import KPI, KPIRecord
-
-
-SOFTWARE_COLUMN_TO_KPI = {
-    "task_completion_rate": "KPI-1 GTO",
-    "on_time_delivery_rate": "KPI-2 ZTO",
-    "commit_score": "KPI-3 GKE",
-    "project_complexity": "KPI-4 KKKE",
-    "bug_density": "KPI-5 BY",
-    "critical_bug_ratio": "KPI-6 KBO",
-    "code_review_acceptance": "KPI-7 CKO",
-    "avg_pr_revision": "KPI-8 ODS",
-    "workload_index": "KPI-9 IYE",
-    "team_collaboration_score": "KPI-11 TYO",
-    "management_quality": "KPI-12 EKS",
-    "feedback_score": "KPI-13 360-GBS",
-    "org_centrality_score": "KPI-14 OMS",
-    "motivation_score": "KPI-15 MS",
-    "general_performance_score": "KPI-18 GPS",
-    "attrition_risk_score": "KPI-19 ARS",
-}
 
 
 class SoftwareKPIImportService:
@@ -50,6 +35,10 @@ class SoftwareKPIImportService:
             key = (kpi.description or "").split("|", 1)[0].strip()
             if key:
                 mapping[key] = kpi
+                definition = get_software_kpi_definition(key)
+                if definition:
+                    for code in definition.all_codes:
+                        mapping[code] = kpi
         return mapping
 
     @staticmethod
@@ -66,7 +55,7 @@ class SoftwareKPIImportService:
         return date.fromisocalendar(year, week, 1)
 
     @staticmethod
-    def _normalize_metric_value(column_name: str, raw_value: Any) -> float:
+    def _normalize_metric_value(column_name: str, raw_value: Any, definition: KPIDefinition) -> float:
         value = float(raw_value)
         if column_name in {
             "task_completion_rate",
@@ -82,6 +71,10 @@ class SoftwareKPIImportService:
             "attrition_risk_score",
         }:
             return round(value * 100, 2)
+
+        if definition.unit == "ratio" and 0 <= value <= 1.5:
+            return round(value * 100, 2)
+
         return round(value, 2)
 
     @staticmethod
@@ -111,18 +104,30 @@ class SoftwareKPIImportService:
             employee_codes.add(external_code)
             period_dates.add(period_date)
 
-            for column_name, kpi_code in SOFTWARE_COLUMN_TO_KPI.items():
-                if column_name not in row or row[column_name] in (None, ""):
+            for definition in SOFTWARE_KPI_REGISTRY:
+                source_column = next(
+                    (
+                        column_name
+                        for column_name in definition.source_columns
+                        if column_name in row and row[column_name] not in (None, "")
+                    ),
+                    None,
+                )
+                if not source_column:
                     continue
-                kpi = kpi_map.get(kpi_code)
+                kpi = kpi_map.get(definition.canonical_code)
                 if not kpi:
                     continue
-                metric_codes_seen.add(kpi_code)
+                metric_codes_seen.add(definition.canonical_code)
                 normalized_records.append(
                     KPIRecord(
                         kpi_id=kpi.id,
                         employee_id=employee.id,
-                        value=SoftwareKPIImportService._normalize_metric_value(column_name, row[column_name]),
+                        value=SoftwareKPIImportService._normalize_metric_value(
+                            source_column,
+                            row[source_column],
+                            definition,
+                        ),
                         period_date=period_date,
                     )
                 )

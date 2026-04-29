@@ -60,6 +60,39 @@ export interface DepartmentAnalyticsOverviewResponse {
   sprint_focus: string[]
 }
 
+export interface SoftwareModelTrainRequest {
+  upload_id: number
+  target_column: string
+  model_name?: string
+  test_period_count?: number
+}
+
+export interface SoftwareModelTrainResponse {
+  department: string
+  upload_id: number
+  target_column: string
+  model_name: string
+  train_count: number
+  test_count: number
+  labels: string[]
+  metrics: Record<string, any>
+  top_features: Array<Record<string, any>>
+  validation_summary: Record<string, any>
+  artifact_dir: string
+}
+
+export interface SoftwarePredictionResponse {
+  department: string
+  upload_id: number
+  employee_id: number
+  target_column: string
+  predicted_band: string
+  confidence: number
+  probabilities: Record<string, number>
+  top_features: Array<Record<string, any>>
+  summary_payload: Record<string, any>
+}
+
 export const analyticsApi = {
   async getDepartmentConfigs(): Promise<DepartmentAnalyticsConfigResponse[]> {
     const { data } = await apiClient.get<DepartmentAnalyticsConfigResponse[]>('/analytics/departments')
@@ -72,6 +105,30 @@ export const analyticsApi = {
   ): Promise<DepartmentAnalyticsOverviewResponse> {
     const { data } = await apiClient.get<DepartmentAnalyticsOverviewResponse>(
       `/analytics/departments/${departmentKey}/overview`,
+      { params }
+    )
+    return data
+  },
+
+  async trainSoftwareModel(payload: SoftwareModelTrainRequest): Promise<SoftwareModelTrainResponse> {
+    const { data } = await apiClient.post<SoftwareModelTrainResponse>(
+      '/analytics/departments/software/models/train',
+      {
+        model_name: 'random_forest',
+        test_period_count: 12,
+        ...payload,
+      }
+    )
+    return data
+  },
+
+  async getLatestSoftwarePrediction(params: {
+    upload_id: number
+    employee_id: number
+    target_column?: string
+  }): Promise<SoftwarePredictionResponse> {
+    const { data } = await apiClient.get<SoftwarePredictionResponse>(
+      '/analytics/departments/software/predictions/latest',
       { params }
     )
     return data

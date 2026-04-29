@@ -62,3 +62,36 @@ class DepartmentAnalyticsOverviewResponse(BaseModel):
     employee_summaries: list[EmployeeAnalyticsSnapshotResponse]
     notes: list[str]
     sprint_focus: list[str]
+
+
+class SoftwareModelTrainRequest(BaseModel):
+    upload_id: int
+    target_column: str = "performance_band"
+    model_name: str = "random_forest"
+    test_period_count: int = 12
+
+
+class SoftwareModelTrainResponse(BaseModel):
+    department: str
+    upload_id: int
+    target_column: str
+    model_name: str
+    train_count: int
+    test_count: int
+    labels: list[str]
+    metrics: dict
+    top_features: list[dict]
+    validation_summary: dict
+    artifact_dir: str
+
+
+class SoftwarePredictionResponse(BaseModel):
+    department: str
+    upload_id: int
+    employee_id: int
+    target_column: str
+    predicted_band: str
+    confidence: float
+    probabilities: dict[str, float]
+    top_features: list[dict]
+    summary_payload: dict

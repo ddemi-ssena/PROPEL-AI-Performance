@@ -68,14 +68,33 @@ class UploadService:
             record_count = 0
             import_info = None
             if file_type == "Performans Metrikleri (KPI)" and department_key:
-                file.file.seek(0)
-                file.filename = os.path.basename(file_path)
-                import_info = await AnalyticsIngestionService.import_kpi_dataset(
-                    db=db,
-                    file=file,
-                    department_key=department_key,
-                )
-                record_count = int(import_info.get("record_count", 0))
+                rows = AnalyticsIngestionService.load_rows_from_path(file_path)
+                record_count = len(rows)
+                try:
+                    import_info = AnalyticsIngestionService.import_kpi_rows(
+                        db=db,
+                        rows=rows,
+                        department_key=department_key,
+                    )
+                    record_count = int(import_info.get("record_count", record_count))
+                except HTTPException as exc:
+                    db.rollback()
+                    db_upload = db.query(DataUpload).filter(DataUpload.id == db_upload.id).first()
+                    import_info = {
+                        "department": department_key,
+                        "import_status": "Skipped",
+                        "import_warning": exc.detail,
+                        "raw_row_count": record_count,
+                    }
+                except Exception as exc:
+                    db.rollback()
+                    db_upload = db.query(DataUpload).filter(DataUpload.id == db_upload.id).first()
+                    import_info = {
+                        "department": department_key,
+                        "import_status": "Skipped",
+                        "import_warning": str(exc),
+                        "raw_row_count": record_count,
+                    }
             elif ext == '.csv':
                 with open(file_path, 'r', encoding='utf-8') as f:
                     reader = csv.reader(f)
