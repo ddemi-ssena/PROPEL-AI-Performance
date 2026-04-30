@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import admin_uploads, auth, departments, employees, feedback, feedbacks, kpis, survey_responses
+from app.api.routers import admin_uploads, analytics, auth, departments, employees, feedback, feedbacks, kpis, survey_responses
 from app.core.config import settings
 from app.db.models import Base
 from app.db.session import engine
@@ -48,6 +48,7 @@ app.include_router(survey_responses.router, prefix=settings.API_V1_STR + "/surve
 app.include_router(feedback.router, prefix=settings.API_V1_STR + "/feedback", tags=["360 Feedback"])
 app.include_router(feedbacks.router, prefix=settings.API_V1_STR + "/feedbacks", tags=["Dynamic Weekly Pulse"])
 app.include_router(admin_uploads.router, prefix=settings.API_V1_STR + "/admin/uploads", tags=["Admin Uploads"])
+app.include_router(analytics.router, prefix=settings.API_V1_STR + "/analytics", tags=["Analytics"])
 
 
 @app.get("/")

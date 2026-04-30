@@ -15,10 +15,11 @@ router = APIRouter()
 async def upload_data(
     file: UploadFile = File(...),
     file_type: str = Form(...),
+    department_key: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin),
 ):
-    return await UploadService.process_upload(db, file, file_type, current_user)
+    return await UploadService.process_upload(db, file, file_type, current_user, department_key=department_key)
 
 
 @router.get('/', response_model=List[DataUploadResponse])

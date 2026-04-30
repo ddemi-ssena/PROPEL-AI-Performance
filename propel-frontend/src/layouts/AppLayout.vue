@@ -256,6 +256,7 @@ const allNavigation: NavigationItem[] = [
   { name: 'Yapay Zeka Icgoruleri', to: '/admin/ai-insights', icon: ChartBarIcon, role: 'admin' },
   { name: 'Anket Sonuclari', to: '/admin/survey-results', icon: DocumentTextIcon, role: 'admin' },
   { name: 'Departman Performansi', to: '/manager', icon: ChartBarIcon, role: 'department_manager' },
+  { name: 'KPI & ML Analizi', to: '/manager/kpi-ml-analysis', icon: ChartBarIcon, role: 'department_manager' },
   { name: 'Ekibim', to: '/manager/team', icon: UsersIcon, role: 'department_manager' },
   { name: 'Anket Sonuclari', to: '/manager/survey-results', icon: DocumentTextIcon, role: 'department_manager' },
   {
