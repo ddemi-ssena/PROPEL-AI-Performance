@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Gereksinimleri kopyala ve yükle
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
 # Tüm kodu kopyala
 COPY . .

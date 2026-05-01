@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="min-h-screen bg-gray-50 flex font-sans text-slate-800">
     <aside class="w-72 bg-slate-900 border-r border-slate-800 hidden md:flex flex-col shadow-xl z-20">
       <div class="p-6 border-b border-slate-800 flex items-center gap-3">
@@ -273,7 +273,18 @@ const allNavigation: NavigationItem[] = [
   },
   { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'employee' },
   { name: 'Nabiz Anketi', to: '/employee/pulse', icon: HeartIcon, role: 'employee' },
-  { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'admin' },
+  {
+    name: '360 Derece Feedback',
+    type: 'group',
+    icon: ChatBubbleLeftRightIcon,
+    role: 'admin',
+    children: [
+      { name: 'Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon },
+      { name: '360 Derece Feedback Raporlari', type: 'section' },
+      { name: 'Calisan Analizi', to: '/admin/feedback-reports/employees', icon: UsersIcon },
+      { name: 'Departman Analizi', to: '/admin/feedback-reports/department', icon: DocumentTextIcon },
+    ],
+  },
   { name: 'Kisisel Gelisim', to: '/employee', icon: UserIcon, role: 'employee' },
   { name: 'Ayarlar', to: '/settings', icon: Cog6ToothIcon, role: 'all' },
 ]
