@@ -256,7 +256,19 @@ const allNavigation: NavigationItem[] = [
   { name: 'Yapay Zeka Icgoruleri', to: '/admin/ai-insights', icon: ChartBarIcon, role: 'admin' },
   { name: 'Anket Sonuclari', to: '/admin/survey-results', icon: DocumentTextIcon, role: 'admin' },
   { name: 'Departman Performansi', to: '/manager', icon: ChartBarIcon, role: 'department_manager' },
-  { name: 'KPI & ML Analizi', to: '/manager/kpi-ml-analysis', icon: ChartBarIcon, role: 'department_manager' },
+  {
+    name: 'KPI & ML Analizi',
+    type: 'group',
+    icon: ChartBarIcon,
+    role: 'department_manager',
+    children: [
+      { name: 'Model Durumu', to: '/manager/kpi-ml-analysis?section=model', icon: ChartBarIcon },
+      { name: 'Departman Analizi', to: '/manager/kpi-ml-analysis?section=department', icon: DocumentTextIcon },
+      { name: 'Takim Analizi', to: '/manager/kpi-ml-analysis?section=teams', icon: UsersIcon },
+      { name: 'Calisan Analizi', to: '/manager/kpi-ml-analysis?section=watchlist', icon: UsersIcon },
+      { name: 'Teknik Detaylar', to: '/manager/kpi-ml-analysis?section=technical', icon: Cog6ToothIcon },
+    ],
+  },
   { name: 'Ekibim', to: '/manager/team', icon: UsersIcon, role: 'department_manager' },
   { name: 'Anket Sonuclari', to: '/manager/survey-results', icon: DocumentTextIcon, role: 'department_manager' },
   {
@@ -282,13 +294,17 @@ const navigation = computed(() =>
   allNavigation.filter((item) => item.role === 'all' || item.role === userRole.value)
 )
 
-const openGroups = ref<string[]>(['360 Derece Feedback'])
+const openGroups = ref<string[]>(['360 Derece Feedback', 'KPI & ML Analizi'])
 
 const isActiveRoute = (target: string) => {
+  if (target.includes('?')) {
+    return route.fullPath === target
+  }
+  const targetPath = target.split('?')[0]
   if (['/manager', '/admin', '/employee', '/feedback', '/settings'].includes(target)) {
     return route.path === target
   }
-  return route.path === target || route.path.startsWith(`${target}/`)
+  return route.path === targetPath || route.path.startsWith(`${targetPath}/`)
 }
 
 const isGroupOpen = (groupName: string) => openGroups.value.includes(groupName)

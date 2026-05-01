@@ -71,6 +71,43 @@ class SoftwareModelTrainRequest(BaseModel):
     test_period_count: int = 12
 
 
+class SoftwareDatasetResponse(BaseModel):
+    id: int
+    file_name: str
+    file_type: str
+    status: str
+    record_count: int
+    upload_date: str
+    raw_info: Optional[dict] = None
+
+
+class SoftwareDatasetEmployeeResponse(BaseModel):
+    employee_id: int
+    employee_name: Optional[str] = None
+    display_label: Optional[str] = None
+    external_employee_code: Optional[str] = None
+    team: Optional[str] = None
+    role: Optional[str] = None
+    position: Optional[str] = None
+    row_count: int
+
+
+class SoftwareModelStateResponse(BaseModel):
+    department: str
+    upload_id: int
+    target_column: str
+    target_label: str
+    is_trained: bool
+    is_current_dataset: bool
+    trained_at: Optional[str] = None
+    model_name: Optional[str] = None
+    train_count: Optional[int] = None
+    test_count: Optional[int] = None
+    labels: list[str] = []
+    metrics: dict = {}
+    artifact_dir: Optional[str] = None
+
+
 class SoftwareModelTrainResponse(BaseModel):
     department: str
     upload_id: int
@@ -94,4 +131,21 @@ class SoftwarePredictionResponse(BaseModel):
     confidence: float
     probabilities: dict[str, float]
     top_features: list[dict]
+    risk_summary: str
+    top_drivers: list[dict]
+    recommended_actions: list[str]
     summary_payload: dict
+    narrative: Optional[dict] = None
+
+
+class SoftwareBulkPredictionResponse(BaseModel):
+    department: str
+    upload_id: int
+    target_column: str
+    prediction_count: int
+    high_risk_count: int
+    medium_risk_count: int
+    low_risk_count: int
+    department_narrative: Optional[dict] = None
+    team_narratives: list[dict] = []
+    items: list[SoftwarePredictionResponse]

@@ -1,6 +1,4 @@
-import axios from 'axios'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
+import { apiClient } from './client'
 
 export const adminUploadApi = {
     async uploadFile(file: File, fileType: string, departmentKey?: string) {
@@ -10,24 +8,17 @@ export const adminUploadApi = {
         if (departmentKey) {
             formData.append('department_key', departmentKey)
         }
-        
-        const token = localStorage.getItem('token')
-        const response = await axios.post(`${API_URL}/admin/uploads/`, formData, {
+
+        const response = await apiClient.post('/admin/uploads/', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
-                'Authorization': `Bearer ${token}`
             }
         })
         return response.data
     },
 
     async getUploadHistory() {
-        const token = localStorage.getItem('token')
-        const response = await axios.get(`${API_URL}/admin/uploads/`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        })
+        const response = await apiClient.get('/admin/uploads/')
         return response.data
     }
 }

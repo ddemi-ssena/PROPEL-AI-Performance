@@ -4,10 +4,9 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date
 import math
-import re
 from typing import Any
 
-from app.analytics.kpi_registry import KPIDefinition, SOFTWARE_KPI_REGISTRY
+from app.analytics.kpi_registry import KPIDefinition, SOFTWARE_KPI_REGISTRY, software_kpi_feature_name
 
 
 SOFTWARE_TARGET_COLUMNS = ("performance_band", "attrition_risk_band")
@@ -36,9 +35,7 @@ class SoftwareFeatureDataset:
 class SoftwareFeatureBuilder:
     @staticmethod
     def _feature_name(definition: KPIDefinition) -> str:
-        code = definition.canonical_code.lower().replace("-", "_")
-        code = re.sub(r"[^a-z0-9]+", "_", code).strip("_")
-        return code
+        return software_kpi_feature_name(definition)
 
     @staticmethod
     def _parse_float(value: Any) -> float | None:
