@@ -376,6 +376,7 @@ class SoftwareMLService:
         upload_id: int,
         target_column: str,
         use_llm_narrative: bool = False,
+        llm_team: str | None = None,
     ) -> SoftwareBulkPredictionResponse:
         if target_column not in SUPPORTED_TARGETS:
             raise HTTPException(status_code=400, detail=f"Desteklenmeyen target_column: {target_column}")
@@ -456,6 +457,7 @@ class SoftwareMLService:
             target_column=target_column,
             team_summaries=team_summaries,
             allow_llm=use_llm_narrative,
+            llm_team=llm_team,
         )
 
         return SoftwareBulkPredictionResponse(

@@ -212,6 +212,7 @@ export const analyticsApi = {
     upload_id: number
     target_column?: string
     use_llm_narrative?: boolean
+    llm_team?: string
   }): Promise<SoftwareBulkPredictionResponse> {
     const { data } = await apiClient.get<SoftwareBulkPredictionResponse>(
       '/analytics/departments/software/predictions/bulk',

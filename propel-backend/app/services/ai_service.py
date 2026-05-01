@@ -14,6 +14,7 @@ class AIService:
     GEMINI_MODEL = settings.GEMINI_MODEL or "gemini-1.5-flash"
     _RESOLVED_OLLAMA_MODEL: Optional[str] = None
     _RESOLVED_GEMINI_MODEL: Optional[str] = None
+    LAST_LLM_ERROR: Optional[str] = None
 
     DEPARTMENT_ROLE_MATRIX = {
         "Yazilim Gelistirme": {
@@ -340,31 +341,38 @@ class AIService:
         return prompt, required_terms
 
     @staticmethod
-    def _generate_with_ollama(prompt: str) -> Optional[str]:
-        model_name = AIService._resolve_ollama_model()
+    def _generate_with_ollama(prompt: str, timeout_seconds: int = 20, json_mode: bool = False) -> Optional[str]:
+        model_name = AIService._resolve_ollama_model(timeout_seconds=min(timeout_seconds, 10))
         if not model_name:
+            AIService.LAST_LLM_ERROR = "Ollama model bulunamadi."
             return None
         try:
+            body = {"model": model_name, "prompt": prompt, "stream": False}
+            if json_mode:
+                body["format"] = "json"
             res = requests.post(
                 AIService.OLLAMA_URL,
-                json={"model": model_name, "prompt": prompt, "stream": False},
-                timeout=20,
+                json=body,
+                timeout=timeout_seconds,
             )
             if res.ok:
+                AIService.LAST_LLM_ERROR = None
                 return (res.json().get("response") or "").strip() or None
-        except Exception:
+            AIService.LAST_LLM_ERROR = f"Ollama HTTP {res.status_code}: {res.text[:180]}"
+        except Exception as exc:
+            AIService.LAST_LLM_ERROR = f"Ollama hata: {type(exc).__name__}"
             return None
         return None
 
     @staticmethod
-    def _resolve_ollama_model() -> Optional[str]:
+    def _resolve_ollama_model(timeout_seconds: int = 10) -> Optional[str]:
         if AIService._RESOLVED_OLLAMA_MODEL:
             return AIService._RESOLVED_OLLAMA_MODEL
 
         configured_model = (AIService.OLLAMA_MODEL or "").strip()
         try:
             tags_url = AIService.OLLAMA_URL.rsplit("/", 1)[0] + "/tags"
-            res = requests.get(tags_url, timeout=10)
+            res = requests.get(tags_url, timeout=timeout_seconds)
             if not res.ok:
                 return configured_model or None
 
@@ -395,11 +403,18 @@ class AIService:
             return configured_model or None
 
     @staticmethod
-    def _generate_with_gemini(prompt: str) -> Optional[str]:
+    def _generate_with_gemini(
+        prompt: str,
+        timeout_seconds: int = 20,
+        json_mode: bool = False,
+        model_name_override: str | None = None,
+    ) -> Optional[str]:
         if not AIService.GEMINI_API_KEY:
+            AIService.LAST_LLM_ERROR = "Gemini API key ayarli degil."
             return None
-        model_name = AIService._resolve_gemini_model()
+        model_name = model_name_override or AIService._resolve_gemini_model(timeout_seconds=min(timeout_seconds, 15))
         if not model_name:
+            AIService.LAST_LLM_ERROR = "Gemini model bulunamadi."
             return None
         try:
             url = (
@@ -407,28 +422,35 @@ class AIService:
                 f"{model_name}:generateContent?key={AIService.GEMINI_API_KEY}"
             )
             body = {"contents": [{"parts": [{"text": prompt}]}]}
-            res = requests.post(url, json=body, timeout=20)
+            if json_mode:
+                body["generationConfig"] = {"responseMimeType": "application/json"}
+            res = requests.post(url, json=body, timeout=timeout_seconds)
             if not res.ok:
+                AIService.LAST_LLM_ERROR = f"Gemini HTTP {res.status_code}: {res.text[:180]}"
                 return None
             candidates = res.json().get("candidates", [])
             if not candidates:
+                AIService.LAST_LLM_ERROR = "Gemini bos candidate dondurdu."
                 return None
             parts = candidates[0].get("content", {}).get("parts", [])
             if not parts:
+                AIService.LAST_LLM_ERROR = "Gemini bos content dondurdu."
                 return None
+            AIService.LAST_LLM_ERROR = None
             return (parts[0].get("text") or "").strip() or None
-        except Exception:
+        except Exception as exc:
+            AIService.LAST_LLM_ERROR = f"Gemini hata: {type(exc).__name__}"
             return None
 
     @staticmethod
-    def _resolve_gemini_model() -> Optional[str]:
+    def _resolve_gemini_model(timeout_seconds: int = 15) -> Optional[str]:
         if AIService._RESOLVED_GEMINI_MODEL:
             return AIService._RESOLVED_GEMINI_MODEL
 
         configured_model = (AIService.GEMINI_MODEL or "").strip()
         try:
             list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={AIService.GEMINI_API_KEY}"
-            res = requests.get(list_url, timeout=15)
+            res = requests.get(list_url, timeout=timeout_seconds)
             if not res.ok:
                 return configured_model or None
 
