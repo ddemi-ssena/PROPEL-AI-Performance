@@ -33,7 +33,11 @@ class SoftwareArtifactStore:
     def _target_dir(self, target_column: str) -> Path:
         return self.root_dir / target_column
 
-    def save_training_result(self, result: SoftwareTrainingResult) -> SoftwareModelArtifact:
+    def save_training_result(
+        self,
+        result: SoftwareTrainingResult,
+        upload_id: int | None = None,
+    ) -> SoftwareModelArtifact:
         artifact_dir = self._target_dir(result.target_column)
         artifact_dir.mkdir(parents=True, exist_ok=True)
 
@@ -42,6 +46,7 @@ class SoftwareArtifactStore:
 
         metadata = {
             "department": "software",
+            "upload_id": upload_id,
             "target_column": result.target_column,
             "model_name": result.model_name,
             "trained_at": datetime.now(timezone.utc).isoformat(),

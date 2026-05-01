@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from typing import Literal
 
 
@@ -315,3 +316,27 @@ def get_software_kpi_definition(metric_code: str | None) -> KPIDefinition | None
 
 def iter_software_import_columns() -> tuple[tuple[str, KPIDefinition], ...]:
     return tuple(SOFTWARE_KPI_BY_SOURCE_COLUMN.items())
+
+
+def software_kpi_feature_name(definition: KPIDefinition) -> str:
+    code = definition.canonical_code.lower().replace("-", "_")
+    return re.sub(r"[^a-z0-9]+", "_", code).strip("_")
+
+
+SOFTWARE_KPI_BY_FEATURE_NAME: dict[str, KPIDefinition] = {
+    software_kpi_feature_name(definition): definition
+    for definition in SOFTWARE_KPI_REGISTRY
+}
+
+
+def get_software_kpi_by_feature_name(feature_name: str | None) -> KPIDefinition | None:
+    if not feature_name:
+        return None
+
+    normalized = feature_name
+    for suffix in ("_lag_1", "_rolling_4", "_trend_4"):
+        if normalized.endswith(suffix):
+            normalized = normalized[: -len(suffix)]
+            break
+
+    return SOFTWARE_KPI_BY_FEATURE_NAME.get(normalized)

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.analytics.artifacts.software import SoftwareModelArtifact
+from app.analytics.explain.software import SoftwareExplanationBuilder
 from app.analytics.features.software import SoftwareFeatureBuilder
 
 
@@ -15,6 +16,9 @@ class SoftwarePredictionResult:
     confidence: float
     probabilities: dict[str, float]
     top_features: list[dict[str, float]]
+    risk_summary: str
+    top_drivers: list[dict[str, Any]]
+    recommended_actions: list[str]
     summary_payload: dict[str, Any]
 
 
@@ -55,13 +59,25 @@ class SoftwarePredictionService:
             }
             confidence = max(probabilities.values()) if probabilities else 1.0
 
+        top_features = artifact.metadata.get("top_features", [])
+        explanation = SoftwareExplanationBuilder.build(
+            target_column=artifact.target_column,
+            predicted_band=str(prediction),
+            confidence=round(float(confidence), 6),
+            feature_row=feature_row,
+            top_features=top_features,
+        )
+
         return SoftwarePredictionResult(
             department="software",
             target_column=artifact.target_column,
             predicted_band=str(prediction),
             confidence=round(float(confidence), 6),
             probabilities=probabilities,
-            top_features=artifact.metadata.get("top_features", []),
+            top_features=top_features,
+            risk_summary=explanation["risk_summary"],
+            top_drivers=explanation["top_drivers"],
+            recommended_actions=explanation["recommended_actions"],
             summary_payload={
                 "employee_id": metadata_row["employee_id"],
                 "team": metadata_row.get("team"),

@@ -1,0 +1,156 @@
+{
+  "department": "software",
+  "target_column": "attrition_risk_band",
+  "model_name": "random_forest",
+  "trained_at": "2026-04-30T14:33:29.165944+00:00",
+  "train_count": 1200,
+  "test_count": 360,
+  "labels": [
+    "Dusuk",
+    "Orta",
+    "Yuksek"
+  ],
+  "metrics": {
+    "accuracy": 0.833333,
+    "macro_f1": 0.825591,
+    "weighted_f1": 0.832386,
+    "classification_report": {
+      "Dusuk": {
+        "precision": 0.8181818181818182,
+        "recall": 0.8947368421052632,
+        "f1-score": 0.8547486033519553,
+        "support": 171.0
+      },
+      "Orta": {
+        "precision": 0.8496732026143791,
+        "recall": 0.7784431137724551,
+        "f1-score": 0.8124999999999999,
+        "support": 167.0
+      },
+      "Yuksek": {
+        "precision": 0.85,
+        "recall": 0.7727272727272727,
+        "f1-score": 0.8095238095238095,
+        "support": 22.0
+      },
+      "accuracy": 0.8333333333333334,
+      "macro avg": {
+        "precision": 0.8392850069320658,
+        "recall": 0.815302409534997,
+        "f1-score": 0.8255908042919217,
+        "support": 360.0
+      },
+      "weighted avg": {
+        "precision": 0.8347347659602562,
+        "recall": 0.8333333333333334,
+        "f1-score": 0.8323862082853004,
+        "support": 360.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        153,
+        18,
+        0
+      ],
+      [
+        34,
+        130,
+        3
+      ],
+      [
+        0,
+        5,
+        17
+      ]
+    ]
+  },
+  "top_features": [
+    {
+      "feature": "kpi_15_ms_rolling_4",
+      "importance": 0.07371
+    },
+    {
+      "feature": "kpi_15_ms",
+      "importance": 0.070382
+    },
+    {
+      "feature": "kpi_9_iye",
+      "importance": 0.056755
+    },
+    {
+      "feature": "kpi_16_mte",
+      "importance": 0.0507
+    },
+    {
+      "feature": "kpi_10_says",
+      "importance": 0.046116
+    },
+    {
+      "feature": "kpi_10_says_rolling_4",
+      "importance": 0.04434
+    },
+    {
+      "feature": "kpi_15_ms_lag_1",
+      "importance": 0.040858
+    },
+    {
+      "feature": "actual_work_hours",
+      "importance": 0.040278
+    },
+    {
+      "feature": "kpi_10_says_lag_1",
+      "importance": 0.026498
+    },
+    {
+      "feature": "kpi_9_iye_rolling_4",
+      "importance": 0.026137
+    },
+    {
+      "feature": "kpi_9_iye_lag_1",
+      "importance": 0.023748
+    },
+    {
+      "feature": "kpi_15_ms_trend_4",
+      "importance": 0.019861
+    },
+    {
+      "feature": "kpi_1_gto_rolling_4",
+      "importance": 0.019119
+    },
+    {
+      "feature": "kpi_2_zto_rolling_4",
+      "importance": 0.018869
+    },
+    {
+      "feature": "kpi_16_mte_trend_4",
+      "importance": 0.016495
+    }
+  ],
+  "validation_summary": {
+    "row_count": 1560,
+    "employee_count": 30,
+    "period_count": 52,
+    "feature_count": 85,
+    "target_columns": [
+      "attrition_risk_band",
+      "performance_band"
+    ],
+    "target_distribution": {
+      "performance_band": {
+        "Stabil": 915,
+        "Riskli": 579,
+        "Yuksek": 66
+      },
+      "attrition_risk_band": {
+        "Dusuk": 792,
+        "Orta": 674,
+        "Yuksek": 94
+      }
+    },
+    "excluded_target_like_kpis": [
+      "KPI-18 GPS",
+      "KPI-19 ARS"
+    ]
+  }
+}

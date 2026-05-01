@@ -67,6 +67,43 @@ export interface SoftwareModelTrainRequest {
   test_period_count?: number
 }
 
+export interface SoftwareDatasetResponse {
+  id: number
+  file_name: string
+  file_type: string
+  status: string
+  record_count: number
+  upload_date: string
+  raw_info?: Record<string, any> | null
+}
+
+export interface SoftwareDatasetEmployeeResponse {
+  employee_id: number
+  employee_name?: string | null
+  display_label?: string | null
+  external_employee_code?: string | null
+  team?: string | null
+  role?: string | null
+  position?: string | null
+  row_count: number
+}
+
+export interface SoftwareModelStateResponse {
+  department: string
+  upload_id: number
+  target_column: string
+  target_label: string
+  is_trained: boolean
+  is_current_dataset: boolean
+  trained_at?: string | null
+  model_name?: string | null
+  train_count?: number | null
+  test_count?: number | null
+  labels: string[]
+  metrics: Record<string, any>
+  artifact_dir?: string | null
+}
+
 export interface SoftwareModelTrainResponse {
   department: string
   upload_id: number
@@ -90,7 +127,24 @@ export interface SoftwarePredictionResponse {
   confidence: number
   probabilities: Record<string, number>
   top_features: Array<Record<string, any>>
+  risk_summary: string
+  top_drivers: Array<Record<string, any>>
+  recommended_actions: string[]
   summary_payload: Record<string, any>
+  narrative?: Record<string, any> | null
+}
+
+export interface SoftwareBulkPredictionResponse {
+  department: string
+  upload_id: number
+  target_column: string
+  prediction_count: number
+  high_risk_count: number
+  medium_risk_count: number
+  low_risk_count: number
+  department_narrative?: Record<string, any> | null
+  team_narratives: Array<Record<string, any>>
+  items: SoftwarePredictionResponse[]
 }
 
 export const analyticsApi = {
@@ -106,6 +160,25 @@ export const analyticsApi = {
     const { data } = await apiClient.get<DepartmentAnalyticsOverviewResponse>(
       `/analytics/departments/${departmentKey}/overview`,
       { params }
+    )
+    return data
+  },
+
+  async getSoftwareDatasets(): Promise<SoftwareDatasetResponse[]> {
+    const { data } = await apiClient.get<SoftwareDatasetResponse[]>('/analytics/departments/software/datasets')
+    return data
+  },
+
+  async getSoftwareDatasetEmployees(uploadId: number): Promise<SoftwareDatasetEmployeeResponse[]> {
+    const { data } = await apiClient.get<SoftwareDatasetEmployeeResponse[]>(
+      `/analytics/departments/software/datasets/${uploadId}/employees`
+    )
+    return data
+  },
+
+  async getSoftwareModelState(uploadId: number): Promise<SoftwareModelStateResponse[]> {
+    const { data } = await apiClient.get<SoftwareModelStateResponse[]>(
+      `/analytics/departments/software/datasets/${uploadId}/model-state`
     )
     return data
   },
@@ -126,9 +199,22 @@ export const analyticsApi = {
     upload_id: number
     employee_id: number
     target_column?: string
+    use_llm_narrative?: boolean
   }): Promise<SoftwarePredictionResponse> {
     const { data } = await apiClient.get<SoftwarePredictionResponse>(
       '/analytics/departments/software/predictions/latest',
+      { params }
+    )
+    return data
+  },
+
+  async getBulkSoftwarePredictions(params: {
+    upload_id: number
+    target_column?: string
+    use_llm_narrative?: boolean
+  }): Promise<SoftwareBulkPredictionResponse> {
+    const { data } = await apiClient.get<SoftwareBulkPredictionResponse>(
+      '/analytics/departments/software/predictions/bulk',
       { params }
     )
     return data
