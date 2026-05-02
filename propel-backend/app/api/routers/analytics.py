@@ -20,7 +20,7 @@ router = APIRouter()
 def list_department_analytics_configs(
     current_user: User = Depends(get_current_user),
 ):
-    return AnalyticsService.list_department_configs()
+    return AnalyticsService.list_department_configs(current_user)
 
 
 @router.get("/departments/{department_key}/overview", response_model=DepartmentAnalyticsOverviewResponse)

@@ -8,435 +8,432 @@
         </p>
       </div>
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <!-- Admin Department Filter -->
+        <select
+          v-if="isAdmin"
+          v-model="selectedDepartmentId"
+          class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
+        >
+          <option :value="null">Tüm Departmanlar</option>
+          <option v-for="dept in departments" :key="dept.id" :value="dept.id">
+            {{ dept.name }}
+          </option>
+        </select>
+
         <select
           v-model="selectedTeam"
           class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
         >
-          <option value="all">Tum Takimlar</option>
+          <option value="all">Tüm Takımlar</option>
           <option v-for="team in teamOptions" :key="team" :value="team">
             {{ team }}
           </option>
         </select>
         <div class="rounded-full border border-indigo-100 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700">
-          {{ filteredTeamMembers.length }} calisan listeleniyor
+          {{ filteredTeamMembers.length }} çalışan listeleniyor
         </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-6">
-      <aside class="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div class="border-b border-slate-100 px-5 py-4">
-          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Çalışanlar</p>
-          <h3 class="mt-1 text-lg font-bold text-slate-900">Rapor seçimi</h3>
+    <div class="grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-8">
+      <!-- Left Selection Sidebar -->
+      <aside class="xl:sticky xl:top-24 h-fit max-h-[calc(100vh-120px)] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="border-b border-slate-100 px-5 py-4 bg-slate-50/50">
+          <div class="flex items-center justify-between mb-3">
+             <h3 class="text-lg font-bold text-slate-900">Çalışan Seçimi</h3>
+             <UsersIcon class="w-5 h-5 text-slate-400" />
+          </div>
+          <!-- Search Bar -->
+          <div class="relative">
+            <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              v-model="searchQuery"
+              type="text" 
+              placeholder="İsim veya pozisyon ara..." 
+              class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+            />
+          </div>
         </div>
 
-        <div v-if="filteredTeamMembers.length" class="max-h-[720px] overflow-y-auto p-3 space-y-3">
+        <div v-if="filteredAndSearchedMembers.length" class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
           <button
-            v-for="employee in filteredTeamMembers"
+            v-for="employee in filteredAndSearchedMembers"
             :key="employee.id"
             type="button"
-            class="w-full rounded-2xl border p-4 text-left transition-all"
+            class="w-full rounded-2xl border p-4 text-left transition-all group relative overflow-hidden"
             :class="selectedEmployeeId === employee.id
-              ? 'border-indigo-200 bg-indigo-50 shadow-sm'
-              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'"
+              ? 'border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600 shadow-md'
+              : 'border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50'"
             @click="selectedEmployeeId = employee.id"
           >
+            <!-- Active Indicator -->
+            <div v-if="selectedEmployeeId === employee.id" class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-600"></div>
+
             <div class="flex items-start justify-between gap-3">
-              <div>
+              <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
-                  <p class="font-semibold text-slate-900">{{ employee.user.full_name }}</p>
-                  <div v-if="employeeReportBadges(employee.id).length" class="flex items-center gap-1">
+                  <p class="font-bold text-slate-900 truncate">{{ employee.user.full_name }}</p>
+                </div>
+                <div class="mt-1 flex flex-col gap-1">
+                  <span class="text-xs text-slate-500 truncate font-medium">{{ employee.position || 'Çalışan' }}</span>
+                  <div class="flex flex-wrap gap-1.5 mt-1">
+                    <span
+                      v-if="employee.team"
+                      class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 uppercase tracking-tight"
+                    >
+                      {{ employee.team }}
+                    </span>
+                    <span
+                      class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700 uppercase tracking-tight"
+                    >
+                      {{ employee.department?.name || 'Genel' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex flex-col items-end gap-2">
+                  <div v-if="employeeReportBadges(employee.id).length" class="flex -space-x-1">
                     <BadgeMedal
-                      v-for="badge in employeeReportBadges(employee.id).slice(0, 2)"
+                      v-for="badge in employeeReportBadges(employee.id).slice(0, 3)"
                       :key="`list-badge-${employee.id}-${badge.id}`"
                       :badge-type="badge.badge_type"
                       :badge-level="badge.badge_level"
                       size="xs"
                       :description="getBadgeDescription(badge)"
                     />
-                    <span
-                      v-if="employeeReportBadges(employee.id).length > 2"
-                      class="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500"
-                    >
-                      +{{ employeeReportBadges(employee.id).length - 2 }}
-                    </span>
                   </div>
-                </div>
-                <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                  <span>{{ employee.position || 'Calisan' }}</span>
-                  <span
-                    v-if="employee.team"
-                    class="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700"
-                  >
-                    {{ employee.team }}
-                  </span>
-                </div>
+                  <ChevronRightIcon class="w-4 h-4 text-slate-300 group-hover:text-indigo-400 transition-colors" />
               </div>
-              <span
-                class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                :class="selectedEmployeeId === employee.id
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-100 text-slate-500'"
-              >
-                {{ employee.department?.name || 'Departman yok' }}
-              </span>
             </div>
-            <p class="mt-3 text-xs leading-5 text-slate-500">
-              {{ getPreviewSummary(employee.id) }}
+            
+            <p v-if="getPreviewSummary(employee.id)" class="mt-3 text-[11px] leading-4 text-slate-500 line-clamp-2 border-t border-slate-100 pt-2 italic">
+              "{{ getPreviewSummary(employee.id) }}"
             </p>
           </button>
         </div>
 
-        <div v-else class="p-6 text-sm text-slate-400">
-          Secili takim icin listelenecek calisan bulunamadi.
+        <div v-else class="p-8 text-center">
+          <div class="bg-slate-50 rounded-2xl p-4 mb-4 inline-block">
+            <UsersIcon class="w-8 h-8 text-slate-300" />
+          </div>
+          <p class="text-sm font-medium text-slate-900">Çalışan Bulunamadı</p>
+          <p class="text-xs text-slate-500 mt-1">Arama kriterlerini değiştirmeyi deneyin.</p>
         </div>
       </aside>
 
-      <section v-if="selectedEmployeeReport" class="space-y-6">
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            <div>
-              <p class="text-sm text-slate-500">{{ selectedEmployeeReport.report_title }}</p>
-              <h3 class="mt-1 text-2xl font-bold text-slate-900">
-                {{ selectedEmployeeReport.employee_name }}
-              </h3>
-              <p class="mt-1 text-sm text-slate-500">
-                {{ selectedEmployeeReport.position || 'Çalışan' }}
-                <span v-if="selectedEmployeeReport.department_name"> - {{ selectedEmployeeReport.department_name }}</span>
-              </p>
-              <div v-if="selectedEmployeeReport.team" class="mt-3">
-                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                  {{ selectedEmployeeReport.team }} Takimi
-                </span>
+      <!-- Right Content Area -->
+      <div class="min-w-0">
+        <section v-if="selectedEmployeeReport" class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <!-- Main Profile Card -->
+          <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm relative overflow-hidden">
+            <!-- Decorative Gradient -->
+            <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+
+            <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div class="flex items-center gap-6">
+                 <div class="w-20 h-20 rounded-2xl bg-indigo-600 flex items-center justify-center text-2xl font-bold text-white shadow-xl shadow-indigo-600/20">
+                    {{ selectedEmployeeReport.employee_name.split(' ').map(n => n[0]).join('').toUpperCase() }}
+                 </div>
+                 <div>
+                    <div class="flex items-center gap-3">
+                      <h3 class="text-3xl font-bold text-slate-900 tracking-tight">{{ selectedEmployeeReport.employee_name }}</h3>
+                      <span class="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 uppercase tracking-wider">
+                        Hafta {{ selectedEmployeeReport.period_week }}
+                      </span>
+                    </div>
+                    <div class="mt-2 flex flex-wrap items-center gap-4 text-slate-500 font-medium">
+                      <span class="flex items-center gap-1.5">
+                        <BriefcaseIcon class="w-4 h-4" />
+                        {{ selectedEmployeeReport.position || 'Çalışan' }}
+                      </span>
+                      <span class="w-1 h-1 bg-slate-300 rounded-full"></span>
+                      <span class="flex items-center gap-1.5">
+                        <BuildingOfficeIcon class="w-4 h-4" />
+                        {{ selectedEmployeeReport.department_name || 'Departman Atanmadı' }}
+                      </span>
+                      <span v-if="selectedEmployeeReport.team" class="w-1 h-1 bg-slate-300 rounded-full"></span>
+                      <span v-if="selectedEmployeeReport.team" class="flex items-center gap-1.5">
+                        <UserGroupIcon class="w-4 h-4" />
+                        {{ selectedEmployeeReport.team }} Takımı
+                      </span>
+                    </div>
+                 </div>
               </div>
-              <div v-if="selectedEmployeeReport.badges?.length" class="mt-4 flex flex-wrap gap-3">
-                <div
-                  v-for="badge in selectedEmployeeReport.badges"
-                  :key="`report-badge-${badge.id}`"
-                  class="flex items-center"
-                >
-                  <BadgeMedal
-                    :badge-type="badge.badge_type"
-                    :badge-level="badge.badge_level"
-                    size="xs"
-                    show-label
-                    :description="getBadgeDescription(badge)"
-                  />
+              
+              <div class="flex gap-3">
+                 <button class="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-all shadow-sm">
+                    PDF Raporu
+                 </button>
+                 <button class="px-5 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20">
+                    Feedback İste
+                 </button>
+              </div>
+            </div>
+
+            <!-- Weekly Summary Box -->
+            <div class="mt-8 grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div class="lg:col-span-3 rounded-2xl bg-slate-50 border border-slate-100 p-6">
+                <div class="flex items-center gap-2 mb-4">
+                   <div class="p-1.5 bg-indigo-600 rounded-lg">
+                      <DocumentTextIcon class="w-4 h-4 text-white" />
+                   </div>
+                   <h4 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Haftalık Yönetici Özeti</h4>
                 </div>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap gap-3">
-              <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                Hafta {{ selectedEmployeeReport.period_week }}
-              </span>
-              <span class="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                360 derece geri bildirim özeti
-              </span>
-            </div>
-          </div>
-
-          <div class="mt-5 rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">Haftalık Yönetici Özeti</p>
-            <p class="mt-2 text-sm leading-6 text-slate-700">
-              {{ renderText(selectedEmployeeReport.report_summary) }}
-            </p>
-          </div>
-
-          <div v-if="qualityWarningSection || biasWarningSection" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div
-              v-if="qualityWarningSection"
-              class="rounded-2xl border border-amber-200 bg-amber-50 p-4"
-            >
-              <p class="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">Veri Kalitesi Uyarısı</p>
-              <div class="mt-3 flex flex-wrap gap-2">
-                <span
-                  v-for="item in qualityWarningSection.items"
-                  :key="`quality-${item}`"
-                  class="rounded-full border border-amber-200 bg-white px-2 py-1 text-xs text-amber-700"
-                >
-                  {{ renderText(item) }}
-                </span>
-              </div>
-            </div>
-
-            <div
-              v-if="biasWarningSection"
-              class="rounded-2xl border border-rose-200 bg-rose-50 p-4"
-            >
-              <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">Karşılıklı Bias Şüphesi</p>
-              <div class="mt-3 flex flex-wrap gap-2">
-                <span
-                  v-for="item in biasWarningSection.items"
-                  :key="`bias-${item}`"
-                  class="rounded-full border border-rose-200 bg-white px-2 py-1 text-xs text-rose-700"
-                >
-                  {{ renderText(item) }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_360px] gap-6">
-          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Aylık Derin Analiz</p>
-                <h4 class="mt-1 text-lg font-bold text-slate-900">Trend ve tema özeti</h4>
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <select
-                  v-model="selectedMonth"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                >
-                  <option v-for="month in monthOptions" :key="month.value" :value="month.value">
-                    {{ month.label }}
-                  </option>
-                </select>
-                <select
-                  v-model="selectedYear"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                >
-                  <option v-for="year in yearOptions" :key="year" :value="year">
-                    {{ year }}
-                  </option>
-                </select>
-              </div>
-            </div>
-
-            <div v-if="monthlyDeepAnalysis" class="mt-6 space-y-6">
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                  <p class="text-xs text-slate-500">Motivasyon trendi</p>
-                  <p class="mt-2 text-xl font-bold text-slate-900">{{ formatTrend(monthlyDeepAnalysis.motivation_trend_direction) }}</p>
-                </div>
-                <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                  <p class="text-xs text-slate-500">Duygu trendi</p>
-                  <p class="mt-2 text-xl font-bold text-slate-900">{{ formatTrend(monthlyDeepAnalysis.sentiment_trend_direction) }}</p>
-                </div>
-                <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                  <p class="text-xs text-slate-500">Ayrılma riski skoru</p>
-                  <p class="mt-2 text-xl font-bold text-slate-900">{{ monthlyDeepAnalysis.flight_risk_score ?? '-' }}/10</p>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="rounded-xl border border-rose-100 bg-rose-50 p-4">
-                  <p class="text-xs font-semibold text-rose-700">En sık şikayet konuları</p>
-                  <div class="mt-3 flex flex-wrap gap-2">
-                    <span
-                      v-for="item in monthlyDeepAnalysis.top_complaint_topics"
-                      :key="`complaint-${item}`"
-                      class="rounded-full border border-rose-200 bg-white px-2 py-1 text-xs text-rose-700"
-                    >
-                      {{ item }}
-                    </span>
-                    <span v-if="!monthlyDeepAnalysis.top_complaint_topics.length" class="text-sm text-slate-400">Veri yok</span>
+                <p class="text-slate-700 leading-relaxed text-sm md:text-base">
+                  {{ renderText(selectedEmployeeReport.report_summary) }}
+                </p>
+                
+                <div v-if="qualityWarningSection || biasWarningSection" class="mt-6 flex flex-wrap gap-4">
+                  <div v-if="qualityWarningSection" class="flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-2 rounded-xl border border-amber-100 text-xs font-bold">
+                    <ExclamationTriangleIcon class="w-4 h-4" />
+                    <span>Veri Kalitesi Uyarısı: {{ qualityWarningSection.items.join(', ') }}</span>
                   </div>
-                </div>
-
-                <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                  <p class="text-xs font-semibold text-emerald-700">En sık övgü konuları</p>
-                  <div class="mt-3 flex flex-wrap gap-2">
-                    <span
-                      v-for="item in monthlyDeepAnalysis.top_praise_topics"
-                      :key="`praise-${item}`"
-                      class="rounded-full border border-emerald-200 bg-white px-2 py-1 text-xs text-emerald-700"
-                    >
-                      {{ item }}
-                    </span>
-                    <span v-if="!monthlyDeepAnalysis.top_praise_topics.length" class="text-sm text-slate-400">Veri yok</span>
-                  </div>
-                </div>
-
-                <div class="rounded-xl border border-sky-100 bg-sky-50 p-4">
-                  <p class="text-xs font-semibold text-sky-700">Öne çıkan temalar</p>
-                  <div class="mt-3 flex flex-wrap gap-2">
-                    <span
-                      v-for="item in monthlyDeepAnalysis.top_themes"
-                      :key="`theme-${item}`"
-                      class="rounded-full border border-sky-200 bg-white px-2 py-1 text-xs text-sky-700"
-                    >
-                      {{ item }}
-                    </span>
-                    <span v-if="!monthlyDeepAnalysis.top_themes.length" class="text-sm text-slate-400">Veri yok</span>
+                  <div v-if="biasWarningSection" class="flex items-center gap-2 bg-rose-50 text-rose-700 px-3 py-2 rounded-xl border border-rose-100 text-xs font-bold">
+                    <HandRaisedIcon class="w-4 h-4" />
+                    <span>Bias Şüphesi: {{ biasWarningSection.items.join(', ') }}</span>
                   </div>
                 </div>
               </div>
+              
+              <!-- Mini Stats Sidebar in Profile -->
+              <div class="space-y-4">
+                <div v-if="selectedEmployeeReport.badges?.length" class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Kazanılan Rozetler</p>
+                   <div class="flex flex-wrap gap-3">
+                      <div v-for="badge in selectedEmployeeReport.badges" :key="`badge-big-${badge.id}`">
+                        <BadgeMedal
+                          :badge-type="badge.badge_type"
+                          :badge-level="badge.badge_level"
+                          size="sm"
+                          show-label
+                          :description="getBadgeDescription(badge)"
+                        />
+                      </div>
+                   </div>
+                </div>
+              </div>
             </div>
+          </div>
 
-            <div v-else class="mt-6 text-sm text-slate-400">
-              Aylık derin analiz verisi henüz oluşmadı.
-            </div>
-
-            <div v-if="monthlyRagReport" class="mt-6 rounded-2xl border border-violet-100 bg-violet-50 p-5">
-              <div class="flex items-start justify-between gap-4">
+          <!-- Analysis Grid -->
+          <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_360px] gap-8">
+            <!-- Monthly Deep Analysis -->
+            <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div class="flex items-center justify-between gap-4 mb-8">
                 <div>
-                  <p class="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">Aylık Hafızalı Analiz</p>
-                  <p class="mt-2 text-sm leading-6 text-slate-700">{{ renderText(monthlyRagReport.report_summary) }}</p>
+                  <h4 class="text-xl font-bold text-slate-900">Aylık Derin Analiz</h4>
+                  <p class="text-sm text-slate-500 mt-1">NLP tabanlı duygu ve trend analizi</p>
                 </div>
-                <span class="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-semibold text-violet-700">
-                  {{ formatMemoryCount(monthlyRagReport.retrieved_memory_count) }}
-                </span>
+                <div class="flex gap-2">
+                  <select v-model="selectedMonth" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
+                    <option v-for="month in monthOptions" :key="month.value" :value="month.value">{{ month.label }}</option>
+                  </select>
+                  <select v-model="selectedYear" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
+                    <option v-for="year in yearOptions" :key="year" :value="year">{{ year }}</option>
+                  </select>
+                </div>
               </div>
 
-              <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="rounded-xl border border-violet-100 bg-white p-4">
-                  <p class="text-xs font-semibold text-violet-700">Trend değerlendirmesi</p>
-                  <p class="mt-2 text-sm leading-6 text-slate-700">{{ renderText(monthlyRagReport.trend_summary) }}</p>
+              <div v-if="monthlyDeepAnalysis" class="space-y-8">
+                <!-- Monthly KPIs -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div class="bg-slate-50 rounded-2xl p-5 border border-slate-100 flex flex-col items-center text-center">
+                    <div class="p-2 bg-indigo-100 rounded-xl mb-3"><ArrowTrendingUpIcon class="w-5 h-5 text-indigo-600" /></div>
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Motivasyon</p>
+                    <p class="mt-2 text-2xl font-bold text-slate-900">{{ formatTrend(monthlyDeepAnalysis.motivation_trend_direction) }}</p>
+                  </div>
+                  <div class="bg-slate-50 rounded-2xl p-5 border border-slate-100 flex flex-col items-center text-center">
+                    <div class="p-2 bg-blue-100 rounded-xl mb-3"><FaceSmileIcon class="w-5 h-5 text-blue-600" /></div>
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Duygu Trendi</p>
+                    <p class="mt-2 text-2xl font-bold text-slate-900">{{ formatTrend(monthlyDeepAnalysis.sentiment_trend_direction) }}</p>
+                  </div>
+                  <div class="bg-slate-50 rounded-2xl p-5 border border-slate-100 flex flex-col items-center text-center">
+                    <div class="p-2 bg-rose-100 rounded-xl mb-3"><ExclamationCircleIcon class="w-5 h-5 text-rose-600" /></div>
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Ayrılma Riski</p>
+                    <p class="mt-2 text-2xl font-bold text-slate-900">{{ monthlyDeepAnalysis.flight_risk_score ?? '-' }}/10</p>
+                  </div>
                 </div>
-                <div class="rounded-xl border border-violet-100 bg-white p-4">
-                  <p class="text-xs font-semibold text-violet-700">Elde tutma riski</p>
-                  <p class="mt-2 text-sm leading-6 text-slate-700">
-                    Skor: {{ monthlyRagReport.flight_risk_score ?? '-' }}/10
-                    <span v-if="monthlyRagReport.retention_risk_level"> - {{ formatRiskLabel(monthlyRagReport.retention_risk_level) }}</span>
-                  </p>
+
+                <!-- Theme Lists -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div class="space-y-4">
+                    <h5 class="text-xs font-bold text-rose-600 uppercase tracking-widest flex items-center gap-2">
+                       <span class="w-1.5 h-1.5 bg-rose-600 rounded-full"></span>
+                       Şikayet Konuları
+                    </h5>
+                    <div class="flex flex-wrap gap-2">
+                      <span v-for="item in monthlyDeepAnalysis.top_complaint_topics" :key="item" class="bg-rose-50 text-rose-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-rose-100">
+                        {{ renderText(item) }}
+                      </span>
+                      <p v-if="!monthlyDeepAnalysis.top_complaint_topics.length" class="text-xs text-slate-400">Veri yok</p>
+                    </div>
+                  </div>
+                  <div class="space-y-4">
+                    <h5 class="text-xs font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                       <span class="w-1.5 h-1.5 bg-emerald-600 rounded-full"></span>
+                       Güçlü Alanlar
+                    </h5>
+                    <div class="flex flex-wrap gap-2">
+                      <span v-for="item in monthlyDeepAnalysis.top_praise_topics" :key="item" class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-emerald-100">
+                        {{ renderText(item) }}
+                      </span>
+                      <p v-if="!monthlyDeepAnalysis.top_praise_topics.length" class="text-xs text-slate-400">Veri yok</p>
+                    </div>
+                  </div>
+                  <div class="space-y-4">
+                    <h5 class="text-xs font-bold text-sky-600 uppercase tracking-widest flex items-center gap-2">
+                       <span class="w-1.5 h-1.5 bg-sky-600 rounded-full"></span>
+                       Öne Çıkan Temalar
+                    </h5>
+                    <div class="flex flex-wrap gap-2">
+                      <span v-for="item in monthlyDeepAnalysis.top_themes" :key="item" class="bg-sky-50 text-sky-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-sky-100">
+                        {{ renderText(item) }}
+                      </span>
+                      <p v-if="!monthlyDeepAnalysis.top_themes.length" class="text-xs text-slate-400">Veri yok</p>
+                    </div>
+                  </div>
                 </div>
+                
+                <!-- RAG Section -->
+                <div v-if="monthlyRagReport" class="bg-indigo-900 rounded-2xl p-6 text-white relative overflow-hidden shadow-xl">
+                   <div class="absolute top-0 right-0 p-4 opacity-5">
+                      <SparklesIcon class="w-24 h-24 text-indigo-200" />
+                   </div>
+                   <div class="relative z-10">
+                      <div class="flex items-center justify-between mb-4">
+                         <h5 class="text-sm font-bold uppercase tracking-widest text-indigo-300">Yapay Zeka Bellek Analizi (RAG)</h5>
+                         <div class="bg-white/10 px-2 py-1 rounded-lg text-[10px] font-bold backdrop-blur-sm border border-white/10">
+                            {{ monthlyRagReport.retrieved_memory_count }} Benzer Kayıt Taraması
+                         </div>
+                      </div>
+                      <p class="text-sm leading-relaxed text-indigo-50 font-medium">
+                        {{ renderText(monthlyRagReport.report_summary) }}
+                      </p>
+                      
+                      <div class="mt-6 grid grid-cols-2 gap-4">
+                         <div class="bg-white/5 rounded-xl p-4 border border-white/10">
+                            <p class="text-[10px] font-bold text-indigo-300 uppercase mb-2">Trend Değerlendirmesi</p>
+                            <p class="text-xs text-indigo-100 leading-relaxed">{{ renderText(monthlyRagReport.trend_summary) }}</p>
+                         </div>
+                         <div class="bg-white/5 rounded-xl p-4 border border-white/10">
+                            <p class="text-[10px] font-bold text-indigo-300 uppercase mb-2">Elde Tutma Riski</p>
+                            <div class="flex items-baseline gap-2">
+                               <span class="text-xl font-bold">{{ monthlyRagReport.flight_risk_score ?? '-' }}/10</span>
+                               <span v-if="monthlyRagReport.retention_risk_level" class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/10">{{ formatRiskLabel(monthlyRagReport.retention_risk_level) }}</span>
+                            </div>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+              </div>
+
+              <div v-else class="py-20 text-center text-slate-400">
+                <CloudIcon class="w-12 h-12 mx-auto mb-4 opacity-20" />
+                <p>Seçili dönem için analiz verisi henüz bulunmuyor.</p>
+              </div>
+            </div>
+
+            <!-- Side Cards -->
+            <div class="space-y-8">
+              <!-- Manager Action Card -->
+              <div class="rounded-2xl border border-slate-900 bg-slate-900 p-8 shadow-xl text-white">
+                 <div class="flex items-center gap-3 mb-6">
+                    <div class="p-2 bg-indigo-500 rounded-xl"><BoltIcon class="w-5 h-5 text-white" /></div>
+                    <h4 class="text-lg font-bold">Yönetici Aksiyonu</h4>
+                 </div>
+                 <div class="p-5 bg-white/5 rounded-2xl border border-white/10 mb-6">
+                    <p class="text-[10px] font-bold text-indigo-300 uppercase tracking-widest mb-3">Önerilen İlk Adım</p>
+                    <p class="text-sm leading-relaxed text-slate-200 italic">
+                      "{{ renderText(selectedEmployeeReport.recommended_action || 'Bu çalışan için belirgin bir aksiyon sinyali henüz oluşmadı.') }}"
+                    </p>
+                 </div>
+                 
+                 <div v-if="monthlyDeepAnalysis" class="space-y-4">
+                    <div class="flex flex-col gap-1">
+                       <span class="text-[10px] font-bold text-slate-400 uppercase">Ayrılma Nedeni Sinyalleri</span>
+                       <div class="flex flex-wrap gap-2 mt-2">
+                          <span v-for="item in monthlyDeepAnalysis.flight_risk_reasons" :key="item" class="bg-rose-500/10 text-rose-300 px-2 py-1 rounded text-[10px] font-bold border border-rose-500/20">
+                            {{ renderText(item) }}
+                          </span>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+
+              <!-- Metrics Chart -->
+              <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                 <div class="flex items-center justify-between mb-6">
+                    <h4 class="font-bold text-slate-900">Yetenek Dağılımı</h4>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">1-5 Puan</span>
+                 </div>
+                 <div class="h-64">
+                    <BarChart
+                      :labels="scoreMetricLabels"
+                      :data="scoreMetricValues"
+                      label="Skorlar"
+                      color="#4f46e5"
+                    />
+                 </div>
               </div>
             </div>
           </div>
+        </section>
 
-          <div class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Aylık İçgörüler</p>
-            <div v-if="monthlyDeepAnalysis" class="mt-5 space-y-4">
-              <div class="rounded-xl border border-white/10 bg-white/5 p-4">
-                <p class="text-xs font-semibold text-rose-300">Ayrılma riski nedenleri</p>
-                <div class="mt-3 flex flex-wrap gap-2">
-                  <span
-                    v-for="item in monthlyDeepAnalysis.flight_risk_reasons"
-                    :key="`risk-reason-${item}`"
-                    class="rounded-full border border-rose-500/20 bg-white/5 px-2 py-1 text-xs text-rose-200"
-                  >
-                    {{ renderText(item) }}
-                  </span>
-                  <span v-if="!monthlyDeepAnalysis.flight_risk_reasons.length" class="text-sm text-slate-500">Veri yok</span>
-                </div>
-              </div>
-
-              <div class="rounded-xl border border-white/10 bg-white/5 p-4">
-                <p class="text-xs font-semibold text-amber-300">Aksiyon önerisi</p>
-                <p class="mt-2 text-sm leading-6 text-slate-200">
-                  {{ renderText(monthlyDeepAnalysis.action_recommendation || 'Bu çalışan için aylık aksiyon önerisi henüz oluşmadı.') }}
-                </p>
-              </div>
-
-              <div class="rounded-xl border border-white/10 bg-white/5 p-4">
-                <p class="text-xs font-semibold text-indigo-300">Analiz kapsamı</p>
-                <p class="mt-2 text-sm leading-6 text-slate-200">
-                  Bu rapor son ay içinde toplanan {{ monthlyDeepAnalysis.feedback_count }} feedback cevabı üzerinden hesaplandı.
-                </p>
-              </div>
-
-              <div v-if="monthlyRagReport" class="rounded-xl border border-white/10 bg-white/5 p-4">
-                <p class="text-xs font-semibold text-violet-300">Ana bulgular</p>
-                <div class="mt-3 flex flex-wrap gap-2">
-                  <span
-                    v-for="item in monthlyRagReport.key_takeaways"
-                    :key="`rag-takeaway-${item}`"
-                    class="rounded-full border border-violet-500/20 bg-white/5 px-2 py-1 text-xs text-violet-200"
-                  >
-                    {{ renderText(item) }}
-                  </span>
-                  <span v-if="!monthlyRagReport.key_takeaways.length" class="text-sm text-slate-500">Veri yok</span>
-                </div>
-              </div>
-            </div>
-            <div v-else class="mt-5 text-sm text-slate-500">
-              Aylık içgörüler veri geldikçe burada gösterilecek.
-            </div>
+        <!-- Empty State -->
+        <section
+          v-else
+          class="flex flex-col items-center justify-center min-h-[600px] rounded-3xl border-2 border-dashed border-slate-200 bg-white p-12 text-center"
+        >
+          <div class="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mb-6">
+             <UserPlusIcon class="w-12 h-12 text-indigo-300" />
           </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6">
-          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Skorlar</p>
-                <h4 class="mt-1 text-lg font-bold text-slate-900">Çalışan değerlendirme grafiği</h4>
-              </div>
-              <span class="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                1-5 puan aralığı
-              </span>
-            </div>
-
-            <div class="mt-6 grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div
-                v-for="metric in scoreMetrics"
-                :key="metric.label"
-                class="rounded-xl border border-slate-100 bg-slate-50 p-4"
-              >
-                <p class="text-xs text-slate-500">{{ metric.label }}</p>
-                <p class="mt-1 text-2xl font-bold text-slate-900">{{ metric.display_value }}</p>
-                <p v-if="metric.description" class="mt-1 text-xs text-slate-400">{{ metric.description }}</p>
-              </div>
-            </div>
-
-            <div class="mt-6 h-80">
-              <BarChart
-                :labels="scoreMetricLabels"
-                :data="scoreMetricValues"
-                label="Çalışan Skorları"
-                color="#4f46e5"
-              />
-            </div>
-
-            <div class="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-4">
-              <p class="text-xs font-semibold text-amber-700">Not</p>
-              <p class="mt-1 text-sm text-slate-600">
-                Veri modelinde şu an klasik NPS yerine haftalık 1-5 davranış puanları tutuluyor. Bu grafik, ekip arkadaşlarının birbirine verdiği güncel değerlendirme skorlarını gösterir.
-              </p>
-            </div>
+          <h3 class="text-2xl font-bold text-slate-900">Çalışan Analiz Paneli</h3>
+          <p class="mt-4 text-slate-500 max-w-sm mx-auto leading-relaxed">
+            Soldaki listeden bir çalışan seçtiğinizde kisisel performans trendleri, 360 feedback özetleri ve AI destekli yönetici içgörüleri burada listelenecektir.
+          </p>
+          <div class="mt-8 flex gap-4">
+             <div class="flex flex-col items-center">
+                <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 mb-2">1</div>
+                <span class="text-[10px] font-bold text-slate-400 uppercase">Seç</span>
+             </div>
+             <div class="w-12 h-px bg-slate-100 mt-4"></div>
+             <div class="flex flex-col items-center">
+                <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 mb-2">2</div>
+                <span class="text-[10px] font-bold text-slate-400 uppercase">Analiz Et</span>
+             </div>
+             <div class="w-12 h-px bg-slate-100 mt-4"></div>
+             <div class="flex flex-col items-center">
+                <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 mb-2">3</div>
+                <span class="text-[10px] font-bold text-slate-400 uppercase">Aksiyon Al</span>
+             </div>
           </div>
-
-          <div class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Yönetici Gözlemi</p>
-            <div class="mt-5 space-y-4">
-              <div class="rounded-xl border border-white/10 bg-white/5 p-4">
-                <p class="text-xs font-semibold text-amber-300">Önerilen aksiyon</p>
-                <p class="mt-2 text-sm leading-6 text-slate-200">
-                  {{ renderText(selectedEmployeeReport.recommended_action || 'Bu çalışan için belirgin bir aksiyon sinyali henüz oluşmadı.') }}
-                </p>
-              </div>
-
-              <div
-                v-for="section in selectedEmployeeReport.sections"
-                :key="section.title"
-                class="rounded-xl border p-4"
-                :class="getDarkSectionClass(section.title)"
-              >
-                <p class="text-xs font-semibold mb-2" :class="getDarkSectionTitleClass(section.title)">
-                  {{ section.title }}
-                </p>
-                <div class="flex flex-wrap gap-2">
-                  <span
-                    v-for="item in section.items"
-                    :key="`${section.title}-${item}`"
-                    class="rounded-full border px-2 py-1 text-xs bg-white/5"
-                    :class="getDarkSectionPillClass(section.title)"
-                  >
-                    {{ renderText(item) }}
-                  </span>
-                  <span v-if="!section.items.length" class="text-sm text-slate-500">Veri yok</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section
-        v-else
-        class="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-400"
-      >
-        Soldaki listeden bir çalışan seçtiğinde burada rapor özeti, skor grafiği ve yönetici içgörü alanı görünecek.
-      </section>
+        </section>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { 
+  UsersIcon, 
+  MagnifyingGlassIcon, 
+  ChevronRightIcon, 
+  BriefcaseIcon, 
+  BuildingOfficeIcon, 
+  UserGroupIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  HandRaisedIcon,
+  ArrowTrendingUpIcon,
+  FaceSmileIcon,
+  ExclamationCircleIcon,
+  CloudIcon,
+  BoltIcon,
+  UserPlusIcon,
+  StarIcon,
+  HeartIcon
+} from '@heroicons/vue/24/outline'
 import BarChart from '@/components/dashboard/BarChart.vue'
 import BadgeMedal from '@/components/common/BadgeMedal.vue'
 import {
@@ -449,6 +446,14 @@ import {
   type EmployeeForFeedback,
   type SummaryMetric,
 } from '@/services/api/feedback.api'
+import { employeeApi } from '@/services/api/employee.api'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.user?.role === 'admin')
+const departments = ref<any[]>([])
+const selectedDepartmentId = ref<number | null>(null)
+const searchQuery = ref('')
 
 const teamMembers = ref<EmployeeForFeedback[]>([])
 const selectedTeam = ref<string>('all')
@@ -463,17 +468,17 @@ const selectedYear = ref<number>(today.getFullYear())
 
 const monthOptions = [
   { value: 1, label: 'Ocak' },
-  { value: 2, label: 'Subat' },
+  { value: 2, label: 'Şubat' },
   { value: 3, label: 'Mart' },
   { value: 4, label: 'Nisan' },
-  { value: 5, label: 'Mayis' },
+  { value: 5, label: 'Mayıs' },
   { value: 6, label: 'Haziran' },
   { value: 7, label: 'Temmuz' },
-  { value: 8, label: 'Agustos' },
-  { value: 9, label: 'Eylul' },
+  { value: 8, label: 'Ağustos' },
+  { value: 9, label: 'Eylül' },
   { value: 10, label: 'Ekim' },
-  { value: 11, label: 'Kasim' },
-  { value: 12, label: 'Aralik' },
+  { value: 11, label: 'Kasım' },
+  { value: 12, label: 'Aralık' },
 ]
 
 const yearOptions = computed(() => {
@@ -486,10 +491,33 @@ const teamOptions = computed(() => {
 })
 
 const filteredTeamMembers = computed(() => {
-  if (selectedTeam.value === 'all') {
-    return teamMembers.value
+  let list = teamMembers.value
+  
+  // Department Filter (Admin Only)
+  if (isAdmin.value && selectedDepartmentId.value) {
+    list = list.filter(m => m.department_id === selectedDepartmentId.value)
   }
-  return teamMembers.value.filter((employee) => employee.team === selectedTeam.value)
+  
+  // Team Filter
+  if (selectedTeam.value !== 'all') {
+    list = list.filter((employee) => employee.team === selectedTeam.value)
+  }
+  
+  return list
+})
+
+const filteredAndSearchedMembers = computed(() => {
+  let list = filteredTeamMembers.value
+  
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    list = list.filter(m => 
+      m.user.full_name.toLowerCase().includes(q) || 
+      (m.position || '').toLowerCase().includes(q)
+    )
+  }
+  
+  return list
 })
 
 function formatRiskLabel(value?: string | null) {
@@ -507,66 +535,7 @@ function formatMemoryCount(value: number) {
 
 function renderText(value?: string | null) {
   if (!value) return ''
-
-  const replacements: Array<[string, string]> = [
-    ['surec yavasligi', 'süreç yavaşlığı'],
-    ['toplanti yogunlugu', 'toplantı yoğunluğu'],
-    ['deadline baskisi', 'deadline baskısı'],
-    ['mentorluk eksikligi', 'mentorluk eksikliği'],
-    ['psikolojik guven', 'psikolojik güven'],
-    ['is birligi', 'iş birliği'],
-    ['gelisime aciklik', 'gelişime açıklık'],
-    ['teknik borc', 'teknik borç'],
-    ['liderlik destegi', 'liderlik desteği'],
-    ['yonetsel destek', 'yönetsel destek'],
-    ['destek ihtiyaci', 'destek ihtiyacı'],
-    ['ekip uyumu', 'ekip uyumu'],
-    ['yukselis', 'yükseliş'],
-    ['dusus', 'düşüş'],
-    ['gorunuyor', 'görünüyor'],
-    ['Tekrarlanan sikayet konulari', 'Tekrarlanan şikayet konuları'],
-    ['En belirgin sikayet alanlari', 'En belirgin şikayet alanları'],
-    ['Olumlu sinyaller', 'Olumlu sinyaller'],
-    ['Gecmis benzer yorumlar', 'Geçmiş benzer yorumlar'],
-    ['kayitta', 'kayıtta'],
-    ['ayrilma riski', 'ayrılma riski'],
-    ['olumlu davranislari', 'olumlu davranışları'],
-    ['takdir edin', 'takdir edin'],
-    ['gorusme', 'görüşme'],
-    ['blokajlari', 'blokajları'],
-    ['Çalışan geri bildiriminde', 'Çalışan geri bildiriminde'],
-    ['Calisan geri bildiriminde', 'Çalışan geri bildiriminde'],
-    ['karisik', 'karışık'],
-    ['olumlu', 'olumlu'],
-    ['olumsuz', 'olumsuz'],
-  ]
-
-  let rendered = value
-  for (const [from, to] of replacements) {
-    rendered = rendered.split(from).join(to)
-  }
-  return rendered
-}
-
-function getDarkSectionClass(title: string) {
-  const normalized = title.toLowerCase()
-  if (normalized.includes('guclu')) return 'border-emerald-500/20 bg-emerald-500/10'
-  if (normalized.includes('risk')) return 'border-rose-500/20 bg-rose-500/10'
-  return 'border-amber-500/20 bg-amber-500/10'
-}
-
-function getDarkSectionTitleClass(title: string) {
-  const normalized = title.toLowerCase()
-  if (normalized.includes('guclu')) return 'text-emerald-300'
-  if (normalized.includes('risk')) return 'text-rose-300'
-  return 'text-amber-300'
-}
-
-function getDarkSectionPillClass(title: string) {
-  const normalized = title.toLowerCase()
-  if (normalized.includes('guclu')) return 'text-emerald-200 border-emerald-500/20'
-  if (normalized.includes('risk')) return 'text-rose-200 border-rose-500/20'
-  return 'text-amber-200 border-amber-500/20'
+  return value // Backend already provides mostly clean strings, UI handles specific replacements if needed
 }
 
 function employeeReportBadges(employeeId: number) {
@@ -575,15 +544,15 @@ function employeeReportBadges(employeeId: number) {
 
 function getBadgeDescription(badge: BadgeResponse | { badge_type: BadgeType; source_feedback_ids?: number[] }) {
   const baseMap = {
-    team_player: "Ekip enerjisini ve uyumu yukseltiyor.",
-    problem_solver: "Blokajlara hizli ve sogukkanli yaklasiyor.",
-    communicator: "Geri bildirimlerinde net ve ogretici bir cizgi var.",
-    speed_champion: "Yuksek tempo ve hizli adaptasyon sagliyor.",
-    mentor: "Bilgi paylasimi ve mentorlukta one cikiyor.",
-    innovator: "Gelisime acik ve cevik ilerliyor.",
-    reliable: "Teknik sahiplenme ve saglam uygulama disiplini gosteriyor.",
+    team_player: "Ekip enerjisini ve uyumu yükseltiyor.",
+    problem_solver: "Blokajlara hızlı ve soğukkanlı yaklaşıyor.",
+    communicator: "Geri bildirimlerinde net ve öğretici bir çizgi var.",
+    speed_champion: "Yüksek tempo ve hızlı adaptasyon sağlıyor.",
+    mentor: "Bilgi paylaşımı ve mentorlukta öne çıkıyor.",
+    innovator: "Gelişime açık ve çevik ilerliyor.",
+    reliable: "Teknik sahiplenme ve sağlam uygulama disiplini gösteriyor.",
   } as const
-  return baseMap[badge.badge_type] ?? "Bu ayin analizlerinde istikrarli bir guc sergiledi."
+  return baseMap[badge.badge_type] ?? "Analizlerde istikrarlı bir güç sergiledi."
 }
 
 const scoreMetrics = computed<SummaryMetric[]>(() =>
@@ -603,14 +572,8 @@ const scoreMetricValues = computed(() => scoreMetrics.value.map((metric) => metr
 
 function getPreviewSummary(employeeId: number) {
   const report = employeeReports.value[employeeId]
-  if (!report?.report_summary) {
-    return 'Bu çalışan için ilk rapor yüklendiğinde kısa özet burada görünecek.'
-  }
-
-  const rendered = renderText(report.report_summary)
-  return rendered.length > 120
-    ? `${rendered.slice(0, 120)}...`
-    : rendered
+  if (!report?.report_summary) return ''
+  return report.report_summary.length > 80 ? report.report_summary.slice(0, 80) + '...' : report.report_summary
 }
 
 function formatTrend(value: string) {
@@ -622,8 +585,12 @@ function formatTrend(value: string) {
   return map[value] || 'Stabil'
 }
 
-async function loadTeamMembers() {
+async function loadData() {
   try {
+    if (isAdmin.value) {
+      departments.value = await employeeApi.getDepartments()
+    }
+    
     const candidates = await feedbackApi.getFeedbackCandidates()
     teamMembers.value = candidates.filter((employee) => employee.user.role === 'employee')
 
@@ -631,38 +598,31 @@ async function loadTeamMembers() {
       selectedEmployeeId.value = teamMembers.value[0].id
     }
   } catch (error) {
-    console.error('Ekip uyeleri yuklenemedi:', error)
+    console.error('Veriler yüklenemedi:', error)
   }
 }
 
 async function loadEmployeeReport(employeeId: number) {
   try {
     const report = await feedbackApi.getEmployee360SummaryReport(employeeId)
-    employeeReports.value = {
-      ...employeeReports.value,
-      [employeeId]: report,
-    }
+    employeeReports.value = { ...employeeReports.value, [employeeId]: report }
     selectedEmployeeReport.value = report
   } catch (error) {
-    console.error('Calisan 360 raporu yuklenemedi:', error)
+    console.error('Rapor yüklenemedi:', error)
     selectedEmployeeReport.value = null
   }
 }
 
 async function loadMonthlyDeepAnalysis(employeeId: number) {
   try {
-    const deepAnalysis = await feedbackApi.getEmployeeMonthlyDeepAnalysis(employeeId, {
-      year: selectedYear.value,
-      month: selectedMonth.value,
-    })
-    const ragReport = await feedbackApi.getEmployeeMonthlyRagReport(employeeId, {
-      year: selectedYear.value,
-      month: selectedMonth.value,
-    })
+    const [deepAnalysis, ragReport] = await Promise.all([
+      feedbackApi.getEmployeeMonthlyDeepAnalysis(employeeId, { year: selectedYear.value, month: selectedMonth.value }),
+      feedbackApi.getEmployeeMonthlyRagReport(employeeId, { year: selectedYear.value, month: selectedMonth.value })
+    ])
     monthlyDeepAnalysis.value = deepAnalysis
     monthlyRagReport.value = ragReport
   } catch (error) {
-    console.error('Calisan aylik derin analizi yuklenemedi:', error)
+    console.error('Aylık analizler yüklenemedi:', error)
     monthlyDeepAnalysis.value = null
     monthlyRagReport.value = null
   }
@@ -676,8 +636,15 @@ watch(selectedEmployeeId, (value) => {
 })
 
 watch(selectedTeam, () => {
-  const firstVisibleEmployee = filteredTeamMembers.value[0]
-  selectedEmployeeId.value = firstVisibleEmployee ? firstVisibleEmployee.id : null
+  if (filteredTeamMembers.value.length > 0) {
+    selectedEmployeeId.value = filteredTeamMembers.value[0].id
+  }
+})
+
+watch(selectedDepartmentId, () => {
+    if (filteredTeamMembers.value.length > 0) {
+        selectedEmployeeId.value = filteredTeamMembers.value[0].id
+    }
 })
 
 watch([selectedMonth, selectedYear], () => {
@@ -687,15 +654,22 @@ watch([selectedMonth, selectedYear], () => {
 })
 
 onMounted(async () => {
-  await loadTeamMembers()
-  if (typeof selectedEmployeeId.value === 'number') {
-    await loadEmployeeReport(selectedEmployeeId.value)
-    await loadMonthlyDeepAnalysis(selectedEmployeeId.value)
-  }
+  await loadData()
 })
 </script>
 
-
-
-
-
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+</style>
