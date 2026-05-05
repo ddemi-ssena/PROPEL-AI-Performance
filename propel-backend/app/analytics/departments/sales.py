@@ -14,13 +14,13 @@ class SalesAnalyticsAdapter(DepartmentAnalyticsAdapter):
         key="sales",
         label="Satis",
         description="Satis KPI seti, quota ve donusum bazli feature engineering ile ayni analytics omurgasina baglanacak.",
-        readiness_status="awaiting_dataset",
-        supports_live_data=False,
+        readiness_status="live",
+        supports_live_data=True,
         planned_targets=[
             "quota_risk_band",
             "attrition_risk_band",
         ],
-        supported_teams=["Field Sales", "Inside Sales", "Account Management"],
+        supported_teams=["Kurumsal Satis", "Bireysel Satis", "Musteri Basarisi"],
         layers=[
             AnalyticsLayerDefinition("features", "Katman 1: Ozellik Zenginlestirme", "Quota attainment, donusum, gorusme hizi ve musteri kalitesi gibi KPI'lar normalize edilir."),
             AnalyticsLayerDefinition("base_models", "Katman 2: Baz Ogreniciler", "XGBoost, Random Forest ve LightGBM satis KPI seti icin tekrar egitilir."),

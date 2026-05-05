@@ -407,6 +407,7 @@ const selectedTeam = ref<string>('all')
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin' || localStorage.getItem('role') === 'admin')
 const departments = ref<any[]>([])
+const employees = ref<any[]>([])
 const selectedDepartment = ref<number | null>(null)
 
 const monthOptions = [
@@ -429,7 +430,11 @@ const yearOptions = computed(() => {
   return [baseYear - 1, baseYear, baseYear + 1]
 })
 
-const teamOptions = ['Backend', 'Frontend', 'DevOps', 'QA']
+const teamOptions = computed(() => {
+  if (!employees.value.length) return []
+  const teams = new Set(employees.value.map(e => e.team).filter(t => t && t !== 'Yonetim'))
+  return Array.from(teams).sort()
+})
 
 function currentTeamParam() {
   return selectedTeam.value === 'all' ? undefined : selectedTeam.value
@@ -606,15 +611,27 @@ async function loadMonthlyDeepAnalysis() {
 }
 
 async function loadDepartments() {
-  if (isAdmin.value) {
-    try {
+  try {
+    if (isAdmin.value) {
       departments.value = await employeeApi.getDepartments()
       if (departments.value.length > 0 && !selectedDepartment.value) {
         selectedDepartment.value = departments.value[0].id
       }
-    } catch (error) {
-      console.error('Departmanlar yuklenemedi:', error)
+    } else {
+      // Manager is already restricted to their department in the backend,
+      // but we fetch the employee list to get the teams.
     }
+    
+    // Fetch employees to determine teams
+    const employeesData = await employeeApi.getEmployees()
+    employees.value = employeesData
+    
+    // For non-admin, use the department of the first employee (self/department)
+    if (!isAdmin.value && employeesData.length > 0) {
+      selectedDepartment.value = employeesData[0].department_id
+    }
+  } catch (error) {
+    console.error('Veriler yuklenemedi:', error)
   }
 }
 

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="pb-10">
     <!-- Stronger Header Section (Gradient Banner) -->
     <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 shadow-xl mb-8">
@@ -14,12 +14,12 @@
                  <div>
                      <h1 class="text-3xl font-bold text-white tracking-tight">
                         Hoş Geldin, <br class="md:hidden"/>
-                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-blue-200">{{ userStore.user?.full_name }}</span>
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-blue-200">{{ userStore.user?.full_name || employee?.user?.full_name || 'Değerli Çalışanımız' }}</span>
                      </h1>
                      <div class="flex flex-wrap items-center gap-3 mt-3 text-sm font-medium">
-                        <span class="bg-white/10 text-indigo-100 px-3 py-1 rounded-full backdrop-blur-sm border border-white/10">Senior Developer</span>
-                        <span class="text-slate-400 hidden md:inline">•</span>
-                        <span class="text-slate-300">Yazılım Geliştirme Departmanı</span>
+                        <span v-if="employee?.position" class="bg-white/10 text-indigo-100 px-3 py-1 rounded-full backdrop-blur-sm border border-white/10">{{ employee.position }}</span>
+                        <span v-if="employee?.position" class="text-slate-400 hidden md:inline">•</span>
+                        <span class="text-slate-300">{{ employee?.department?.name || 'Departman Atanmadı' }}</span>
                      </div>
                       <div v-if="badges.length" class="mt-4 flex flex-wrap gap-2">
                          <div
@@ -101,15 +101,19 @@
                 
                 <div class="space-y-4">
                     <div class="bg-white/5 p-4 rounded-xl border border-white/5 hover:border-indigo-500/30 hover:bg-white/10 transition-all backdrop-blur-sm cursor-pointer group/item">
-                        <h4 class="text-sm font-bold text-indigo-200 mb-2 group-hover/item:text-indigo-100 transition-colors">Kod İncelemelerine Katılım</h4>
-                        <p class="text-xs text-slate-300 mb-4 leading-relaxed">Teknik liderliğini güçlendirmek için bu hafta 2 junior pull request'i incelemen öneriliyor.</p>
+                        <h4 class="text-sm font-bold text-indigo-200 mb-2 group-hover/item:text-indigo-100 transition-colors">
+                            {{ isSalesDepartment ? 'Müşteri Takibi' : 'Kod İncelemelerine Katılım' }}
+                        </h4>
+                        <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+                            {{ isSalesDepartment ? 'Pipeline verimliliğini artırmak için bekleyen teklifleri bu hafta sonuna kadar güncellemen öneriliyor.' : 'Teknik liderliğini güçlendirmek için bu hafta 2 junior pull request\'i incelemen öneriliyor.' }}
+                        </p>
                         <button class="w-full py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-500 transition shadow-lg shadow-indigo-900/20">
                             Planla
                         </button>
                     </div>
                     <div class="bg-white/5 p-4 rounded-xl border border-white/5 hover:border-rose-500/30 hover:bg-white/10 transition-all">
                         <h4 class="text-sm font-bold text-rose-200 mb-1">Mola Dengesi</h4>
-                        <p class="text-xs text-slate-300">Geçen hafta %15 fazla çalıştın. Verimliliğini korumak için kısa molaları artır.</p>
+                        <p class="text-xs text-slate-300">Geçen hafta yoğun bir tempo sergiledin. Verimliliğini korumak için kısa molaları artır.</p>
                     </div>
                 </div>
             </div>
@@ -187,20 +191,22 @@
             <div class="space-y-4">
                 <div class="flex gap-4 items-start p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-white hover:border-slate-200 hover:shadow-md transition-all group cursor-default">
                     <div class="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-                        ZK
+                        {{ isSalesDepartment ? 'MD' : 'ZK' }}
                     </div>
                     <div class="flex-1">
                         <div class="flex justify-between items-start mb-1">
                             <div>
-                                <h4 class="font-bold text-slate-900 text-sm">Zeynep Kaya</h4>
-                                <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Product Owner</p>
+                                <h4 class="font-bold text-slate-900 text-sm">{{ isSalesDepartment ? 'Murat Demir' : 'Zeynep Kaya' }}</h4>
+                                <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">{{ isSalesDepartment ? 'Sales Manager' : 'Product Owner' }}</p>
                             </div>
                             <span class="text-[10px] text-slate-400 bg-white px-2 py-1 rounded-full border border-slate-100 shadow-sm">2 saat önce</span>
                         </div>
-                        <p class="text-sm text-slate-600 leading-relaxed mt-2">"API entegrasyonundaki hızlı çözümün projenin yetişmesini sağladı, teşekkürler!"</p>
+                        <p class="text-sm text-slate-600 leading-relaxed mt-2">
+                            {{ isSalesDepartment ? '"Son portföy sunumundaki başarından dolayı tebrikler, harika bir iş çıkardın!"' : '"API entegrasyonundaki hızlı çözümün projenin yetişmesini sağladı, teşekkürler!"' }}
+                        </p>
                         <div class="mt-3 flex gap-2">
                              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                🧠 Problem Çözücü
+                                {{ isSalesDepartment ? '🎯 Hedef Odaklı' : '🧠 Problem Çözücü' }}
                              </span>
                         </div>
                     </div>
@@ -208,17 +214,19 @@
                 
                 <div class="flex gap-4 items-start p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-white hover:border-slate-200 hover:shadow-md transition-all group cursor-default">
                     <div class="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-                        MD
+                        {{ isSalesDepartment ? 'AC' : 'MD' }}
                     </div>
                     <div class="flex-1">
                         <div class="flex justify-between items-start mb-1">
                              <div>
-                                <h4 class="font-bold text-slate-900 text-sm">Mehmet Demir</h4>
-                                <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Tech Lead</p>
+                                <h4 class="font-bold text-slate-900 text-sm">{{ isSalesDepartment ? 'Ayşe Çelik' : 'Mehmet Demir' }}</h4>
+                                <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">{{ isSalesDepartment ? 'Senior Sales' : 'Tech Lead' }}</p>
                             </div>
                             <span class="text-[10px] text-slate-400 bg-white px-2 py-1 rounded-full border border-slate-100 shadow-sm">Dün</span>
                         </div>
-                        <p class="text-sm text-slate-600 leading-relaxed mt-2">"Takım sunumundaki desteğin için çok sağ ol."</p>
+                        <p class="text-sm text-slate-600 leading-relaxed mt-2">
+                            {{ isSalesDepartment ? '"Müşteri itirazlarını karşılama konusundaki desteğin için çok sağ ol."' : '"Takım sunumundaki desteğin için çok sağ ol."' }}
+                        </p>
                          <div class="mt-3 flex gap-2">
                             <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
                                 🤝 Takım Oyuncusu
@@ -247,7 +255,7 @@ import {
     HeartIcon,
     StarIcon
 } from '@heroicons/vue/24/outline'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
 import LineChart from '@/components/dashboard/LineChart.vue'
 import WeeklyPulseModal from '@/components/dashboard/WeeklyPulseModal.vue'
@@ -257,7 +265,14 @@ import { feedbackApi, type BadgeResponse, type BadgeType } from '@/services/api/
 import { employeeApi } from '@/services/api/employee.api'
 const userStore = useAuthStore()
 const badges = ref<BadgeResponse[]>([])
+const employee = ref<any>(null)
 const isWeeklyPulseModalOpen = ref(false)
+
+const isSalesDepartment = computed(() => {
+    const pos = (employee.value?.position || '').toLowerCase()
+    const dept = (employee.value?.department?.name || '').toLowerCase()
+    return pos.includes('sales') || dept.includes('sat') || dept.includes('sales')
+})
 
 function getBadgeDescription(badge: BadgeResponse | { badge_type: BadgeType; source_feedback_ids?: number[] }) {
   const baseMap = {
@@ -273,11 +288,21 @@ function getBadgeDescription(badge: BadgeResponse | { badge_type: BadgeType; sou
 }
 
 onMounted(async () => {
+  // Fetch badges
   try {
     badges.value = await feedbackApi.getMyBadges()
   } catch (error) {
-    console.error('Rozetler yüklenemedi:', error)
-    badges.value = []
+    console.warn('Rozetler yüklenemedi:', error)
+  }
+
+  // Fetch employee data
+  try {
+    const employeesData = await employeeApi.getEmployees()
+    if (employeesData && employeesData.length > 0) {
+      employee.value = employeesData[0]
+    }
+  } catch (error) {
+    console.error('Çalışan verileri yüklenemedi:', error)
   }
 })
 
@@ -300,4 +325,3 @@ const handlePulseSubmit = async (data: any) => {
   }
 }
 </script>
-
