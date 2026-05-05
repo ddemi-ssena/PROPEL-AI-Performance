@@ -88,6 +88,23 @@ class SoftwareMLService:
         return f"SE-{employee_id:03d}"
 
     @staticmethod
+    def _normalize_employee_key(value: Any) -> str | None:
+        if value in (None, ""):
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.upper().startswith("SE-"):
+            try:
+                return str(int(text.split("-", 1)[1]))
+            except ValueError:
+                return text.upper()
+        try:
+            return str(int(float(text)))
+        except ValueError:
+            return text
+
+    @staticmethod
     def _employee_profile(db: Session, employee_id: int, row: dict[str, Any] | None = None) -> dict[str, Any]:
         candidate_codes = {SoftwareMLService._dataset_employee_code(employee_id), str(employee_id)}
         employee = (
@@ -278,7 +295,12 @@ class SoftwareMLService:
                     candidate_ids.add(str(int(numeric_part)))
                 except ValueError:
                     pass
-        return candidate_ids
+        normalized_ids = {
+            normalized
+            for candidate in candidate_ids
+            if (normalized := SoftwareMLService._normalize_employee_key(candidate))
+        }
+        return candidate_ids | normalized_ids
 
     @staticmethod
     def train_from_upload(
@@ -340,7 +362,8 @@ class SoftwareMLService:
         employee_rows = [
             row
             for row in rows
-            if str(row.get("employee_id")) in candidate_employee_ids
+            if SoftwareMLService._normalize_employee_key(row.get("employee_id")) in candidate_employee_ids
+            or str(row.get("employee_id")) in candidate_employee_ids
         ]
         if not employee_rows:
             raise HTTPException(
@@ -451,7 +474,7 @@ class SoftwareMLService:
             low_risk_count=low_risk_count,
             top_reasons=top_reasons,
             team_summaries=team_summaries,
-            allow_llm=use_llm_narrative,
+            allow_llm=use_llm_narrative and not llm_team,
         )
         team_narratives = SoftwareNarrativeService.build_team_narratives(
             target_column=target_column,
