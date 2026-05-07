@@ -394,22 +394,47 @@
                   </span>
                 </div>
 
+                <div class="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                    <p class="text-xs font-semibold text-slate-500">Kritik takim</p>
+                    <p class="mt-2 text-lg font-bold text-slate-900">{{ teamComparisonInsight.criticalTeam }}</p>
+                    <p class="mt-1 text-xs leading-5 text-slate-500">{{ teamComparisonInsight.criticalTeamNote }}</p>
+                  </div>
+                  <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                    <p class="text-xs font-semibold text-slate-500">Toplam izleme</p>
+                    <p class="mt-2 text-lg font-bold text-slate-900">{{ teamComparisonInsight.totalRiskCount }}</p>
+                    <p class="mt-1 text-xs leading-5 text-slate-500">Yuksek ve orta riskteki toplam kisi.</p>
+                  </div>
+                  <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                    <p class="text-xs font-semibold text-slate-500">Tekrar eden neden</p>
+                    <p class="mt-2 text-sm font-bold leading-6 text-slate-900">{{ teamComparisonInsight.repeatedReason }}</p>
+                    <p class="mt-1 text-xs leading-5 text-slate-500">Takimlar arasinda en cok tekrar eden ana sinyal.</p>
+                  </div>
+                </div>
+
                 <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                   <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                    <p class="text-xs font-semibold text-slate-500">Risk yogunlugu</p>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <p class="text-xs font-semibold text-slate-500">Risk yogunlugu</p>
+                      <div class="flex items-center gap-3 text-xs text-slate-500">
+                        <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-rose-500"></span>Yuksek</span>
+                        <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-amber-400"></span>Orta</span>
+                      </div>
+                    </div>
                     <div class="mt-4 space-y-4">
                       <button
                         v-for="team in teamRiskSummaries"
                         :key="`risk-bar-${team.team}`"
-                        class="grid w-full grid-cols-[90px_minmax(0,1fr)_70px] items-center gap-3 text-left text-xs"
+                        class="grid w-full grid-cols-[96px_minmax(0,1fr)_78px] items-center gap-3 rounded-lg px-2 py-1.5 text-left text-xs transition hover:bg-white"
+                        :class="selectedTeamAnalysisName === team.team ? 'bg-white shadow-sm' : ''"
                         @click="selectedTeamAnalysisName = team.team"
                       >
                         <span class="truncate font-semibold text-slate-700">{{ team.team }}</span>
-                        <span class="flex h-3 overflow-hidden rounded-full bg-white">
+                        <span class="flex h-3 overflow-hidden rounded-full bg-white ring-1 ring-slate-100">
                           <span class="bg-rose-500" :style="{ width: `${teamHighWidth(team)}%` }"></span>
                           <span class="bg-amber-400" :style="{ width: `${teamMediumWidth(team)}%` }"></span>
                         </span>
-                        <span class="text-right font-semibold text-slate-500">{{ team.high + team.medium }}/{{ team.total }}</span>
+                        <span class="text-right font-semibold text-slate-500">%{{ teamRiskPercent(team) }}</span>
                       </button>
                     </div>
                   </div>
@@ -457,7 +482,11 @@
                   <div class="rounded-xl border border-white bg-white p-4">
                     <p class="text-xs font-semibold text-slate-500">Takim riski</p>
                     <p class="mt-2 text-2xl font-bold text-slate-900">{{ selectedTeamAnalysis.high + selectedTeamAnalysis.medium }}</p>
-                    <p class="mt-1 text-xs text-slate-500">izleme listesindeki kisi</p>
+                    <p class="mt-1 text-xs text-slate-500">%{{ teamRiskPercent(selectedTeamAnalysis) }} izleme orani</p>
+                    <div class="mt-3 flex h-2 overflow-hidden rounded-full bg-slate-100">
+                      <span class="bg-rose-500" :style="{ width: `${teamHighWidth(selectedTeamAnalysis)}%` }"></span>
+                      <span class="bg-amber-400" :style="{ width: `${teamMediumWidth(selectedTeamAnalysis)}%` }"></span>
+                    </div>
                   </div>
                   <div class="rounded-xl border border-white bg-white p-4">
                     <p class="text-xs font-semibold text-slate-500">Ana neden</p>
@@ -532,6 +561,9 @@
                         {{ person.predicted_band }}
                       </span>
                     </button>
+                    <p v-if="!selectedTeamPeople.length" class="py-4 text-sm leading-6 text-slate-500">
+                      Bu takim icin yuksek veya orta riskte kisi gorunmuyor.
+                    </p>
                   </div>
                 </div>
               </section>
@@ -1379,11 +1411,16 @@ const teamComparisonInsight = computed(() => {
     return {
       title: 'Takim verisi bekleniyor',
       summary: 'Takim analizi calistirildiginda risk yogunlugu ve ana nedenler burada yorumlanir.',
+      criticalTeam: '-',
+      criticalTeamNote: 'Veri geldikten sonra hesaplanir.',
+      totalRiskCount: 0,
+      repeatedReason: '-',
     }
   }
 
   const totalRisk = teams.reduce((sum, team) => sum + team.high + team.medium, 0)
   const repeatedReason = teamReasonDistribution.value[0]?.name || highest.topReason
+  const highestRiskCount = highest.high + highest.medium
   return {
     title: `${highest.team} risk yogunlugunda one cikiyor`,
     summary: (
@@ -1392,6 +1429,10 @@ const teamComparisonInsight = computed(() => {
       `tekrar eden ana neden ${repeatedReason}. Secili ${selected.team} takimi icin odak, ` +
       `${selected.topReason} sinyalinin takim ritmi ve kapasiteyle birlikte okunmasi.`
     ),
+    criticalTeam: highest.team,
+    criticalTeamNote: `${highestRiskCount}/${highest.total} kisi izleme listesinde, oran %${teamRiskPercent(highest)}.`,
+    totalRiskCount: totalRisk,
+    repeatedReason,
   }
 })
 
@@ -1570,6 +1611,11 @@ function teamHighWidth(team: { high: number; total: number }) {
 function teamMediumWidth(team: { medium: number; total: number }) {
   if (!team.total) return 0
   return Math.round((team.medium / team.total) * 100)
+}
+
+function teamRiskPercent(team: { high: number; medium: number; total: number }) {
+  if (!team.total) return 0
+  return Math.round(((team.high + team.medium) / team.total) * 100)
 }
 
 function countBy<T>(items: T[], getKey: (item: T) => string) {

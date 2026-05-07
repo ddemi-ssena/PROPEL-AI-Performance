@@ -167,7 +167,7 @@ class SoftwareNarrativeService:
         prompt = SoftwareNarrativeService._aggregate_prompt(payload, scope_label)
         raw_output, provider, model_name, errors = SoftwareNarrativeService._generate_llm_json(
             prompt,
-            timeout_seconds=18,
+            timeout_seconds=24,
         )
         if not provider:
             return SoftwareNarrativeService._llm_fallback(
@@ -226,10 +226,15 @@ class SoftwareNarrativeService:
             if AIService.LAST_LLM_ERROR:
                 errors.append(AIService.LAST_LLM_ERROR)
 
-            for fallback_model in ("gemini-flash-lite-latest", "gemma-3-1b-it"):
+            fallback_models = [
+                model_name
+                for model_name in AIService._preferred_gemini_models(timeout_seconds=min(timeout_seconds, 10))
+                if model_name != (AIService._RESOLVED_GEMINI_MODEL or AIService.GEMINI_MODEL)
+            ][:3]
+            for fallback_model in fallback_models:
                 raw_output = AIService._generate_with_gemini(
                     prompt,
-                    timeout_seconds=timeout_seconds,
+                    timeout_seconds=min(timeout_seconds, 18),
                     json_mode=False,
                     model_name_override=fallback_model,
                 )

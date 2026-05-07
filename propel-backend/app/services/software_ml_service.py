@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,7 @@ TARGET_LABELS = {
     "performance_band": "Performans",
     "attrition_risk_band": "Ayrilma Riski",
 }
+logger = logging.getLogger(__name__)
 
 
 class SoftwareMLService:
@@ -213,13 +216,13 @@ class SoftwareMLService:
 
         for target_column in sorted(SUPPORTED_TARGETS):
             artifact_dir = store.root_dir / target_column
-            metadata_path = artifact_dir / "metadata.json"
             metadata: dict[str, Any] = {}
-            if metadata_path.exists():
-                try:
-                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-                except json.JSONDecodeError:
-                    metadata = {}
+            try:
+                metadata = store.latest_metadata(target_column)
+                if metadata.get("run_id"):
+                    artifact_dir = artifact_dir / "runs" / str(metadata["run_id"])
+            except (FileNotFoundError, json.JSONDecodeError):
+                metadata = {}
 
             artifact_upload_id = metadata.get("upload_id")
             states.append(
@@ -278,9 +281,21 @@ class SoftwareMLService:
                 return [payload]
             raise HTTPException(status_code=400, detail="JSON icerigi liste veya nesne formatinda olmali.")
 
+        if ext == ".xlsx":
+            try:
+                import pandas as pd
+            except ImportError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="XLSX okuma icin pandas backend ortaminda kurulu olmali.",
+                ) from exc
+            dataframe = pd.read_excel(path)
+            dataframe = dataframe.where(dataframe.notna(), None)
+            return dataframe.to_dict(orient="records")
+
         raise HTTPException(
             status_code=400,
-            detail="ML egitimi icin su anda CSV veya JSON upload destekleniyor.",
+            detail="ML egitimi icin CSV, XLSX veya JSON upload destekleniyor.",
         )
 
     @staticmethod
@@ -318,6 +333,7 @@ class SoftwareMLService:
             raise HTTPException(status_code=400, detail="test_period_count en az 1 olmali.")
 
         upload = SoftwareMLService._resolve_upload(db, upload_id)
+        start = time.perf_counter()
         rows = SoftwareMLService._load_rows(SoftwareMLService._upload_path(upload))
 
         try:
@@ -328,6 +344,15 @@ class SoftwareMLService:
                 test_period_count=test_period_count,
             )
             artifact = SoftwareArtifactStore().save_training_result(result, upload_id=upload_id)
+            logger.info(
+                "software_model_train_ok",
+                extra={
+                    "upload_id": upload_id,
+                    "target_column": target_column,
+                    "model_name": model_name,
+                    "latency_ms": round((time.perf_counter() - start) * 1000),
+                },
+            )
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -357,6 +382,7 @@ class SoftwareMLService:
             raise HTTPException(status_code=400, detail=f"Desteklenmeyen target_column: {target_column}")
 
         upload = SoftwareMLService._resolve_upload(db, upload_id)
+        start = time.perf_counter()
         rows = SoftwareMLService._load_rows(SoftwareMLService._upload_path(upload))
         candidate_employee_ids = SoftwareMLService._candidate_employee_ids(db, employee_id)
         employee_rows = [
@@ -405,6 +431,7 @@ class SoftwareMLService:
             raise HTTPException(status_code=400, detail=f"Desteklenmeyen target_column: {target_column}")
 
         upload = SoftwareMLService._resolve_upload(db, upload_id)
+        start = time.perf_counter()
         rows = SoftwareMLService._load_rows(SoftwareMLService._upload_path(upload))
         grouped_rows: dict[int, list[dict[str, Any]]] = {}
 
@@ -481,6 +508,17 @@ class SoftwareMLService:
             team_summaries=team_summaries,
             allow_llm=use_llm_narrative,
             llm_team=llm_team,
+        )
+        logger.info(
+            "software_bulk_predict_ok",
+            extra={
+                "upload_id": upload_id,
+                "target_column": target_column,
+                "prediction_count": len(items),
+                "use_llm_narrative": use_llm_narrative,
+                "llm_team": llm_team,
+                "latency_ms": round((time.perf_counter() - start) * 1000),
+            },
         )
 
         return SoftwareBulkPredictionResponse(
