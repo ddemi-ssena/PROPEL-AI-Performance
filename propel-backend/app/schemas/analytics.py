@@ -1,7 +1,11 @@
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+
+class AnalyticsBaseModel(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class AnalyticsLayerResponse(BaseModel):
@@ -64,7 +68,7 @@ class DepartmentAnalyticsOverviewResponse(BaseModel):
     sprint_focus: list[str]
 
 
-class SoftwareModelTrainRequest(BaseModel):
+class SoftwareModelTrainRequest(AnalyticsBaseModel):
     upload_id: int
     target_column: str = "performance_band"
     model_name: str = "random_forest"
@@ -92,7 +96,7 @@ class SoftwareDatasetEmployeeResponse(BaseModel):
     row_count: int
 
 
-class SoftwareModelStateResponse(BaseModel):
+class SoftwareModelStateResponse(AnalyticsBaseModel):
     department: str
     upload_id: int
     target_column: str
@@ -108,7 +112,7 @@ class SoftwareModelStateResponse(BaseModel):
     artifact_dir: Optional[str] = None
 
 
-class SoftwareModelTrainResponse(BaseModel):
+class SoftwareModelTrainResponse(AnalyticsBaseModel):
     department: str
     upload_id: int
     target_column: str
