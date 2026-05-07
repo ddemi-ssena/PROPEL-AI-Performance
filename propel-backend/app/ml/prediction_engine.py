@@ -1,6 +1,8 @@
 import logging
 from typing import Dict, Any
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 class MLPredictionEngine:
@@ -10,6 +12,9 @@ class MLPredictionEngine:
         Loads the BERTürk sentiment analysis model.
         """
         self.sentiment_analyzer = None
+        if not settings.ENABLE_LOCAL_SENTIMENT_MODEL:
+            logger.info("Local sentiment model disabled; weekly pulse NLP will use neutral fallback scores.")
+            return
         try:
             from transformers import pipeline
             logger.info("Yükleniyor: savasy/bert-base-turkish-sentiment-cased...")

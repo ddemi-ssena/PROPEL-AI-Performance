@@ -5,8 +5,10 @@ FROM python:3.10-slim-bookworm
 WORKDIR /app
 
 # Gereksinimleri kopyala ve yükle
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements-nlp.txt ./
+ARG INSTALL_NLP_DEPS=false
+RUN pip install --no-cache-dir -r requirements.txt \
+    && if [ "$INSTALL_NLP_DEPS" = "true" ]; then pip install --no-cache-dir -r requirements-nlp.txt; fi
 
 # Tüm kodu kopyala
 COPY . .

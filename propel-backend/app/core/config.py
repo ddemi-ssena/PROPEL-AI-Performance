@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: Optional[str] = None
+    ENABLE_LOCAL_SENTIMENT_MODEL: bool = False
     EMBEDDING_PROVIDER: str = "hash"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
     EMBEDDING_DIMENSION: int = 128
