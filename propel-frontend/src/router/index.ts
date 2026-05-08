@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -55,6 +55,18 @@ const router = createRouter({
           name: 'admin-survey-results',
           component: () => import('@/views/shared/SurveyResults.vue'),
           meta: { title: 'Anket Sonuclari' },
+        },
+        {
+          path: 'feedback-reports/employees',
+          name: 'admin-employee-analysis',
+          component: () => import('@/views/manager/EmployeeAnalysisView.vue'),
+          meta: { title: 'Calisan Analizi' },
+        },
+        {
+          path: 'feedback-reports/department',
+          name: 'admin-department-analysis',
+          component: () => import('@/views/manager/DepartmentAnalysisView.vue'),
+          meta: { title: 'Departman Analizi' },
         },
       ],
     },
