@@ -242,7 +242,7 @@
         class="rounded-2xl border border-slate-200 bg-white p-5"
       >
         <div
-          v-if="!bulkPredictionResult"
+          v-if="!bulkPredictionResult && activeAnalyticsSection !== 'teams'"
           class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center"
         >
           <p class="text-sm font-semibold text-slate-900">Bu bolum icin once dataset analizi calistirilmali.</p>
@@ -293,7 +293,7 @@
         </div>
 
         <div
-          v-if="bulkPredictionResult.department_narrative"
+          v-if="departmentNarrative"
           v-show="activeAnalyticsSection === 'department'"
           class="mt-5 rounded-2xl border border-violet-100 bg-violet-50/70 p-5"
         >
@@ -301,22 +301,22 @@
             <div>
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">Departman Yorumu</p>
               <h4 class="mt-1 text-base font-bold text-slate-900">
-                {{ bulkPredictionResult.department_narrative.manager_summary }}
+                {{ departmentNarrative.manager_summary }}
               </h4>
             </div>
             <span class="w-fit rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-semibold text-violet-700">
-              {{ narrativeSourceLabel(bulkPredictionResult.department_narrative.source) }}
+              {{ narrativeSourceLabel(departmentNarrative.source) }}
             </span>
           </div>
 
           <p class="mt-4 text-sm leading-6 text-slate-700">
-            {{ bulkPredictionResult.department_narrative.risk_interpretation }}
+            {{ departmentNarrative.risk_interpretation }}
           </p>
           <p
-            v-if="narrativeFallbackReason(bulkPredictionResult.department_narrative)"
+            v-if="narrativeFallbackReason(departmentNarrative)"
             class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800"
           >
-            {{ narrativeFallbackReason(bulkPredictionResult.department_narrative) }}
+            {{ narrativeFallbackReason(departmentNarrative) }}
           </p>
 
           <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -324,7 +324,7 @@
               <p class="text-xs font-semibold text-slate-500">Bu haftaki aksiyonlar</p>
               <div class="mt-3 space-y-3">
                 <div
-                  v-for="action in aggregateActionPlan(bulkPredictionResult.department_narrative)"
+                  v-for="action in aggregateActionPlan(departmentNarrative)"
                   :key="action.title"
                   class="border-b border-slate-100 pb-3 last:border-b-0 last:pb-0"
                 >
@@ -341,7 +341,7 @@
               <p class="text-xs font-semibold text-slate-500">Takim liderleriyle konusulacaklar</p>
               <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
                 <li
-                  v-for="point in aggregateTalkingPoints(bulkPredictionResult.department_narrative)"
+                  v-for="point in aggregateTalkingPoints(departmentNarrative)"
                   :key="point"
                 >
                   - {{ point }}
@@ -359,7 +359,7 @@
                 <button
                   v-for="range in teamTimeRanges"
                   :key="range.value"
-                  class="rounded-lg px-3 py-2 text-xs font-bold transition"
+                  class="interactive-button rounded-lg px-3 py-2 text-xs font-bold transition"
                   :class="selectedTeamTimeRange === range.value
                     ? 'bg-blue-500 text-white shadow-sm'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
@@ -371,7 +371,7 @@
 
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <button
-                  class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                  class="interactive-button inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
                   @click="showDateRangePanel = !showDateRangePanel"
                 >
                   <span aria-hidden="true">&#128197;</span>
@@ -380,7 +380,7 @@
 
                 <div class="relative">
                   <button
-                    class="inline-flex min-w-[128px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                    class="interactive-button inline-flex min-w-[128px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                     @click="showRiskFilterMenu = !showRiskFilterMenu"
                   >
                     Filtre ({{ selectedRiskFilters.length }})
@@ -408,7 +408,7 @@
                 </div>
 
                 <button
-                  class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
+                  class="interactive-button inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
                   @click="resetTeamFilters"
                 >
                   <span aria-hidden="true">&#8635;</span>
@@ -438,7 +438,7 @@
                 />
               </label>
               <button
-                class="self-end rounded-lg bg-blue-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-600"
+                class="interactive-button self-end rounded-lg bg-blue-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-600"
                 @click="applyCustomDateRange"
               >
                 Uygula
@@ -452,13 +452,88 @@
               <span class="h-3 w-3 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600"></span>
               Filtreler uygulanıyor...
             </div>
+            <div v-if="teamFilterLoading" class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <span class="skeleton-shimmer h-2.5 rounded-full"></span>
+              <span class="skeleton-shimmer h-2.5 rounded-full"></span>
+              <span class="skeleton-shimmer h-2.5 rounded-full"></span>
+            </div>
           </div>
 
+          <div
+            v-if="teamDashboardLoading"
+            class="space-y-5"
+          >
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div v-for="index in 4" :key="`team-kpi-skeleton-${index}`" class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                <div class="skeleton h-4 w-28 rounded"></div>
+                <div class="skeleton mt-4 h-9 w-20 rounded"></div>
+                <div class="skeleton mt-6 h-8 w-full rounded"></div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
+              <aside class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div class="skeleton h-4 w-24 rounded"></div>
+                <div class="mt-4 space-y-3">
+                  <div v-for="index in 4" :key="`team-list-skeleton-${index}`" class="skeleton h-14 rounded-xl"></div>
+                </div>
+              </aside>
+              <div class="space-y-5">
+                <div class="skeleton h-80 rounded-2xl"></div>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                  <div v-for="index in 6" :key="`person-skeleton-${index}`" class="rounded-xl border border-slate-100 bg-white p-5">
+                    <div class="flex items-center gap-4">
+                      <div class="skeleton h-[60px] w-[60px] rounded-full"></div>
+                      <div class="flex-1">
+                        <div class="skeleton h-5 w-32 rounded"></div>
+                        <div class="skeleton mt-2 h-4 w-40 rounded"></div>
+                      </div>
+                    </div>
+                    <div class="skeleton mt-5 h-2 w-full rounded"></div>
+                    <div class="skeleton mt-5 h-10 w-full rounded-lg"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else-if="teamDashboardError"
+            class="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center"
+          >
+            <div class="text-6xl text-rose-600" aria-hidden="true">!</div>
+            <h4 class="mt-4 text-2xl font-bold text-rose-900">Bir Hata Olustu</h4>
+            <p class="mt-2 max-w-xl text-sm leading-6 text-rose-700">{{ mlError }}</p>
+            <button
+              class="action-button interactive-button mt-5 rounded-lg border border-blue-500 px-5 py-3 text-sm font-bold text-blue-700 hover:bg-blue-500 hover:text-white"
+              @click="loadBulkPredictions(activeAnalyticsSection === 'department')"
+            >
+              Yeniden Dene
+            </button>
+          </div>
+
+          <div
+            v-else-if="teamDashboardEmpty"
+            class="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm"
+          >
+            <div class="text-6xl" aria-hidden="true">📊</div>
+            <h4 class="mt-4 text-2xl font-bold text-slate-950">Henuz Veri Yok</h4>
+            <p class="mt-2 max-w-xl text-sm leading-6 text-slate-500">{{ teamDashboardEmptyDescription }}</p>
+            <button
+              class="action-button interactive-button mt-5 rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+              @click="handleTeamDashboardEmptyAction"
+            >
+              {{ teamDashboardEmptyCtaLabel }}
+            </button>
+          </div>
+
+          <template v-else>
           <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <article
-              v-for="metric in teamKpiCards"
+              v-for="(metric, index) in teamKpiCards"
               :key="metric.label"
-              class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              class="kpi-card reveal-on-scroll rounded-xl border border-slate-100 bg-white p-6 shadow-sm"
+              :style="{ transitionDelay: `${index * 70}ms` }"
             >
               <div class="flex items-start justify-between gap-4">
                 <div>
@@ -497,8 +572,8 @@
           </div>
 
           <div class="mb-4 border-b border-slate-100 pb-4">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Takim Karsilastirmasi</p>
-            <h4 class="mt-1 text-lg font-bold text-slate-900">Takimlar arasi risk, yogunluk ve ana neden karsilastirmasi</h4>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Takim Analizi</p>
+            <h4 class="mt-1 text-lg font-bold text-slate-900">Soldan bir takim secin, sagda sadece o takimin detayli analizini inceleyin</h4>
           </div>
           <div v-if="filteredTeamRiskSummaries.length" class="grid grid-cols-1 gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
             <aside class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
@@ -507,11 +582,11 @@
                 <button
                   v-for="team in filteredTeamRiskSummaries"
                   :key="`team-tab-${team.team}`"
-                  class="flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition"
+                  class="interactive-button flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition"
                   :class="selectedTeamAnalysisName === team.team
                     ? 'border-indigo-200 bg-white text-slate-950 shadow-sm'
                     : 'border-transparent bg-transparent text-slate-600 hover:bg-white'"
-                  @click="selectedTeamAnalysisName = team.team"
+                  @click="selectTeamForAnalysis(team.team)"
                 >
                   <span>
                     <span class="block text-sm font-bold">{{ team.team }}</span>
@@ -525,8 +600,8 @@
               </div>
             </aside>
 
-            <div class="min-w-0 space-y-5">
-              <section class="rounded-2xl border border-slate-200 bg-white p-5">
+            <div class="flex min-w-0 flex-col gap-5">
+              <section v-if="false" class="reveal-on-scroll rounded-2xl border border-slate-200 bg-white p-5">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Grafik Yorumu</p>
@@ -562,7 +637,7 @@
                       <div>
                         <p class="text-xs font-semibold text-slate-500">Risk yogunlugu</p>
                         <p class="mt-1 text-[11px] leading-5 text-slate-500">
-                          Bar 0-100 risk skorunu gosterir; marker secili datasetin son donem takim skorunu isaretler.
+                          Bar 0-100 risk skorunu gosterir; marker secili zaman araligindaki ortalama takim skorunu isaretler.
                         </p>
                       </div>
                       <div class="flex items-center gap-3 text-xs text-slate-500">
@@ -572,7 +647,7 @@
                       </div>
                     </div>
                     <div class="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900">
-                      Risk skoru ve trend, secili datasetin haftalik satirlarindan uretilen model olasiliklarina dayanir. Trend grafigi son 4 dataset donemini, marker ise son donem takim skorunu gosterir.
+                      Risk skoru ve trend, secili datasetin haftalik satirlarindan uretilen model olasiliklarina dayanir. Zaman filtresi hem grafikteki donemleri hem de tablodaki ortalama risk skorunu degistirir.
                     </div>
                     <div class="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white">
                       <div class="sticky top-0 z-10 grid min-w-[760px] grid-cols-[18%_30%_17%_9%_16%_10%] items-center gap-3 bg-[#F9FAFB] px-4 py-4 text-xs font-bold uppercase tracking-wide text-[#6B7280]">
@@ -586,13 +661,14 @@
                       <button
                         v-for="(team, index) in filteredTeamRiskSummaries"
                         :key="`risk-bar-${team.team}`"
-                        class="grid min-w-[760px] w-full grid-cols-[18%_30%_17%_9%_16%_10%] items-center gap-3 border-b border-[#E5E7EB] px-4 py-5 text-left text-xs transition duration-200 ease-in-out last:border-b-0 hover:bg-[#F3F4F6] hover:shadow-sm"
+                        class="team-table-row reveal-on-scroll grid min-w-[760px] w-full grid-cols-[18%_30%_17%_9%_16%_10%] items-center gap-3 border-b border-[#E5E7EB] px-4 py-5 text-left text-xs last:border-b-0"
                         :class="[
                           index % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]',
                           selectedTeamAnalysisName === team.team ? 'ring-1 ring-inset ring-indigo-200' : ''
                         ]"
+                        :style="{ transitionDelay: `${index * 45}ms` }"
                         :title="`${team.team}: ${teamRiskScore(team)}/100 - ${teamRiskCategory(team)}`"
-                        @click="selectedTeamAnalysisName = team.team"
+                        @click="selectTeamForAnalysis(team.team)"
                       >
                         <span class="flex min-w-0 items-center truncate font-bold text-slate-800">
                           <span class="truncate">{{ team.team }}</span>
@@ -641,7 +717,7 @@
                         </span>
                         <span class="flex justify-start">
                           <span
-                            class="inline-flex min-w-[104px] items-center justify-center gap-1.5 rounded-2xl border-2 px-2.5 py-1.5 text-[11px] font-semibold"
+                            class="risk-badge inline-flex min-w-[104px] items-center justify-center gap-1.5 rounded-2xl border-2 px-2.5 py-1.5 text-[11px] font-semibold"
                             :class="teamRiskBadgeClass(team)"
                           >
                             <span class="h-2 w-2 rounded-full" :class="teamRiskDotClass(team)"></span>
@@ -672,7 +748,7 @@
                 </div>
               </section>
 
-              <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <section class="order-2 reveal-on-scroll rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Trend Karsilastirma</p>
@@ -685,7 +761,7 @@
                     <label
                       v-for="team in filteredTeamRiskSummaries"
                       :key="`trend-toggle-${team.team}`"
-                      class="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white"
+                      class="interactive-button inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white"
                     >
                       <input
                         v-model="visibleTrendTeams[team.team]"
@@ -703,46 +779,199 @@
                 </div>
               </section>
 
-              <section v-if="selectedTeamAnalysis" class="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-5">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-500">Secili Takim</p>
-                    <h5 class="mt-1 text-xl font-bold text-slate-900">{{ selectedTeamAnalysis.team }}</h5>
-                    <p class="mt-2 text-sm leading-6 text-slate-700">
-                      {{ selectedTeamAnalysis.total }} kisilik takimda {{ selectedTeamAnalysis.high }} yuksek,
-                      {{ selectedTeamAnalysis.medium }} orta risk sinyali var. Ana neden: {{ selectedTeamAnalysis.topReason }}.
-                    </p>
+              <section
+                v-if="selectedTeamAnalysis && selectedTeamDetailVisible"
+                class="order-1 reveal-on-scroll overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm"
+              >
+                <div class="flex min-h-20 flex-col gap-4 bg-gradient-to-r from-[#1E40AF] to-[#3B82F6] p-6 lg:flex-row lg:items-center lg:justify-between">
+                  <div class="flex min-w-0 items-center gap-4">
+                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-lg font-black text-white ring-1 ring-white/20">
+                      {{ teamInitials(selectedTeamAnalysis.team) }}
+                    </span>
+                    <div class="min-w-0">
+                      <h5 class="truncate text-2xl font-bold text-white lg:text-[28px]">{{ selectedTeamAnalysis.team }}</h5>
+                      <p class="mt-1 text-sm leading-6 text-white/80">
+                        {{ selectedTeamAnalysis.total }} kisilik takimda {{ selectedTeamAnalysis.high }} yuksek,
+                        {{ selectedTeamAnalysis.medium }} orta risk sinyali var
+                      </p>
+                    </div>
                   </div>
-                  <span
-                    class="w-fit rounded-full px-3 py-1 text-xs font-semibold"
-                    :class="selectedTeamAnalysis.tone === 'high'
-                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                      : selectedTeamAnalysis.tone === 'medium'
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'"
-                  >
-                    {{ riskToneLabel(selectedTeamAnalysis.tone) }}
-                  </span>
+
+                  <div class="flex shrink-0 items-center gap-4">
+                    <span
+                      class="inline-flex items-center gap-2 rounded-[24px] px-6 py-3 text-base font-bold"
+                      :class="teamHeaderRiskBadgeClass(selectedTeamAnalysis)"
+                    >
+                      <span class="h-2.5 w-2.5 rounded-full" :class="teamRiskDotClass(selectedTeamAnalysis)"></span>
+                      {{ teamRiskCategory(selectedTeamAnalysis) }}
+                    </span>
+                    <button
+                      class="interactive-button flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold text-white hover:bg-white/15"
+                      type="button"
+                      aria-label="Takim detayini kapat"
+                      @click="selectedTeamDetailVisible = false"
+                    >
+                      x
+                    </button>
+                  </div>
                 </div>
 
-                <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                  <div class="rounded-xl border border-white bg-white p-4">
-                    <p class="text-xs font-semibold text-slate-500">Takim riski</p>
-                    <p class="mt-2 text-2xl font-bold text-slate-900">{{ selectedTeamAnalysis.high + selectedTeamAnalysis.medium }}</p>
-                    <p class="mt-1 text-xs text-slate-500">%{{ teamRiskPercent(selectedTeamAnalysis) }} izleme orani</p>
+                <div class="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+                  <article class="selected-team-kpi-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <div class="flex items-start justify-between gap-4">
+                      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-sm font-black text-blue-700">01</span>
+                      <span class="text-xs font-semibold text-slate-400">Takim</span>
+                    </div>
+                    <p class="mt-4 text-sm font-semibold text-slate-500">Toplam Kisi</p>
+                    <p class="mt-2 text-[32px] font-bold leading-none text-slate-950">{{ selectedTeamAnalysis.total }} kisi</p>
+                    <p class="mt-3 text-sm text-slate-500">{{ selectedTeamRoleMix }}</p>
+                  </article>
+
+                  <article class="selected-team-kpi-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <div class="flex items-start justify-between gap-4">
+                      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-sm font-black text-rose-700">02</span>
+                      <span class="text-xs font-semibold text-slate-400">Model</span>
+                    </div>
+                    <p class="mt-4 text-sm font-semibold text-slate-500">Takim Riski</p>
+                    <p class="mt-2 text-[32px] font-bold leading-none text-rose-600">{{ selectedTeamAnalysis.high + selectedTeamAnalysis.medium }} / {{ selectedTeamAnalysis.total }}</p>
+                    <p class="mt-3 text-sm text-slate-500">%{{ teamRiskPercent(selectedTeamAnalysis) }} izleme orani</p>
                     <div class="mt-3 flex h-2 overflow-hidden rounded-full bg-slate-100">
                       <span class="bg-rose-500" :style="{ width: `${teamHighWidth(selectedTeamAnalysis)}%` }"></span>
                       <span class="bg-amber-400" :style="{ width: `${teamMediumWidth(selectedTeamAnalysis)}%` }"></span>
                     </div>
-                  </div>
-                  <div class="rounded-xl border border-white bg-white p-4">
-                    <p class="text-xs font-semibold text-slate-500">Ana neden</p>
-                    <p class="mt-2 text-sm font-bold leading-6 text-slate-900">{{ selectedTeamAnalysis.topReason }}</p>
-                  </div>
-                  <div class="rounded-xl border border-white bg-white p-4">
-                    <p class="text-xs font-semibold text-slate-500">Haftalik odak</p>
-                    <p class="mt-2 text-sm leading-6 text-slate-700">{{ selectedTeamAnalysis.action }}</p>
-                  </div>
+                  </article>
+
+                  <article class="selected-team-kpi-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <div class="flex items-start justify-between gap-4">
+                      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-sm font-black text-red-700">03</span>
+                      <span class="text-xs font-semibold text-slate-400">Alarm</span>
+                    </div>
+                    <p class="mt-4 text-sm font-semibold text-slate-500">Yuksek Riskli</p>
+                    <p class="mt-2 text-[32px] font-bold leading-none text-red-600">{{ selectedTeamAnalysis.high }} kisi</p>
+                    <p class="mt-3 text-sm text-slate-500">{{ selectedTeamAnalysis.high ? 'Acil mudahale gerekli' : 'Acil mudahale sinyali yok' }}</p>
+                  </article>
+
+                  <article class="selected-team-kpi-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <div class="flex items-start justify-between gap-4">
+                      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-sm font-black text-amber-700">04</span>
+                      <span class="text-xs font-semibold text-slate-400">Sprint</span>
+                    </div>
+                    <p class="mt-4 text-sm font-semibold text-slate-500">Sprint Kapasitesi</p>
+                    <p class="mt-2 text-[32px] font-bold leading-none text-amber-600">+%{{ selectedTeamSprintOverage }}</p>
+                    <p class="mt-3 text-sm text-slate-500">{{ selectedTeamSprintOverage >= 20 ? 'Kapasite asimi' : 'Kontrollu yogunluk' }}</p>
+                  </article>
+                </div>
+
+                <div class="px-5 pb-5">
+                  <article class="main-issue-card selected-team-problem-card reveal-on-scroll rounded-xl border-2 border-[#F59E0B] bg-gradient-to-r from-[#FEF3C7] to-[#FEE2E2] p-6">
+                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.7fr)_minmax(240px,0.3fr)] lg:items-center">
+                      <div>
+                        <span class="inline-flex rounded-full border border-amber-300 bg-white/70 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-amber-800">
+                          Bu hafta odaklanilacak
+                        </span>
+                        <h5 class="mt-4 text-2xl font-bold text-amber-950">
+                          {{ selectedTeamAnalysis.topReason }} kritik seviyede
+                        </h5>
+                        <p class="mt-3 text-base leading-7 text-[#78350F]">
+                          {{ selectedTeamProblemDescription }}
+                        </p>
+                      </div>
+
+                      <div class="rounded-xl border border-amber-200 bg-white/65 p-5 shadow-sm">
+                        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-2xl font-black text-amber-700">
+                          !
+                        </div>
+                        <p class="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Ana Neden</p>
+                        <p class="mt-2 text-lg font-bold leading-6 text-amber-950">{{ selectedTeamAnalysis.topReason }}</p>
+                        <div class="mt-4 h-2 overflow-hidden rounded-full bg-white">
+                          <div class="h-full rounded-full bg-gradient-to-r from-amber-400 to-rose-500" :style="{ width: `${teamRiskMarkerPosition(selectedTeamAnalysis)}%` }"></div>
+                        </div>
+                        <p class="mt-2 text-xs text-amber-800">{{ teamRiskScore(selectedTeamAnalysis) }}/100 takim risk skoru</p>
+                      </div>
+                    </div>
+
+                    <div class="mt-6 border-t border-amber-300/70 pt-4">
+                      <p class="text-sm italic text-[#78350F]">Detayli analiz icin asagidaki onerilere bakin.</p>
+                    </div>
+                  </article>
+                </div>
+
+                <div class="grid grid-cols-1 gap-5 px-5 pb-5 xl:grid-cols-[minmax(0,0.65fr)_minmax(320px,0.35fr)]">
+                  <article class="reveal-on-scroll rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">Risk Trendi</p>
+                        <h5 class="mt-1 text-lg font-bold text-slate-900">12 Haftalik Risk Trendi</h5>
+                        <p class="mt-2 text-sm leading-6 text-slate-500">
+                          Y ekseni 0-10 risk skoru; grafik secili takimin haftalik model risk sinyalini gosterir.
+                        </p>
+                      </div>
+                      <span class="w-fit rounded-full bg-rose-50 px-3 py-1 text-sm font-bold text-rose-700">
+                        {{ selectedTeamTrendChangeLabel }}
+                      </span>
+                    </div>
+
+                    <div class="mt-6 h-[300px]">
+                      <Line :data="selectedTeamRiskTrendChartData" :options="selectedTeamRiskTrendChartOptions" />
+                    </div>
+
+                    <div class="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                      <span class="inline-flex items-center gap-1.5">
+                        <span class="h-2.5 w-2.5 rounded-full bg-blue-500"></span>
+                        Hafta 8: Sprint baslangici
+                      </span>
+                      <span class="inline-flex items-center gap-1.5">
+                        <span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+                        Hafta 10: Kapasite asimi
+                      </span>
+                    </div>
+                  </article>
+
+                  <aside class="reveal-on-scroll rounded-xl bg-gradient-to-br from-[#8B5CF6] to-[#3B82F6] p-6 text-white shadow-sm" style="transition-delay: 100ms">
+                    <div class="flex items-start justify-between gap-4">
+                      <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">AI Aksiyon Paneli</p>
+                        <h5 class="mt-1 text-xl font-bold">Onerilen Aksiyonlar</h5>
+                      </div>
+                      <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white/90">
+                        {{ narrativeSourceLabel(selectedTeamNarrative?.source) }}
+                      </span>
+                    </div>
+
+                    <div class="mt-5 space-y-3">
+                      <article
+                        v-for="action in selectedTeamAiActionCards"
+                        :key="action.title"
+                        class="rounded-lg border border-white/10 bg-white/10 p-3 backdrop-blur"
+                      >
+                        <p class="text-sm font-bold leading-5">{{ action.title }}</p>
+                        <p class="mt-2 text-sm leading-6 text-white/80">{{ action.reason }}</p>
+                      </article>
+
+                      <article class="rounded-lg border border-white/10 bg-white/10 p-3 backdrop-blur">
+                        <p class="text-sm font-bold leading-5">LLM ile Yorum</p>
+                        <p class="mt-2 text-sm leading-6 text-white/80">
+                          Secili takim icin risk nedeni, kapasite ve haftalik yonetici aksiyonlarini Gemini ile yeniden yorumlat.
+                        </p>
+                        <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                          <button
+                            class="action-button interactive-button rounded-lg bg-white px-3 py-2 text-xs font-bold text-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            :disabled="Boolean(mlLoading) || !selectedTeamAnalysis"
+                            @click="loadBulkPredictions(true, selectedTeamAnalysis?.team)"
+                          >
+                            {{ mlLoading === 'narrative' ? 'Analiz ediliyor...' : 'Gemini ile Analiz Et' }}
+                          </button>
+                          <button
+                            class="action-button interactive-button rounded-lg border border-white/50 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                            :disabled="Boolean(mlLoading) || !selectedTeamAnalysis"
+                            @click="loadBulkPredictions(true, selectedTeamAnalysis?.team)"
+                          >
+                            Secili Takimi Yorumla
+                          </button>
+                        </div>
+                      </article>
+                    </div>
+                  </aside>
                 </div>
 
                 <div v-if="selectedTeamNarrative" class="mt-5 rounded-xl border border-white bg-white p-4">
@@ -768,7 +997,7 @@
                   >
                     {{ narrativeFallbackReason(selectedTeamNarrative) }}
                   </p>
-                  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <div class="mt-4 grid grid-cols-1 gap-4">
                     <div>
                       <p class="text-xs font-semibold text-slate-500">Haftalik oneriler</p>
                       <div class="mt-3 space-y-3">
@@ -782,40 +1011,186 @@
                         </div>
                       </div>
                     </div>
-                    <div>
-                      <p class="text-xs font-semibold text-slate-500">Takim lideriyle konusulacaklar</p>
-                      <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-                        <li v-for="point in aggregateTalkingPoints(selectedTeamNarrative)" :key="point">- {{ point }}</li>
-                      </ul>
-                    </div>
                   </div>
                 </div>
 
-                <div class="mt-5 rounded-xl border border-white bg-white p-4">
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Takimdaki Riskli Kisiler</p>
-                  <div class="mt-3 divide-y divide-slate-100">
-                    <button
-                      v-for="person in selectedTeamPeople"
-                      :key="`team-person-${person.employee_id}`"
-                      class="flex w-full items-center justify-between gap-3 py-3 text-left"
-                      @click="openEmployeeAnalysis(person)"
-                    >
-                      <span>
-                        <span class="block text-sm font-semibold text-slate-900">{{ displayEmployeeName(person) }}</span>
-                        <span class="mt-0.5 block text-xs text-slate-500">{{ employeeSubtitle(person) }}</span>
+                <div class="px-5 pb-5">
+                  <section class="rounded-xl bg-[#F9FAFB] p-6">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <p class="text-xl font-bold text-slate-950">Bu Hafta Konusulacak Konular</p>
+                        <p class="mt-1 text-sm text-slate-500">{{ selectedTeamTalkingPointItems.length }} oncelikli konu belirlendi</p>
+                      </div>
+                      <span class="w-fit rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                        Checklist
                       </span>
-                      <span class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="predictionBandClass(person.predicted_band, person.target_column)">
-                        {{ person.predicted_band }}
+                    </div>
+
+                    <div class="mt-5 space-y-3">
+                      <article
+                        v-for="item in selectedTeamTalkingPointItems"
+                        :key="item.id"
+                        class="accordion-item talking-point-item overflow-hidden rounded-xl border border-slate-200 bg-white"
+                      >
+                        <button
+                          class="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-slate-50"
+                          type="button"
+                          @click="toggleTalkingPoint(item.id)"
+                        >
+                          <input
+                            class="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                            type="checkbox"
+                            :checked="Boolean(completedTalkingPoints[item.id])"
+                            @click.stop
+                            @change="toggleTalkingPointDone(item.id)"
+                          />
+                          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                            {{ item.index }}
+                          </span>
+                          <span class="min-w-0 flex-1">
+                            <span
+                              class="block text-base font-bold text-slate-900"
+                              :class="completedTalkingPoints[item.id] ? 'text-slate-400 line-through' : ''"
+                            >
+                              {{ item.title }}
+                            </span>
+                          </span>
+                          <span class="rounded-full px-3 py-1 text-xs font-bold" :class="talkingPointPriorityClass(item.priority)">
+                            {{ item.priorityLabel }}
+                          </span>
+                          <span class="text-sm font-bold text-slate-500">
+                            {{ expandedTalkingPoints[item.id] ? '^' : 'v' }}
+                          </span>
+                        </button>
+
+                        <div
+                          v-if="expandedTalkingPoints[item.id]"
+                          class="accordion-content border-t border-slate-100 bg-white px-4 pb-4"
+                        >
+                          <div class="mt-4 border-l-4 border-blue-500 bg-blue-50/40 p-4">
+                            <p class="text-sm leading-6 text-slate-700">{{ item.detail }}</p>
+                            <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                              <li v-for="bullet in item.bullets" :key="bullet">- {{ bullet }}</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </article>
+                    </div>
+                  </section>
+                </div>
+
+                <div class="px-5 pb-5">
+                  <section class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <p class="text-2xl font-bold text-slate-950">Takim Uyeleri - Detayli Risk Analizi</p>
+                        <p class="mt-1 text-sm text-slate-500">
+                          {{ selectedTeamHighRiskCount }} kisi yuksek risk seviyesinde
+                        </p>
+                      </div>
+                      <span class="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                        {{ selectedTeamPeople.length }} kisi listeleniyor
                       </span>
-                    </button>
-                    <p v-if="!selectedTeamPeople.length" class="py-4 text-sm leading-6 text-slate-500">
+                    </div>
+
+                    <div v-if="selectedTeamPeople.length" class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                      <article
+                        v-for="(person, index) in selectedTeamPeople"
+                        :key="`team-person-card-${person.employee_id}`"
+                        class="person-card member-risk-card reveal-on-scroll rounded-xl border border-[#E5E7EB] bg-white p-5"
+                        :style="{ transitionDelay: `${index * 100}ms` }"
+                      >
+                        <div class="flex items-start gap-4">
+                          <span
+                            class="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full border-[3px] border-white text-lg font-black text-white shadow-sm"
+                            :class="memberAvatarGradientClass(index)"
+                          >
+                            {{ employeeInitials(person) }}
+                          </span>
+                          <div class="min-w-0">
+                            <p class="truncate text-lg font-bold text-slate-950">{{ displayEmployeeName(person) }}</p>
+                            <p class="mt-1 truncate text-sm text-slate-500">{{ employeeRoleLabel(person) }}</p>
+                          </div>
+                        </div>
+
+                        <div class="my-4 border-t border-slate-100"></div>
+
+                        <div>
+                          <div class="flex items-center justify-between gap-3">
+                            <p class="text-sm font-semibold text-slate-600">Risk</p>
+                            <p class="text-sm font-bold text-slate-950">{{ employeeRiskOutOfTen(person) }}/10</p>
+                          </div>
+                          <div class="mt-2 h-2 overflow-hidden rounded bg-slate-100">
+                            <div
+                              class="h-full rounded bg-rose-500"
+                              :style="{ width: `${employeeRiskOutOfTen(person) * 10}%` }"
+                            ></div>
+                          </div>
+                        </div>
+
+                        <div class="mt-4 flex items-center justify-between gap-3">
+                          <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                            #{{ employeeCodeLabel(person) }}
+                          </span>
+                          <span class="rounded-full px-3 py-1 text-xs font-bold" :class="predictionBandClass(person.predicted_band, person.target_column)">
+                            {{ person.predicted_band }}
+                          </span>
+                        </div>
+
+                        <div class="mt-4 grid grid-cols-[1fr_auto] gap-2">
+                          <button
+                            class="action-button interactive-button rounded-lg border border-blue-200 px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50"
+                            @click="openEmployeeAnalysis(person)"
+                          >
+                            Detaylar
+                          </button>
+                          <span class="inline-flex items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-sm font-bold text-white">
+                            Riskli
+                          </span>
+                        </div>
+                      </article>
+                    </div>
+
+                    <p v-else class="mt-5 rounded-xl border border-slate-100 bg-slate-50 px-4 py-5 text-sm leading-6 text-slate-500">
                       Bu takim icin yuksek veya orta riskte kisi gorunmuyor.
                     </p>
+                  </section>
+                </div>
+
+                <div class="sticky bottom-0 z-20 border-t border-[#E5E7EB] bg-white px-6 py-4 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+                  <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                    <p class="text-xs font-semibold text-slate-500">
+                      Son guncelleme: {{ selectedTeamUpdatedAt }}
+                    </p>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <button
+                        class="action-button interactive-button inline-flex items-center justify-center gap-2 rounded-lg border border-blue-500 px-6 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-500 hover:text-white"
+                        type="button"
+                      >
+                        <span aria-hidden="true">@</span>
+                        Rapor Gonder
+                      </button>
+                      <button
+                        class="action-button interactive-button inline-flex items-center justify-center gap-2 rounded-lg border border-violet-500 px-6 py-3 text-sm font-semibold text-violet-700 hover:bg-violet-500 hover:text-white"
+                        type="button"
+                      >
+                        <span aria-hidden="true">+</span>
+                        Toplanti Planla
+                      </button>
+                      <button
+                        class="action-button interactive-button inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
+                        type="button"
+                      >
+                        <span aria-hidden="true">XLS</span>
+                        Excel Indir
+                      </button>
+                    </div>
                   </div>
                 </div>
               </section>
             </div>
           </div>
+          </template>
         </div>
 
         <div v-if="employeeAnalysisRows.length" v-show="activeAnalyticsSection === 'watchlist'">
@@ -967,20 +1342,20 @@
           <div>
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Toplu Risk Taramasi</p>
             <h4 class="mt-1 text-base font-bold text-slate-900">
-              {{ bulkPredictionResult.prediction_count }} calisan icin {{ targetLabel(bulkPredictionResult.target_column) }}
+              {{ bulkPredictionResult?.prediction_count || 0 }} calisan icin {{ targetLabel(bulkPredictionResult?.target_column || '') }}
             </h4>
           </div>
           <div class="grid grid-cols-3 gap-2 text-center text-xs">
             <div class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">
-              <p class="font-bold text-base">{{ bulkPredictionResult.high_risk_count }}</p>
+              <p class="font-bold text-base">{{ bulkPredictionResult?.high_risk_count || 0 }}</p>
               <p>Yuksek</p>
             </div>
             <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">
-              <p class="font-bold text-base">{{ bulkPredictionResult.medium_risk_count }}</p>
+              <p class="font-bold text-base">{{ bulkPredictionResult?.medium_risk_count || 0 }}</p>
               <p>Orta</p>
             </div>
             <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-700">
-              <p class="font-bold text-base">{{ bulkPredictionResult.low_risk_count }}</p>
+              <p class="font-bold text-base">{{ bulkPredictionResult?.low_risk_count || 0 }}</p>
               <p>Dusuk</p>
             </div>
           </div>
@@ -1001,7 +1376,7 @@
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr
-                v-for="item in bulkPredictionResult.items"
+                v-for="item in bulkPredictionResult?.items || []"
                 :key="item.employee_id"
                 class="align-top"
               >
@@ -1438,13 +1813,14 @@ import {
   CategoryScale,
   Chart as ChartJS,
   type ChartOptions,
+  Filler,
   Legend,
   LineElement,
   LinearScale,
   PointElement,
   Tooltip,
 } from 'chart.js'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useRoute } from 'vue-router'
 import {
@@ -1459,7 +1835,7 @@ import {
   type SoftwarePredictionResponse,
 } from '@/services/api/analytics.api'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
 const route = useRoute()
 const departmentConfigs = ref<DepartmentAnalyticsConfigResponse[]>([])
@@ -1467,6 +1843,7 @@ const overview = ref<DepartmentAnalyticsOverviewResponse | null>(null)
 const selectedDepartment = ref('software')
 const selectedTeam = ref('all')
 const selectedTeamAnalysisName = ref('')
+const selectedTeamDetailVisible = ref(true)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const mlUploadId = ref<number | null>(null)
@@ -1481,6 +1858,8 @@ const softwareDatasets = ref<SoftwareDatasetResponse[]>([])
 const datasetEmployees = ref<SoftwareDatasetEmployeeResponse[]>([])
 const modelStates = ref<SoftwareModelStateResponse[]>([])
 const visibleTrendTeams = ref<Record<string, boolean>>({})
+const expandedTalkingPoints = ref<Record<string, boolean>>({ 0: true })
+const completedTalkingPoints = ref<Record<string, boolean>>({})
 const selectedTeamTimeRange = ref<'1m' | '3m' | '6m' | '1y' | 'all' | 'custom'>('6m')
 const selectedRiskFilters = ref<string[]>(['low', 'medium', 'high'])
 const showRiskFilterMenu = ref(false)
@@ -1488,6 +1867,7 @@ const showDateRangePanel = ref(false)
 const customDateStart = ref('')
 const customDateEnd = ref('')
 const teamFilterLoading = ref(false)
+let revealObserver: IntersectionObserver | null = null
 type AnalyticsSectionKey = 'model' | 'department' | 'teams' | 'watchlist' | 'technical'
 const analyticsSectionKeys: AnalyticsSectionKey[] = ['model', 'department', 'teams', 'watchlist', 'technical']
 const activeAnalyticsSection = ref<AnalyticsSectionKey>('model')
@@ -1557,6 +1937,43 @@ const activeSectionMeta = computed(() => sectionMeta[activeAnalyticsSection.valu
 const activeSectionNeedsBulk = computed(() =>
   bulkSections.includes(activeAnalyticsSection.value) && !bulkPredictionResult.value
 )
+
+const departmentNarrative = computed(() => bulkPredictionResult.value?.department_narrative || null)
+
+const teamDashboardLoading = computed(() =>
+  activeAnalyticsSection.value === 'teams'
+  && Boolean(mlLoading.value)
+  && !bulkPredictionResult.value
+)
+
+const teamDashboardError = computed(() =>
+  activeAnalyticsSection.value === 'teams'
+  && Boolean(mlError.value)
+  && !bulkPredictionResult.value
+)
+
+const teamDashboardEmpty = computed(() =>
+  activeAnalyticsSection.value === 'teams'
+  && !teamDashboardLoading.value
+  && !teamDashboardError.value
+  && (!bulkPredictionResult.value || filteredTeamRiskSummaries.value.length === 0)
+)
+
+const teamDashboardEmptyDescription = computed(() => {
+  if (bulkPredictionResult.value && filteredTeamRiskSummaries.value.length === 0) {
+    return 'Secili risk filtreleriyle eslesen takim bulunamadi. Filtreleri sifirlayip tekrar deneyin.'
+  }
+  if (mlUploadId.value) {
+    return 'Dataset secili. Takim analizini olusturmak icin toplu risk taramasini calistirin.'
+  }
+  return 'Takim analizi icin once dataset secilmeli veya admin panelinden veri yuklenmeli.'
+})
+
+const teamDashboardEmptyCtaLabel = computed(() => {
+  if (bulkPredictionResult.value && filteredTeamRiskSummaries.value.length === 0) return 'Filtreleri Sifirla'
+  if (mlUploadId.value) return 'Analizi Calistir'
+  return 'Dataset Sec'
+})
 
 const bulkInsight = computed(() => {
   const result = bulkPredictionResult.value
@@ -1677,6 +2094,13 @@ const selectedTeamNarrative = computed(() => {
   return teamNarrative(selectedTeamAnalysis.value.team)
 })
 
+const selectedTeamAllPeople = computed(() => {
+  const team = selectedTeamAnalysis.value?.team
+  if (!team) return []
+  return (bulkPredictionResult.value?.items || [])
+    .filter((item) => String(item.summary_payload?.team || 'Takim bilgisi yok') === team)
+})
+
 const selectedTeamPeople = computed(() => {
   const team = selectedTeamAnalysis.value?.team
   if (!team) return []
@@ -1684,6 +2108,205 @@ const selectedTeamPeople = computed(() => {
     .filter((item) => String(item.summary_payload?.team || 'Takim bilgisi yok') === team)
     .filter((item) => predictionRiskTone(item.predicted_band, item.target_column) !== 'low')
     .slice(0, 6)
+})
+
+const selectedTeamHighRiskCount = computed(() =>
+  selectedTeamPeople.value.filter((person) => predictionRiskTone(person.predicted_band, person.target_column) === 'high').length
+)
+
+const selectedTeamRoleMix = computed(() => {
+  const people = selectedTeamAllPeople.value
+  const total = selectedTeamAnalysis.value?.total || people.length
+  const seniorCount = people.filter((item) => {
+    const role = String(item.summary_payload?.position || item.summary_payload?.role || '').toLowerCase()
+    return role.includes('senior') || role.includes('lead') || role.includes('principal')
+  }).length
+  if (!total) return 'Rol dagilimi dataset ile hesaplanacak'
+  if (!people.length) return `${total} muhendis, rol dagilimi bekleniyor`
+  return `${total} muhendis, ${seniorCount} senior`
+})
+
+const selectedTeamSprintOverage = computed(() => {
+  const team = selectedTeamAnalysis.value
+  if (!team) return 0
+  return Math.max(0, Math.min(35, Math.round((teamRiskScore(team) - 50) * 0.7)))
+})
+
+const selectedTeamProblemDescription = computed(() => {
+  const team = selectedTeamAnalysis.value
+  if (!team) return ''
+  const capacityNote = selectedTeamSprintOverage.value >= 20
+    ? 'sprint kapasitesi ve gorev dagilimi bu hafta yeniden dengelenmeli'
+    : 'sprint ritmi, gorev akisi ve takim kapasitesi bu hafta yakindan izlenmeli'
+  const riskNote = team.high
+    ? `${team.high} yuksek riskli kisi icin hizli aksiyon almak gerekiyor`
+    : 'yuksek risk sinyali dusuk olsa da orta seviye riskler takip edilmeli'
+  return `${team.team} takiminin ${capacityNote}. ${riskNote}. Ana odak, ${team.topReason} sinyalinin takim ritmi, motivasyon ve potansiyel blokajlarla birlikte okunmasi. ${team.action}`
+})
+
+const selectedTeamWeeklyRiskValues = computed(() => {
+  const team = selectedTeamAnalysis.value
+  if (!team) return []
+  const values = selectedTrendValuesForTeam(team)
+  const normalized = normalizeTrendSeries(values.length ? values : [teamRiskScore(team)], 12)
+  return normalized.map((value) => Math.max(0, Math.min(10, Math.round((value / 10) * 10) / 10)))
+})
+
+const selectedTeamTrendChangeLabel = computed(() => {
+  const values = selectedTeamWeeklyRiskValues.value
+  if (values.length < 8) return 'Trend verisi izleniyor'
+  const previous = values.slice(-8, -4)
+  const recent = values.slice(-4)
+  const previousAvg = previous.reduce((sum, value) => sum + value, 0) / previous.length
+  const recentAvg = recent.reduce((sum, value) => sum + value, 0) / recent.length
+  if (!previousAvg) return 'Trend verisi izleniyor'
+  const change = Math.round(((recentAvg - previousAvg) / previousAvg) * 100)
+  if (change > 0) return `+%${change} artis son 4 haftada`
+  if (change < 0) return `-%${Math.abs(change)} dusus son 4 haftada`
+  return 'Stabil trend son 4 haftada'
+})
+
+const selectedTeamRiskTrendChartData = computed(() => {
+  const labels = Array.from({ length: 12 }, (_, index) => `Hafta ${index + 1}`)
+  return {
+    labels,
+    datasets: [{
+      label: selectedTeamAnalysis.value?.team || 'Takim',
+      data: selectedTeamWeeklyRiskValues.value,
+      borderColor: '#EF4444',
+      backgroundColor: (context: any) => {
+        const chart = context.chart
+        const area = chart.chartArea
+        if (!area) return 'rgba(239, 68, 68, 0.18)'
+        const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom)
+        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.32)')
+        gradient.addColorStop(1, 'rgba(239, 68, 68, 0)')
+        return gradient
+      },
+      borderWidth: 3,
+      pointRadius: (context: any) => ([7, 9].includes(context.dataIndex) ? 5 : 2),
+      pointHoverRadius: 6,
+      pointBackgroundColor: (context: any) => {
+        if (context.dataIndex === 7) return '#3B82F6'
+        if (context.dataIndex === 9) return '#F59E0B'
+        return '#EF4444'
+      },
+      pointBorderColor: '#FFFFFF',
+      pointBorderWidth: 2,
+      tension: 0.42,
+      fill: true,
+    }],
+  }
+})
+
+const selectedTeamRiskTrendChartOptions = computed<ChartOptions<'line'>>(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: {
+    mode: 'index' as const,
+    intersect: false,
+  },
+  plugins: {
+    legend: {
+      display: false,
+    },
+    tooltip: {
+      backgroundColor: '#111827',
+      borderColor: '#1F2937',
+      borderWidth: 1,
+      padding: 12,
+      cornerRadius: 8,
+      callbacks: {
+        title: (items: any[]) => {
+          const index = items?.[0]?.dataIndex
+          if (index === 7) return 'Hafta 8 - Sprint baslangici'
+          if (index === 9) return 'Hafta 10 - Kapasite asimi'
+          return items?.[0]?.label || 'Hafta'
+        },
+        label: (context: any) => `Risk skoru: ${context.parsed.y}/10`,
+      },
+    },
+  },
+  scales: {
+    y: {
+      min: 0,
+      max: 10,
+      grid: {
+        color: '#E5E7EB',
+        borderDash: [5, 5],
+      },
+      ticks: {
+        stepSize: 2,
+        color: '#6B7280',
+      },
+    },
+    x: {
+      grid: {
+        color: '#F3F4F6',
+        borderDash: [5, 5],
+      },
+      ticks: {
+        color: '#6B7280',
+        maxRotation: 0,
+      },
+    },
+  },
+}))
+
+const selectedTeamAiActionCards = computed(() => {
+  const narrativeActions = aggregateActionPlan(selectedTeamNarrative.value).slice(0, 2)
+  if (narrativeActions.length >= 2) return narrativeActions
+
+  const team = selectedTeamAnalysis.value
+  const roleCount = selectedTeamAllPeople.value.length || team?.total || 0
+  const fallback = [
+    {
+      title: 'Takim Lideri ile Motivasyon Gorusmesi',
+      reason: `${team?.team || 'Secili takim'} icin ${team?.topReason || 'ana KPI'} sinyalindeki dususu anlamak, yonetici engellerini ve blokajlari netlestirmek.`,
+    },
+    {
+      title: 'Rol Bazli Kapasite ve Blokaj Analizi',
+      reason: `${roleCount} kisilik ekipte junior/senior dagilimi, is yuku ve teslim baskisi birlikte incelenmeli.`,
+    },
+  ]
+  return [...narrativeActions, ...fallback].slice(0, 2)
+})
+
+const selectedTeamUpdatedAt = computed(() =>
+  new Date().toLocaleString('tr-TR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+)
+
+const selectedTeamTalkingPointItems = computed(() => {
+  const team = selectedTeamAnalysis.value
+  const points = aggregateTalkingPoints(selectedTeamNarrative.value).slice(0, 3)
+  const fallbackPoints = [
+    `${team?.topReason || 'Ana KPI'} sinyalinin son haftalarda neden arttigini takim lideriyle netlestirin.`,
+    `${team?.team || 'Secili takim'} icin is yuku, blokaj ve rol dagilimi kaynakli riskleri ayristirin.`,
+    'Bu hafta uygulanacak aksiyonun sahibi, tarihi ve beklenen etkisini netlestirin.',
+  ]
+  const normalized = [...points, ...fallbackPoints].slice(0, 3)
+  const priorities = ['high', 'medium', 'low'] as const
+  return normalized.map((point, index) => {
+    const priority = priorities[index] || 'low'
+    return {
+      id: String(index),
+      index: index + 1,
+      title: shortenTalkingPoint(point),
+      detail: point,
+      priority,
+      priorityLabel: priority === 'high' ? 'Yuksek' : priority === 'medium' ? 'Orta' : 'Dusuk',
+      bullets: [
+        'Somut ornek ve son hafta verisiyle konusmayi baslatin.',
+        'Engel, sahiplik ve takip tarihini toplantida yazili hale getirin.',
+      ],
+    }
+  })
 })
 
 const teamReasonDistribution = computed(() => {
@@ -1935,6 +2558,42 @@ function displayEmployeeName(item: SoftwarePredictionResponse | null) {
     || `Dataset #${item.employee_id}`
 }
 
+function employeeInitials(item: SoftwarePredictionResponse | null) {
+  const name = String(displayEmployeeName(item))
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part: string) => part.charAt(0).toUpperCase())
+    .join('') || 'K'
+}
+
+function employeeRoleLabel(item: SoftwarePredictionResponse | null) {
+  if (!item) return 'Rol yok'
+  return item.summary_payload?.position || item.summary_payload?.role || 'Rol yok'
+}
+
+function employeeCodeLabel(item: SoftwarePredictionResponse | null) {
+  if (!item) return '-'
+  return item.summary_payload?.external_employee_code || `SE-${String(item.employee_id).padStart(3, '0')}`
+}
+
+function employeeRiskOutOfTen(item: SoftwarePredictionResponse) {
+  return Math.max(1, Math.min(10, Math.round(employeeRiskScore(item) / 10)))
+}
+
+function memberAvatarGradientClass(index: number) {
+  const classes = [
+    'bg-gradient-to-br from-blue-500 to-indigo-600',
+    'bg-gradient-to-br from-violet-500 to-fuchsia-600',
+    'bg-gradient-to-br from-rose-500 to-orange-500',
+    'bg-gradient-to-br from-emerald-500 to-teal-600',
+    'bg-gradient-to-br from-sky-500 to-cyan-600',
+    'bg-gradient-to-br from-amber-500 to-red-500',
+  ]
+  return classes[index % classes.length]
+}
+
 function employeeSubtitle(item: SoftwarePredictionResponse | null) {
   if (!item) return '-'
   const team = item.summary_payload?.team || 'Takim yok'
@@ -2048,6 +2707,57 @@ function riskToneLabel(tone: string) {
   return 'Dusuk'
 }
 
+function shortenTalkingPoint(value: string) {
+  const text = String(value).trim()
+  if (text.length <= 72) return text
+  return `${text.slice(0, 69).trim()}...`
+}
+
+function toggleTalkingPoint(id: string) {
+  expandedTalkingPoints.value = {
+    ...expandedTalkingPoints.value,
+    [id]: !expandedTalkingPoints.value[id],
+  }
+}
+
+function toggleTalkingPointDone(id: string) {
+  completedTalkingPoints.value = {
+    ...completedTalkingPoints.value,
+    [id]: !completedTalkingPoints.value[id],
+  }
+}
+
+function talkingPointPriorityClass(priority: string) {
+  if (priority === 'high') return 'bg-rose-100 text-rose-700'
+  if (priority === 'medium') return 'bg-amber-100 text-amber-700'
+  return 'bg-emerald-100 text-emerald-700'
+}
+
+async function selectTeamForAnalysis(teamName: string) {
+  selectedTeamAnalysisName.value = teamName
+  selectedTeamDetailVisible.value = true
+  expandedTalkingPoints.value = { 0: true }
+  completedTalkingPoints.value = {}
+  await nextTick()
+  setupRevealAnimations()
+}
+
+function teamInitials(teamName: string) {
+  return teamName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'T'
+}
+
+function teamHeaderRiskBadgeClass(team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[]; high: number; medium: number; total: number }) {
+  const level = teamRiskLevel(team)
+  if (level === 'high') return 'border border-rose-200 bg-rose-100 text-rose-800'
+  if (level === 'medium') return 'border border-amber-200 bg-amber-100 text-amber-800'
+  return 'border border-emerald-200 bg-emerald-100 text-emerald-800'
+}
+
 function teamRiskWidth(team: { high: number; medium: number }) {
   const score = team.high * 2 + team.medium
   return Math.max(8, Math.round((score / maxTeamRiskScore.value) * 100))
@@ -2068,40 +2778,54 @@ function teamRiskPercent(team: { high: number; medium: number; total: number }) 
   return Math.round(((team.high + team.medium) / team.total) * 100)
 }
 
-function teamRiskScore(team: { riskScore?: number; high: number; medium: number; total: number }) {
-  if (typeof team.riskScore === 'number' && Number.isFinite(team.riskScore)) {
-    return Math.round(team.riskScore)
+function selectedTrendValuesForTeam(team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[] }) {
+  const values = team.trendValues || []
+  const periods = team.trendPeriods || []
+  if (values.length && periods.length) {
+    const allowedPeriods = new Set(filterPeriodsByTeamRange(periods))
+    const filteredValues = values.filter((_, index) => allowedPeriods.has(periods[index]))
+    if (filteredValues.length) return filteredValues
+  }
+  if (values.length) return values
+  if (typeof team.riskScore === 'number' && Number.isFinite(team.riskScore)) return [team.riskScore]
+  return []
+}
+
+function teamRiskScore(team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[]; high: number; medium: number; total: number }) {
+  const selectedValues = selectedTrendValuesForTeam(team)
+  if (selectedValues.length) {
+    return Math.round(selectedValues.reduce((sum, value) => sum + value, 0) / selectedValues.length)
   }
   if (!team.total) return 0
   return Math.round(((team.high * 1) + (team.medium * 0.55)) / team.total * 100)
 }
 
-function teamRiskMarkerPosition(team: { riskScore?: number; high: number; medium: number; total: number }) {
+function teamRiskMarkerPosition(team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[]; high: number; medium: number; total: number }) {
   return Math.min(98, Math.max(2, teamRiskScore(team)))
 }
 
-function teamRiskCategory(team: { riskScore?: number; high: number; medium: number; total: number }) {
+function teamRiskCategory(team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[]; high: number; medium: number; total: number }) {
   const score = teamRiskScore(team)
   if (score >= 67) return 'Yuksek Risk'
   if (score >= 34) return 'Orta Risk'
   return 'Dusuk Risk'
 }
 
-function teamRiskLevel(team: { riskScore?: number; high: number; medium: number; total: number }) {
+function teamRiskLevel(team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[]; high: number; medium: number; total: number }) {
   const score = teamRiskScore(team)
   if (score >= 67) return 'high'
   if (score >= 34) return 'medium'
   return 'low'
 }
 
-function teamRiskBadgeClass(team: { riskScore?: number; high: number; medium: number; total: number }) {
+function teamRiskBadgeClass(team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[]; high: number; medium: number; total: number }) {
   const score = teamRiskScore(team)
   if (score >= 67) return 'border-[#EF4444] bg-[#FEE2E2] text-[#991B1B]'
   if (score >= 34) return 'border-[#F59E0B] bg-[#FEF3C7] text-[#92400E]'
   return 'border-[#10B981] bg-[#D1FAE5] text-[#065F46]'
 }
 
-function teamRiskDotClass(team: { riskScore?: number; high: number; medium: number; total: number }) {
+function teamRiskDotClass(team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[]; high: number; medium: number; total: number }) {
   const score = teamRiskScore(team)
   if (score >= 67) return 'bg-[#EF4444]'
   if (score >= 34) return 'bg-[#F59E0B]'
@@ -2110,11 +2834,7 @@ function teamRiskDotClass(team: { riskScore?: number; high: number; medium: numb
 
 function teamTrendValues(teamName: string) {
   const team = teamRiskSummaries.value.find((item) => item.team === teamName)
-  const periods = team?.trendPeriods || []
-  const allowedPeriods = new Set(filterPeriodsByTeamRange(periods))
-  const values = periods.length
-    ? (team?.trendValues || []).filter((_, index) => allowedPeriods.has(periods[index]))
-    : (team?.trendValues || [])
+  const values = team ? selectedTrendValuesForTeam(team) : []
   return values.length ? values : [team ? teamRiskScore(team) : 0]
 }
 
@@ -2141,7 +2861,7 @@ function teamTrendPath(teamName: string) {
 
 function teamTrendTooltip(teamName: string) {
   const team = teamRiskSummaries.value.find((item) => item.team === teamName)
-  const periods = team?.trendPeriods || []
+  const periods = team ? filterPeriodsByTeamRange(team.trendPeriods || []) : []
   return teamTrendValues(teamName)
     .map((value, index) => {
       const period = periods[index] ? formatPeriod(periods[index]) : `Donem ${index + 1}`
@@ -2150,7 +2870,7 @@ function teamTrendTooltip(teamName: string) {
     .join(', ')
 }
 
-function teamTrendLineClass(team: { riskScore?: number; high: number; medium: number; total: number }) {
+function teamTrendLineClass(team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[]; high: number; medium: number; total: number }) {
   const score = teamRiskScore(team)
   if (score >= 67) return 'text-[#EF4444]'
   if (score >= 34) return 'text-[#F59E0B]'
@@ -2224,11 +2944,49 @@ function resetTeamFilters() {
   flashTeamFilterLoading()
 }
 
+function handleTeamDashboardEmptyAction() {
+  if (bulkPredictionResult.value && filteredTeamRiskSummaries.value.length === 0) {
+    resetTeamFilters()
+    return
+  }
+  if (mlUploadId.value) {
+    loadBulkPredictions(false)
+    return
+  }
+  activeAnalyticsSection.value = 'model'
+}
+
 function flashTeamFilterLoading() {
   teamFilterLoading.value = true
   window.setTimeout(() => {
     teamFilterLoading.value = false
   }, 250)
+}
+
+function setupRevealAnimations() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+  const elements = Array.from(document.querySelectorAll<HTMLElement>('.reveal-on-scroll'))
+  if (!elements.length) return
+
+  if (!('IntersectionObserver' in window)) {
+    elements.forEach((element) => element.classList.add('is-visible'))
+    return
+  }
+
+  revealObserver?.disconnect()
+  revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return
+      entry.target.classList.add('is-visible')
+      revealObserver?.unobserve(entry.target)
+    })
+  }, { threshold: 0.12 })
+
+  elements.forEach((element) => {
+    if (element.classList.contains('is-visible')) return
+    revealObserver?.observe(element)
+  })
 }
 
 function employeeRiskScore(item: SoftwarePredictionResponse) {
@@ -2446,15 +3204,18 @@ watch(mlTargetColumn, () => {
   predictionResult.value = null
   bulkPredictionResult.value = null
   selectedTeamAnalysisName.value = ''
+  selectedTeamDetailVisible.value = false
 })
 
 watch(filteredTeamRiskSummaries, (teams) => {
   if (!teams.length) {
     selectedTeamAnalysisName.value = ''
+    selectedTeamDetailVisible.value = false
     return
   }
   if (!teams.find((team) => team.team === selectedTeamAnalysisName.value)) {
     selectedTeamAnalysisName.value = teams[0].team
+    selectedTeamDetailVisible.value = true
   }
   const nextVisible = { ...visibleTrendTeams.value }
   for (const team of teams) {
@@ -2470,11 +3231,23 @@ watch(selectedRiskFilters, () => {
   flashTeamFilterLoading()
 }, { deep: true })
 
+watch([filteredTeamRiskSummaries, activeAnalyticsSection], async () => {
+  await nextTick()
+  setupRevealAnimations()
+})
+
 watch(mlUploadId, () => {
   trainingResult.value = null
   predictionResult.value = null
   bulkPredictionResult.value = null
+  selectedTeamDetailVisible.value = false
   loadDatasetEmployees()
+})
+
+watch([activeAnalyticsSection, mlUploadId], ([section, uploadId]) => {
+  if (section !== 'teams') return
+  if (!uploadId || bulkPredictionResult.value || mlLoading.value) return
+  loadBulkPredictions(false)
 })
 
 watch(
@@ -2488,5 +3261,228 @@ onMounted(async () => {
   await loadUploadHistory()
   await loadDatasetEmployees()
   await loadOverview()
+  await nextTick()
+  setupRevealAnimations()
+})
+
+onBeforeUnmount(() => {
+  revealObserver?.disconnect()
 })
 </script>
+
+<style scoped>
+.kpi-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(59, 130, 246, 0.25);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.selected-team-kpi-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.selected-team-kpi-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(59, 130, 246, 0.22);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+}
+
+.selected-team-problem-card {
+  animation: main-issue-pulse 2s infinite;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.selected-team-problem-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(245, 158, 11, 0.18);
+}
+
+.team-table-row {
+  cursor: pointer;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.team-table-row:hover {
+  transform: translateY(-1px);
+  background: #f3f4f6;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.member-risk-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.member-risk-card:hover {
+  transform: translateY(-8px);
+  border-color: #3b82f6;
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.2);
+}
+
+.talking-point-item {
+  cursor: pointer;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.talking-point-item:hover {
+  background: #f9fafb;
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.accordion-content {
+  animation: accordion-open 0.3s ease;
+}
+
+.interactive-button {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.interactive-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.risk-badge {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.risk-badge:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: #e5e7eb;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.skeleton-shimmer::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  animation: shimmer 1.3s infinite;
+  transform: translateX(-100%);
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+.reveal-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes main-issue-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes accordion-open {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kpi-card,
+  .selected-team-kpi-card,
+  .selected-team-problem-card,
+  .main-issue-card,
+  .team-table-row,
+  .member-risk-card,
+  .person-card,
+  .talking-point-item,
+  .accordion-item,
+  .accordion-content,
+  .interactive-button,
+  .action-button,
+  .risk-badge,
+  .skeleton,
+  .skeleton-shimmer,
+  .skeleton-shimmer::after,
+  .reveal-on-scroll {
+    transition: none;
+    animation: none;
+  }
+
+  .kpi-card:hover,
+  .selected-team-kpi-card:hover,
+  .selected-team-problem-card:hover,
+  .main-issue-card:hover,
+  .team-table-row:hover,
+  .member-risk-card:hover,
+  .person-card:hover,
+  .talking-point-item:hover,
+  .accordion-item:hover,
+  .interactive-button:hover,
+  .action-button:hover,
+  .risk-badge:hover,
+  .reveal-on-scroll {
+    transform: none;
+  }
+
+  .reveal-on-scroll {
+    opacity: 1;
+  }
+}
+</style>
