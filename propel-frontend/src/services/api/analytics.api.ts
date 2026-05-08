@@ -144,6 +144,7 @@ export interface SoftwareBulkPredictionResponse {
   low_risk_count: number
   department_narrative?: Record<string, any> | null
   team_narratives: Array<Record<string, any>>
+  team_analytics?: Array<Record<string, any>>
   items: SoftwarePredictionResponse[]
 }
 

@@ -351,17 +351,161 @@
           </div>
         </div>
 
-        <div v-if="teamRiskSummaries.length" v-show="activeAnalyticsSection === 'teams'">
+        <div v-show="activeAnalyticsSection === 'teams'">
+          <div class="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Zaman Araligi</span>
+                <button
+                  v-for="range in teamTimeRanges"
+                  :key="range.value"
+                  class="rounded-lg px-3 py-2 text-xs font-bold transition"
+                  :class="selectedTeamTimeRange === range.value
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                  @click="applyTeamTimeRange(range.value)"
+                >
+                  {{ range.label }}
+                </button>
+              </div>
+
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                  @click="showDateRangePanel = !showDateRangePanel"
+                >
+                  <span aria-hidden="true">&#128197;</span>
+                  {{ selectedDateRangeLabel }}
+                </button>
+
+                <div class="relative">
+                  <button
+                    class="inline-flex min-w-[128px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                    @click="showRiskFilterMenu = !showRiskFilterMenu"
+                  >
+                    Filtre ({{ selectedRiskFilters.length }})
+                    <span class="text-slate-400">v</span>
+                  </button>
+                  <div
+                    v-if="showRiskFilterMenu"
+                    class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-lg"
+                  >
+                    <label
+                      v-for="filter in riskFilterOptions"
+                      :key="filter.value"
+                      class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <input
+                        v-model="selectedRiskFilters"
+                        type="checkbox"
+                        :value="filter.value"
+                        class="h-3.5 w-3.5 rounded border-slate-300"
+                      />
+                      <span class="h-2.5 w-2.5 rounded-full" :class="filter.dotClass"></span>
+                      {{ filter.label }}
+                    </label>
+                  </div>
+                </div>
+
+                <button
+                  class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
+                  @click="resetTeamFilters"
+                >
+                  <span aria-hidden="true">&#8635;</span>
+                  Sifirla
+                </button>
+              </div>
+            </div>
+
+            <div
+              v-if="showDateRangePanel"
+              class="mt-4 grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            >
+              <label class="text-xs font-semibold text-slate-600">
+                Baslangic
+                <input
+                  v-model="customDateStart"
+                  type="date"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                />
+              </label>
+              <label class="text-xs font-semibold text-slate-600">
+                Bitis
+                <input
+                  v-model="customDateEnd"
+                  type="date"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                />
+              </label>
+              <button
+                class="self-end rounded-lg bg-blue-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-600"
+                @click="applyCustomDateRange"
+              >
+                Uygula
+              </button>
+            </div>
+
+            <div
+              v-if="teamFilterLoading"
+              class="mt-3 flex items-center gap-2 text-xs font-semibold text-blue-600"
+            >
+              <span class="h-3 w-3 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600"></span>
+              Filtreler uygulanıyor...
+            </div>
+          </div>
+
+          <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <article
+              v-for="metric in teamKpiCards"
+              :key="metric.label"
+              class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium text-slate-500">{{ metric.label }}</p>
+                  <p class="mt-3 text-[32px] font-bold leading-none text-slate-950">
+                    <span v-if="metric.valueDirection === 'down'">&#8595;</span>
+                    <span v-else-if="metric.valueDirection === 'up'">&#8593;</span>
+                    {{ metric.value }}
+                  </p>
+                </div>
+                <span
+                  class="rounded-full px-2.5 py-1 text-xs font-bold"
+                  :class="metric.badgeClass"
+                >
+                  <span v-if="metric.direction === 'down'">&#8595;</span>
+                  <span v-else>&#8593;</span>
+                  {{ metric.trend }}
+                </span>
+              </div>
+
+              <div class="mt-5 flex items-end justify-between gap-4">
+                <p class="text-sm font-semibold" :class="metric.trendClass">{{ metric.change }}</p>
+                <svg viewBox="0 0 120 36" class="h-9 w-32 shrink-0" aria-hidden="true">
+                  <polyline
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    :class="metric.sparkClass"
+                    :points="metric.sparkline"
+                  />
+                </svg>
+              </div>
+            </article>
+          </div>
+
           <div class="mb-4 border-b border-slate-100 pb-4">
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Takim Karsilastirmasi</p>
             <h4 class="mt-1 text-lg font-bold text-slate-900">Takimlar arasi risk, yogunluk ve ana neden karsilastirmasi</h4>
           </div>
-          <div class="grid grid-cols-1 gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
+          <div v-if="filteredTeamRiskSummaries.length" class="grid grid-cols-1 gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
             <aside class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <p class="px-2 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Takimlar</p>
               <div class="space-y-2">
                 <button
-                  v-for="team in teamRiskSummaries"
+                  v-for="team in filteredTeamRiskSummaries"
                   :key="`team-tab-${team.team}`"
                   class="flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition"
                   :class="selectedTeamAnalysisName === team.team
@@ -390,7 +534,7 @@
                     <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{{ teamComparisonInsight.summary }}</p>
                   </div>
                   <span class="w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                    {{ teamRiskSummaries.length }} takim
+                    {{ filteredTeamRiskSummaries.length }} takim
                   </span>
                 </div>
 
@@ -415,26 +559,98 @@
                 <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                   <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
                     <div class="flex flex-wrap items-center justify-between gap-3">
-                      <p class="text-xs font-semibold text-slate-500">Risk yogunlugu</p>
+                      <div>
+                        <p class="text-xs font-semibold text-slate-500">Risk yogunlugu</p>
+                        <p class="mt-1 text-[11px] leading-5 text-slate-500">
+                          Bar 0-100 risk skorunu gosterir; marker secili datasetin son donem takim skorunu isaretler.
+                        </p>
+                      </div>
                       <div class="flex items-center gap-3 text-xs text-slate-500">
+                        <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>Dusuk</span>
+                        <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-amber-500"></span>Orta</span>
                         <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-rose-500"></span>Yuksek</span>
-                        <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-amber-400"></span>Orta</span>
                       </div>
                     </div>
-                    <div class="mt-4 space-y-4">
+                    <div class="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900">
+                      Risk skoru ve trend, secili datasetin haftalik satirlarindan uretilen model olasiliklarina dayanir. Trend grafigi son 4 dataset donemini, marker ise son donem takim skorunu gosterir.
+                    </div>
+                    <div class="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                      <div class="sticky top-0 z-10 grid min-w-[760px] grid-cols-[18%_30%_17%_9%_16%_10%] items-center gap-3 bg-[#F9FAFB] px-4 py-4 text-xs font-bold uppercase tracking-wide text-[#6B7280]">
+                        <span>Takim Adi</span>
+                        <span>Risk Skoru (0-100)</span>
+                        <span>Trend (Son 4 Hafta)</span>
+                        <span>Kisi</span>
+                        <span>Status</span>
+                        <span>Izleme</span>
+                      </div>
                       <button
-                        v-for="team in teamRiskSummaries"
+                        v-for="(team, index) in filteredTeamRiskSummaries"
                         :key="`risk-bar-${team.team}`"
-                        class="grid w-full grid-cols-[96px_minmax(0,1fr)_78px] items-center gap-3 rounded-lg px-2 py-1.5 text-left text-xs transition hover:bg-white"
-                        :class="selectedTeamAnalysisName === team.team ? 'bg-white shadow-sm' : ''"
+                        class="grid min-w-[760px] w-full grid-cols-[18%_30%_17%_9%_16%_10%] items-center gap-3 border-b border-[#E5E7EB] px-4 py-5 text-left text-xs transition duration-200 ease-in-out last:border-b-0 hover:bg-[#F3F4F6] hover:shadow-sm"
+                        :class="[
+                          index % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]',
+                          selectedTeamAnalysisName === team.team ? 'ring-1 ring-inset ring-indigo-200' : ''
+                        ]"
+                        :title="`${team.team}: ${teamRiskScore(team)}/100 - ${teamRiskCategory(team)}`"
                         @click="selectedTeamAnalysisName = team.team"
                       >
-                        <span class="truncate font-semibold text-slate-700">{{ team.team }}</span>
-                        <span class="flex h-3 overflow-hidden rounded-full bg-white ring-1 ring-slate-100">
-                          <span class="bg-rose-500" :style="{ width: `${teamHighWidth(team)}%` }"></span>
-                          <span class="bg-amber-400" :style="{ width: `${teamMediumWidth(team)}%` }"></span>
+                        <span class="flex min-w-0 items-center truncate font-bold text-slate-800">
+                          <span class="truncate">{{ team.team }}</span>
                         </span>
-                        <span class="text-right font-semibold text-slate-500">%{{ teamRiskPercent(team) }}</span>
+                        <span class="relative block pt-5">
+                          <span
+                            class="absolute top-0 -translate-x-1/2 rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-800 shadow-sm"
+                            :style="{ left: `${teamRiskMarkerPosition(team)}%` }"
+                          >
+                            {{ teamRiskScore(team) }}
+                          </span>
+                          <span
+                            class="absolute top-[18px] h-0 w-0 -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-slate-800"
+                            :style="{ left: `${teamRiskMarkerPosition(team)}%` }"
+                          ></span>
+                          <span class="relative flex h-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-inner">
+                            <span class="h-full flex-1 bg-emerald-500"></span>
+                            <span class="h-full w-px bg-slate-200"></span>
+                            <span class="h-full flex-1 bg-amber-500"></span>
+                            <span class="h-full w-px bg-slate-200"></span>
+                            <span class="h-full flex-1 bg-rose-500"></span>
+                            <span
+                              class="absolute top-1/2 h-7 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-900 bg-white shadow"
+                              :style="{ left: `${teamRiskMarkerPosition(team)}%` }"
+                            ></span>
+                          </span>
+                        </span>
+                        <span
+                          class="flex justify-center"
+                          :title="teamTrendTooltip(team.team)"
+                        >
+                          <svg viewBox="0 0 100 40" class="h-10 w-[100px]" aria-hidden="true">
+                            <path
+                              :d="teamTrendPath(team.team)"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              :class="teamTrendLineClass(team)"
+                            />
+                          </svg>
+                        </span>
+                        <span class="text-sm font-bold text-slate-800">
+                          {{ team.total }}
+                        </span>
+                        <span class="flex justify-start">
+                          <span
+                            class="inline-flex min-w-[104px] items-center justify-center gap-1.5 rounded-2xl border-2 px-2.5 py-1.5 text-[11px] font-semibold"
+                            :class="teamRiskBadgeClass(team)"
+                          >
+                            <span class="h-2 w-2 rounded-full" :class="teamRiskDotClass(team)"></span>
+                            {{ teamRiskCategory(team) }}
+                          </span>
+                        </span>
+                        <span class="text-sm font-bold text-slate-800">
+                          {{ team.high + team.medium }}
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -453,6 +669,37 @@
                       </div>
                     </div>
                   </div>
+                </div>
+              </section>
+
+              <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Trend Karsilastirma</p>
+                    <h5 class="mt-1 text-lg font-bold text-slate-900">6 Aylik Performans Trendi</h5>
+                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                      Secili datasetten uretilen ay bazli takim risk skorlari. Y ekseni 0-100 risk skorunu, X ekseni dataset donemlerini gosterir.
+                    </p>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <label
+                      v-for="team in filteredTeamRiskSummaries"
+                      :key="`trend-toggle-${team.team}`"
+                      class="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white"
+                    >
+                      <input
+                        v-model="visibleTrendTeams[team.team]"
+                        type="checkbox"
+                        class="h-3.5 w-3.5 rounded border-slate-300"
+                      />
+                      <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: teamLineColor(team.team) }"></span>
+                      {{ team.team }}
+                    </label>
+                  </div>
+                </div>
+
+                <div class="mt-6 h-[400px] max-w-[800px]">
+                  <Line :data="teamTrendChartData" :options="teamTrendChartOptions" />
                 </div>
               </section>
 
@@ -1187,7 +1434,18 @@
 </template>
 
 <script setup lang="ts">
+import {
+  CategoryScale,
+  Chart as ChartJS,
+  type ChartOptions,
+  Legend,
+  LineElement,
+  LinearScale,
+  PointElement,
+  Tooltip,
+} from 'chart.js'
 import { computed, onMounted, ref, watch } from 'vue'
+import { Line } from 'vue-chartjs'
 import { useRoute } from 'vue-router'
 import {
   analyticsApi,
@@ -1200,6 +1458,8 @@ import {
   type SoftwareModelTrainResponse,
   type SoftwarePredictionResponse,
 } from '@/services/api/analytics.api'
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
 const route = useRoute()
 const departmentConfigs = ref<DepartmentAnalyticsConfigResponse[]>([])
@@ -1220,10 +1480,30 @@ const bulkPredictionResult = ref<SoftwareBulkPredictionResponse | null>(null)
 const softwareDatasets = ref<SoftwareDatasetResponse[]>([])
 const datasetEmployees = ref<SoftwareDatasetEmployeeResponse[]>([])
 const modelStates = ref<SoftwareModelStateResponse[]>([])
+const visibleTrendTeams = ref<Record<string, boolean>>({})
+const selectedTeamTimeRange = ref<'1m' | '3m' | '6m' | '1y' | 'all' | 'custom'>('6m')
+const selectedRiskFilters = ref<string[]>(['low', 'medium', 'high'])
+const showRiskFilterMenu = ref(false)
+const showDateRangePanel = ref(false)
+const customDateStart = ref('')
+const customDateEnd = ref('')
+const teamFilterLoading = ref(false)
 type AnalyticsSectionKey = 'model' | 'department' | 'teams' | 'watchlist' | 'technical'
 const analyticsSectionKeys: AnalyticsSectionKey[] = ['model', 'department', 'teams', 'watchlist', 'technical']
 const activeAnalyticsSection = ref<AnalyticsSectionKey>('model')
 const bulkSections: AnalyticsSectionKey[] = ['department', 'teams', 'watchlist', 'technical']
+const teamTimeRanges = [
+  { label: 'Son 1 Ay', value: '1m' },
+  { label: 'Son 3 Ay', value: '3m' },
+  { label: 'Son 6 Ay', value: '6m' },
+  { label: 'Son 1 Yil', value: '1y' },
+  { label: 'Tumu', value: 'all' },
+] as const
+const riskFilterOptions = [
+  { label: 'Dusuk Risk', value: 'low', dotClass: 'bg-emerald-500' },
+  { label: 'Orta Risk', value: 'medium', dotClass: 'bg-amber-500' },
+  { label: 'Yuksek Risk', value: 'high', dotClass: 'bg-rose-500' },
+]
 
 const selectedDepartmentConfig = computed(() =>
   departmentConfigs.value.find((item) => item.key === selectedDepartment.value) || null
@@ -1338,6 +1618,10 @@ const employeeAnalysisRows = computed(() => bulkPredictionResult.value?.items ||
 
 const teamRiskSummaries = computed(() => {
   const items = bulkPredictionResult.value?.items || []
+  const analyticsByTeam = new Map(
+    (bulkPredictionResult.value?.team_analytics || [])
+      .map((item) => [String(item.team), item])
+  )
   const grouped = items.reduce<Record<string, SoftwarePredictionResponse[]>>((acc, item) => {
     const team = String(item.summary_payload?.team || 'Takim bilgisi yok')
     if (!acc[team]) acc[team] = []
@@ -1354,6 +1638,8 @@ const teamRiskSummaries = computed(() => {
         1
       )[0]?.[0] || 'KPI sinyali'
       const tone = high > 0 ? 'high' : medium > 0 ? 'medium' : 'low'
+      const analytics = analyticsByTeam.get(team)
+      const riskScore = Number(analytics?.risk_score ?? averageRiskScore(teamItems))
       return {
         team,
         total: teamItems.length,
@@ -1362,20 +1648,28 @@ const teamRiskSummaries = computed(() => {
         tone,
         topReason,
         action: buildBulkActions([topReason], team)[0],
+        riskScore,
+        trendValues: Array.isArray(analytics?.trend_values) ? analytics.trend_values.map((value: unknown) => Number(value)) : [riskScore],
+        trendPeriods: Array.isArray(analytics?.trend_periods) ? analytics.trend_periods.map((value: unknown) => String(value)) : [],
+        trendBasis: String(analytics?.trend_basis || 'latest_prediction_probability'),
       }
     })
     .sort((a, b) => b.high - a.high || b.medium - a.medium || b.total - a.total)
 })
 
+const filteredTeamRiskSummaries = computed(() =>
+  teamRiskSummaries.value.filter((team) => selectedRiskFilters.value.includes(teamRiskLevel(team)))
+)
+
 const maxTeamRiskScore = computed(() => {
-  const scores = teamRiskSummaries.value.map((team) => team.high * 2 + team.medium)
+  const scores = filteredTeamRiskSummaries.value.map((team) => team.high * 2 + team.medium)
   return Math.max(1, ...scores)
 })
 
 const selectedTeamAnalysis = computed(() => {
-  if (!teamRiskSummaries.value.length) return null
-  return teamRiskSummaries.value.find((team) => team.team === selectedTeamAnalysisName.value)
-    || teamRiskSummaries.value[0]
+  if (!filteredTeamRiskSummaries.value.length) return null
+  return filteredTeamRiskSummaries.value.find((team) => team.team === selectedTeamAnalysisName.value)
+    || filteredTeamRiskSummaries.value[0]
 })
 
 const selectedTeamNarrative = computed(() => {
@@ -1393,7 +1687,7 @@ const selectedTeamPeople = computed(() => {
 })
 
 const teamReasonDistribution = computed(() => {
-  const counts = countBy(teamRiskSummaries.value, (team) => team.topReason)
+  const counts = countBy(filteredTeamRiskSummaries.value, (team) => team.topReason)
   const entries = topEntries(counts, 4)
   const max = Math.max(1, ...entries.map(([, count]) => count))
   return entries.map(([name, count]) => ({
@@ -1404,7 +1698,7 @@ const teamReasonDistribution = computed(() => {
 })
 
 const teamComparisonInsight = computed(() => {
-  const teams = teamRiskSummaries.value
+  const teams = filteredTeamRiskSummaries.value
   const highest = teams[0]
   const selected = selectedTeamAnalysis.value
   if (!highest || !selected) {
@@ -1434,6 +1728,162 @@ const teamComparisonInsight = computed(() => {
     totalRiskCount: totalRisk,
     repeatedReason,
   }
+})
+
+const teamKpiCards = computed(() => [
+  {
+    label: 'Toplam Takim',
+    value: '4 takim',
+    trend: '+0%',
+    direction: 'up',
+    change: 'Son 4 hafta stabil',
+    badgeClass: 'bg-blue-50 text-blue-700',
+    trendClass: 'text-slate-500',
+    sparkClass: 'text-blue-500',
+    sparkline: '4,24 40,18 78,18 116,14',
+  },
+  {
+    label: 'Ortalama Risk Skoru',
+    value: '88.2/100',
+    trend: '+8%',
+    direction: 'up',
+    change: 'Risk yukseliyor',
+    badgeClass: 'bg-rose-50 text-rose-700',
+    trendClass: 'text-rose-600',
+    sparkClass: 'text-rose-500',
+    sparkline: '4,28 40,22 78,15 116,8',
+  },
+  {
+    label: 'Yuksek Riskli Takimlar',
+    value: '3 takim',
+    trend: '+1',
+    direction: 'up',
+    change: 'Yakindan izlenmeli',
+    badgeClass: 'bg-amber-50 text-amber-700',
+    trendClass: 'text-amber-600',
+    sparkClass: 'text-amber-500',
+    sparkline: '4,26 40,26 78,16 116,12',
+  },
+  {
+    label: 'Bu Ay Trend',
+    value: '-5%',
+    valueDirection: 'down',
+    trend: '-5%',
+    direction: 'down',
+    change: 'Performans dususu',
+    badgeClass: 'bg-rose-50 text-rose-700',
+    trendClass: 'text-rose-600',
+    sparkClass: 'text-rose-500',
+    sparkline: '4,8 40,13 78,20 116,28',
+  },
+])
+
+const teamTrendChartLabels = computed(() => {
+  const labels = Array.from(new Set(
+    filteredTeamRiskSummaries.value.flatMap((team) => filterPeriodsByTeamRange(team.trendPeriods || []))
+  )).sort()
+
+  if (labels.length) return labels.slice(-6).map((period) => formatMonthLabel(period))
+  return ["Ara '24", "Oca '25", "Sub '25", "Mar '25", "Nis '25", "May '25"]
+})
+
+const teamTrendChartData = computed(() => {
+  const rawPeriods = Array.from(new Set(
+    filteredTeamRiskSummaries.value.flatMap((team) => filterPeriodsByTeamRange(team.trendPeriods || []))
+  )).sort()
+  const fallbackLabels = ["Ara '24", "Oca '25", "Sub '25", "Mar '25", "Nis '25", "May '25"]
+  const labels = rawPeriods.length ? rawPeriods.map((period) => formatMonthLabel(period)) : fallbackLabels
+
+  return {
+    labels,
+    datasets: filteredTeamRiskSummaries.value
+      .filter((team) => visibleTrendTeams.value[team.team] !== false)
+      .map((team) => {
+        const valuesByPeriod = new Map(
+          (team.trendPeriods || []).map((period: string, index: number) => [period, team.trendValues?.[index] ?? teamRiskScore(team)])
+        )
+        const data = rawPeriods.length
+          ? rawPeriods.map((period) => Number(valuesByPeriod.get(period) ?? null))
+          : normalizeTrendSeries(team.trendValues || [teamRiskScore(team)], labels.length)
+
+        return {
+          label: team.team,
+          data,
+          borderColor: teamLineColor(team.team),
+          backgroundColor: teamLineColor(team.team),
+          borderWidth: 3,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          tension: 0.42,
+          fill: false,
+          spanGaps: true,
+        }
+      }),
+  }
+})
+
+const teamTrendChartOptions = computed<ChartOptions<'line'>>(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: {
+    mode: 'index' as const,
+    intersect: false,
+  },
+  plugins: {
+    legend: {
+      display: false,
+    },
+    tooltip: {
+      mode: 'index' as const,
+      intersect: false,
+      backgroundColor: '#111827',
+      borderColor: '#1F2937',
+      borderWidth: 1,
+      padding: 12,
+      cornerRadius: 8,
+      callbacks: {
+        label: (context: any) => `${context.dataset.label}: ${context.parsed.y}/100`,
+      },
+    },
+  },
+  scales: {
+    y: {
+      min: 0,
+      max: 100,
+      title: {
+        display: true,
+        text: 'Risk skoru',
+        color: '#6B7280',
+        font: { size: 12, weight: 'bold' },
+      },
+      grid: {
+        color: '#E5E7EB',
+        borderDash: [5, 5],
+      },
+      ticks: {
+        stepSize: 20,
+        color: '#6B7280',
+      },
+    },
+    x: {
+      grid: {
+        display: false,
+      },
+      ticks: {
+        color: '#6B7280',
+      },
+    },
+  },
+}))
+
+const selectedDateRangeLabel = computed(() => {
+  if (selectedTeamTimeRange.value !== 'custom') {
+    return teamTimeRanges.find((range) => range.value === selectedTeamTimeRange.value)?.label || 'Son 6 Ay'
+  }
+  if (customDateStart.value && customDateEnd.value) {
+    return `${formatPeriod(customDateStart.value)} - ${formatPeriod(customDateEnd.value)}`
+  }
+  return 'Ozel tarih araligi'
 })
 
 function readinessLabel(status: string) {
@@ -1616,6 +2066,190 @@ function teamMediumWidth(team: { medium: number; total: number }) {
 function teamRiskPercent(team: { high: number; medium: number; total: number }) {
   if (!team.total) return 0
   return Math.round(((team.high + team.medium) / team.total) * 100)
+}
+
+function teamRiskScore(team: { riskScore?: number; high: number; medium: number; total: number }) {
+  if (typeof team.riskScore === 'number' && Number.isFinite(team.riskScore)) {
+    return Math.round(team.riskScore)
+  }
+  if (!team.total) return 0
+  return Math.round(((team.high * 1) + (team.medium * 0.55)) / team.total * 100)
+}
+
+function teamRiskMarkerPosition(team: { riskScore?: number; high: number; medium: number; total: number }) {
+  return Math.min(98, Math.max(2, teamRiskScore(team)))
+}
+
+function teamRiskCategory(team: { riskScore?: number; high: number; medium: number; total: number }) {
+  const score = teamRiskScore(team)
+  if (score >= 67) return 'Yuksek Risk'
+  if (score >= 34) return 'Orta Risk'
+  return 'Dusuk Risk'
+}
+
+function teamRiskLevel(team: { riskScore?: number; high: number; medium: number; total: number }) {
+  const score = teamRiskScore(team)
+  if (score >= 67) return 'high'
+  if (score >= 34) return 'medium'
+  return 'low'
+}
+
+function teamRiskBadgeClass(team: { riskScore?: number; high: number; medium: number; total: number }) {
+  const score = teamRiskScore(team)
+  if (score >= 67) return 'border-[#EF4444] bg-[#FEE2E2] text-[#991B1B]'
+  if (score >= 34) return 'border-[#F59E0B] bg-[#FEF3C7] text-[#92400E]'
+  return 'border-[#10B981] bg-[#D1FAE5] text-[#065F46]'
+}
+
+function teamRiskDotClass(team: { riskScore?: number; high: number; medium: number; total: number }) {
+  const score = teamRiskScore(team)
+  if (score >= 67) return 'bg-[#EF4444]'
+  if (score >= 34) return 'bg-[#F59E0B]'
+  return 'bg-[#10B981]'
+}
+
+function teamTrendValues(teamName: string) {
+  const team = teamRiskSummaries.value.find((item) => item.team === teamName)
+  const periods = team?.trendPeriods || []
+  const allowedPeriods = new Set(filterPeriodsByTeamRange(periods))
+  const values = periods.length
+    ? (team?.trendValues || []).filter((_, index) => allowedPeriods.has(periods[index]))
+    : (team?.trendValues || [])
+  return values.length ? values : [team ? teamRiskScore(team) : 0]
+}
+
+function teamTrendPath(teamName: string) {
+  const values = teamTrendValues(teamName)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = Math.max(1, max - min)
+  const points = values.map((value, index) => {
+    const x = Math.round((index / Math.max(1, values.length - 1)) * 96) + 2
+    const y = Math.round(34 - ((value - min) / span) * 28)
+    return { x, y: Math.max(4, Math.min(36, y)) }
+  })
+
+  return points
+    .map((point, index) => {
+      if (index === 0) return `M ${point.x} ${point.y}`
+      const previous = points[index - 1]
+      const controlX = Math.round((previous.x + point.x) / 2)
+      return `C ${controlX} ${previous.y}, ${controlX} ${point.y}, ${point.x} ${point.y}`
+    })
+    .join(' ')
+}
+
+function teamTrendTooltip(teamName: string) {
+  const team = teamRiskSummaries.value.find((item) => item.team === teamName)
+  const periods = team?.trendPeriods || []
+  return teamTrendValues(teamName)
+    .map((value, index) => {
+      const period = periods[index] ? formatPeriod(periods[index]) : `Donem ${index + 1}`
+      return `${period}: ${value}`
+    })
+    .join(', ')
+}
+
+function teamTrendLineClass(team: { riskScore?: number; high: number; medium: number; total: number }) {
+  const score = teamRiskScore(team)
+  if (score >= 67) return 'text-[#EF4444]'
+  if (score >= 34) return 'text-[#F59E0B]'
+  return 'text-[#10B981]'
+}
+
+function teamLineColor(teamName: string) {
+  const normalized = teamName.toLowerCase()
+  if (normalized.includes('backend')) return '#EF4444'
+  if (normalized.includes('frontend')) return '#F59E0B'
+  if (normalized.includes('qa')) return '#10B981'
+  if (normalized.includes('devops')) return '#3B82F6'
+  return '#8B5CF6'
+}
+
+function normalizeTrendSeries(values: number[], length: number) {
+  if (!values.length) return Array.from({ length }, () => 0)
+  if (values.length >= length) return values.slice(-length)
+  const first = values[0]
+  return [...Array.from({ length: length - values.length }, () => first), ...values]
+}
+
+function formatMonthLabel(period: string) {
+  const [year, month] = period.split('-').map((part) => Number(part))
+  if (!year || !month) return period
+  const date = new Date(year, month - 1, 1)
+  const label = date.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' })
+  return label.replace('.', '').replace(' ', " '")
+}
+
+function teamRangeLimit() {
+  if (selectedTeamTimeRange.value === '1m') return 1
+  if (selectedTeamTimeRange.value === '3m') return 3
+  if (selectedTeamTimeRange.value === '6m') return 6
+  if (selectedTeamTimeRange.value === '1y') return 12
+  return Number.POSITIVE_INFINITY
+}
+
+function filterPeriodsByTeamRange(periods: string[]) {
+  const sortedPeriods = [...periods].sort()
+  if (selectedTeamTimeRange.value === 'custom') {
+    return sortedPeriods.filter((period) => {
+      const normalized = period.length === 7 ? `${period}-01` : period
+      if (customDateStart.value && normalized < customDateStart.value) return false
+      if (customDateEnd.value && normalized > customDateEnd.value) return false
+      return true
+    })
+  }
+  return sortedPeriods.slice(-teamRangeLimit())
+}
+
+function applyTeamTimeRange(value: '1m' | '3m' | '6m' | '1y' | 'all') {
+  selectedTeamTimeRange.value = value
+  showDateRangePanel.value = false
+  flashTeamFilterLoading()
+}
+
+function applyCustomDateRange() {
+  selectedTeamTimeRange.value = 'custom'
+  showDateRangePanel.value = false
+  flashTeamFilterLoading()
+}
+
+function resetTeamFilters() {
+  selectedTeamTimeRange.value = '6m'
+  selectedRiskFilters.value = ['low', 'medium', 'high']
+  customDateStart.value = ''
+  customDateEnd.value = ''
+  showRiskFilterMenu.value = false
+  showDateRangePanel.value = false
+  flashTeamFilterLoading()
+}
+
+function flashTeamFilterLoading() {
+  teamFilterLoading.value = true
+  window.setTimeout(() => {
+    teamFilterLoading.value = false
+  }, 250)
+}
+
+function employeeRiskScore(item: SoftwarePredictionResponse) {
+  if (item.target_column === 'attrition_risk_band') {
+    return Math.round(
+      ((item.probabilities?.Yuksek || 0) * 100)
+      + ((item.probabilities?.Orta || 0) * 55)
+      + ((item.probabilities?.Dusuk || 0) * 15)
+    )
+  }
+  return Math.round(
+    ((item.probabilities?.Riskli || 0) * 100)
+    + ((item.probabilities?.Stabil || 0) * 55)
+    + ((item.probabilities?.Yuksek || 0) * 20)
+    + ((item.probabilities?.Guclu || 0) * 10)
+  )
+}
+
+function averageRiskScore(items: SoftwarePredictionResponse[]) {
+  if (!items.length) return 0
+  return Math.round(items.reduce((sum, item) => sum + employeeRiskScore(item), 0) / items.length)
 }
 
 function countBy<T>(items: T[], getKey: (item: T) => string) {
@@ -1814,7 +2448,7 @@ watch(mlTargetColumn, () => {
   selectedTeamAnalysisName.value = ''
 })
 
-watch(teamRiskSummaries, (teams) => {
+watch(filteredTeamRiskSummaries, (teams) => {
   if (!teams.length) {
     selectedTeamAnalysisName.value = ''
     return
@@ -1822,7 +2456,19 @@ watch(teamRiskSummaries, (teams) => {
   if (!teams.find((team) => team.team === selectedTeamAnalysisName.value)) {
     selectedTeamAnalysisName.value = teams[0].team
   }
+  const nextVisible = { ...visibleTrendTeams.value }
+  for (const team of teams) {
+    if (nextVisible[team.team] === undefined) nextVisible[team.team] = true
+  }
+  for (const teamName of Object.keys(nextVisible)) {
+    if (!teams.find((team) => team.team === teamName)) delete nextVisible[teamName]
+  }
+  visibleTrendTeams.value = nextVisible
 })
+
+watch(selectedRiskFilters, () => {
+  flashTeamFilterLoading()
+}, { deep: true })
 
 watch(mlUploadId, () => {
   trainingResult.value = null

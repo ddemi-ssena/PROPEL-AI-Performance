@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.analytics.artifacts.software import SoftwareArtifactStore
+from app.analytics.features.software import SoftwareFeatureBuilder
 from app.analytics.prediction.software import SoftwarePredictionService
 from app.analytics.training.software import SoftwareBaselineTrainer
 from app.db.models.data_upload import DataUpload
@@ -491,6 +492,7 @@ class SoftwareMLService:
         )
         top_reasons = SoftwareMLService._top_driver_counts(items)
         team_summaries = SoftwareMLService._team_summaries(items)
+        team_analytics = SoftwareMLService._team_analytics(rows, artifact, target_column)
         from app.services.software_narrative_service import SoftwareNarrativeService
 
         department_narrative = SoftwareNarrativeService.build_department_narrative(
@@ -531,6 +533,7 @@ class SoftwareMLService:
             low_risk_count=low_risk_count,
             department_narrative=department_narrative,
             team_narratives=team_narratives,
+            team_analytics=team_analytics,
             items=items,
         )
 
@@ -573,3 +576,71 @@ class SoftwareMLService:
                 }
             )
         return sorted(summaries, key=lambda item: (item["high"], item["medium"], item["total"]), reverse=True)
+
+    @staticmethod
+    def _probability_risk_score(target_column: str, probabilities: dict[str, float], predicted_band: str | None = None) -> int:
+        if target_column == "attrition_risk_band":
+            score = (
+                probabilities.get("Yuksek", 0.0) * 100
+                + probabilities.get("Orta", 0.0) * 55
+                + probabilities.get("Dusuk", 0.0) * 15
+            )
+            if not probabilities and predicted_band:
+                score = {"Yuksek": 85, "Orta": 55, "Dusuk": 20}.get(predicted_band, 50)
+            return int(round(score))
+
+        score = (
+            probabilities.get("Riskli", 0.0) * 100
+            + probabilities.get("Stabil", 0.0) * 55
+            + probabilities.get("Yuksek", 0.0) * 20
+            + probabilities.get("Guclu", 0.0) * 10
+        )
+        if not probabilities and predicted_band:
+            score = {"Riskli": 85, "Stabil": 55, "Yuksek": 20, "Guclu": 10}.get(predicted_band, 50)
+        return int(round(score))
+
+    @staticmethod
+    def _team_analytics(rows: list[dict[str, Any]], artifact: Any, target_column: str) -> list[dict[str, Any]]:
+        dataset = SoftwareFeatureBuilder.build_from_rows(rows)
+        if not dataset.feature_rows:
+            return []
+
+        classifier = artifact.pipeline.named_steps.get("classifier")
+        classes = [str(label) for label in getattr(classifier, "classes_", [])]
+        period_scores: dict[str, dict[str, list[int]]] = {}
+
+        for feature_row, metadata in zip(dataset.feature_rows, dataset.metadata_rows):
+            team = str(metadata.get("team") or "Takim bilgisi yok")
+            period_date = str(metadata.get("period_date") or "")
+            period = period_date[:7] if period_date else ""
+            predicted_band = str(artifact.pipeline.predict([feature_row])[0])
+            probabilities: dict[str, float] = {}
+            if hasattr(artifact.pipeline, "predict_proba"):
+                probability_values = artifact.pipeline.predict_proba([feature_row])[0]
+                probabilities = {
+                    label: round(float(probability), 6)
+                    for label, probability in zip(classes, probability_values)
+                }
+            score = SoftwareMLService._probability_risk_score(target_column, probabilities, predicted_band)
+            period_scores.setdefault(team, {}).setdefault(period, []).append(score)
+
+        analytics: list[dict[str, Any]] = []
+        for team, periods in period_scores.items():
+            ordered_periods = sorted(period for period in periods if period)[-6:]
+            trend_values = [
+                int(round(sum(periods[period]) / len(periods[period])))
+                for period in ordered_periods
+                if periods[period]
+            ]
+            latest_score = trend_values[-1] if trend_values else 0
+            analytics.append(
+                {
+                    "team": team,
+                    "risk_score": latest_score,
+                    "trend_values": trend_values,
+                    "trend_periods": ordered_periods,
+                    "trend_basis": "model_probability_by_period",
+                }
+            )
+
+        return sorted(analytics, key=lambda item: item["risk_score"], reverse=True)

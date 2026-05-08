@@ -152,4 +152,5 @@ class SoftwareBulkPredictionResponse(BaseModel):
     low_risk_count: int
     department_narrative: Optional[dict] = None
     team_narratives: list[dict] = []
+    team_analytics: list[dict] = []
     items: list[SoftwarePredictionResponse]
