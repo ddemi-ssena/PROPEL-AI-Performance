@@ -47,8 +47,10 @@ class SoftwareNarrativeService:
         target_column: str,
         team_summaries: list[dict[str, Any]],
         allow_llm: bool = False,
+        llm_team: str | None = None,
     ) -> list[dict[str, Any]]:
         narratives: list[dict[str, Any]] = []
+        selected_team = (llm_team or "").strip().lower()
         for summary in team_summaries:
             payload = {
                 "scope": "team",
@@ -56,13 +58,14 @@ class SoftwareNarrativeService:
                 **summary,
             }
             fallback = SoftwareNarrativeService._team_fallback(payload)
+            should_use_llm = allow_llm and selected_team and str(summary.get("team", "")).strip().lower() == selected_team
             narrative = (
                 SoftwareNarrativeService._build_aggregate_with_llm(
                     payload=payload,
                     fallback=fallback,
                     scope_label=f"{summary.get('team', 'takim')} takimi",
                 )
-                if allow_llm
+                if should_use_llm
                 else fallback
             )
             narrative["team"] = summary.get("team")
@@ -162,25 +165,98 @@ class SoftwareNarrativeService:
         scope_label: str,
     ) -> dict[str, Any]:
         prompt = SoftwareNarrativeService._aggregate_prompt(payload, scope_label)
-        raw_output = None
-        provider = None
-        model_name = None
-        if AIService.GEMINI_API_KEY:
-            raw_output = AIService._generate_with_gemini(prompt)
-            provider = "gemini"
-            model_name = AIService._resolve_gemini_model() or AIService.GEMINI_MODEL or "gemini"
-        if not raw_output and settings.OLLAMA_URL:
-            raw_output = AIService._generate_with_ollama(prompt)
-            provider = "ollama"
-            model_name = AIService._resolve_ollama_model() or AIService.OLLAMA_MODEL or "ollama"
+        raw_output, provider, model_name, errors = SoftwareNarrativeService._generate_llm_json(
+            prompt,
+            timeout_seconds=24,
+        )
+        if not provider:
+            return SoftwareNarrativeService._llm_fallback(
+                fallback,
+                provider=None,
+                reason="LLM provider ayarli degil; deterministik KPI yorumu kullanildi.",
+            )
 
         sanitized = SoftwareNarrativeService._sanitize_aggregate(raw_output)
         if not sanitized:
-            return fallback
+            return SoftwareNarrativeService._llm_fallback(
+                fallback,
+                provider=provider,
+                reason=(
+                    f"LLM yaniti alinamadi veya beklenen JSON formatinda degildi ({'; '.join(errors)}); "
+                    "deterministik KPI yorumu kullanildi."
+                ),
+            )
         sanitized["source"] = provider or "llm"
         sanitized["model"] = model_name
         sanitized["fallback_used"] = False
         return sanitized
+
+    @staticmethod
+    def _llm_fallback(
+        fallback: dict[str, Any],
+        *,
+        provider: str | None,
+        reason: str,
+    ) -> dict[str, Any]:
+        enriched = dict(fallback)
+        enriched["llm_attempted"] = bool(provider)
+        enriched["requested_source"] = provider
+        enriched["fallback_reason"] = reason
+        return enriched
+
+    @staticmethod
+    def _generate_llm_json(
+        prompt: str,
+        *,
+        timeout_seconds: int,
+    ) -> tuple[str | None, str | None, str | None, list[str]]:
+        errors: list[str] = []
+        attempted_provider = None
+
+        if AIService.GEMINI_API_KEY:
+            attempted_provider = "gemini"
+            raw_output = AIService._generate_with_gemini(
+                prompt,
+                timeout_seconds=timeout_seconds,
+                json_mode=True,
+            )
+            model_name = AIService._RESOLVED_GEMINI_MODEL or AIService.GEMINI_MODEL or "gemini"
+            if raw_output:
+                return raw_output, "gemini", model_name, errors
+            if AIService.LAST_LLM_ERROR:
+                errors.append(AIService.LAST_LLM_ERROR)
+
+            fallback_models = [
+                model_name
+                for model_name in AIService._preferred_gemini_models(timeout_seconds=min(timeout_seconds, 10))
+                if model_name != (AIService._RESOLVED_GEMINI_MODEL or AIService.GEMINI_MODEL)
+            ][:3]
+            for fallback_model in fallback_models:
+                raw_output = AIService._generate_with_gemini(
+                    prompt,
+                    timeout_seconds=min(timeout_seconds, 18),
+                    json_mode=False,
+                    model_name_override=fallback_model,
+                )
+                if raw_output:
+                    return raw_output, "gemini", fallback_model, errors
+                if AIService.LAST_LLM_ERROR:
+                    errors.append(AIService.LAST_LLM_ERROR)
+
+        if settings.USE_LOCAL_LLM or settings.OLLAMA_URL:
+            attempted_provider = attempted_provider or "ollama"
+            raw_output = AIService._generate_with_ollama(
+                prompt,
+                timeout_seconds=timeout_seconds,
+                json_mode=True,
+            )
+            model_name = AIService._RESOLVED_OLLAMA_MODEL or AIService.OLLAMA_MODEL or "ollama"
+            if raw_output:
+                return raw_output, "ollama", model_name, errors
+            if AIService.LAST_LLM_ERROR:
+                errors.append(AIService.LAST_LLM_ERROR)
+
+        return None, attempted_provider, None, errors or ["LLM provider cevap dondurmedi"]
 
     @staticmethod
     def _aggregate_prompt(payload: dict[str, Any], scope_label: str) -> str:
@@ -273,24 +349,22 @@ class SoftwareNarrativeService:
         if not allow_llm:
             return fallback
 
-        raw_output = None
-        provider = None
-        model_name = None
         prompt = SoftwareNarrativeService._prompt(prediction)
-
-        if AIService.GEMINI_API_KEY:
-            raw_output = AIService._generate_with_gemini(prompt)
-            provider = "gemini"
-            model_name = AIService._resolve_gemini_model() or AIService.GEMINI_MODEL or "gemini"
-
-        if not raw_output and settings.OLLAMA_URL:
-            raw_output = AIService._generate_with_ollama(prompt)
-            provider = "ollama"
-            model_name = AIService._resolve_ollama_model() or AIService.OLLAMA_MODEL or "ollama"
+        raw_output, provider, model_name, errors = SoftwareNarrativeService._generate_llm_json(
+            prompt,
+            timeout_seconds=18,
+        )
 
         sanitized = SoftwareNarrativeService._sanitize(raw_output)
         if not sanitized:
-            return fallback
+            return SoftwareNarrativeService._llm_fallback(
+                fallback,
+                provider=provider,
+                reason=(
+                    f"LLM yaniti alinamadi veya beklenen JSON formatinda degildi ({'; '.join(errors)}); "
+                    "deterministik KPI yorumu kullanildi."
+                ),
+            )
 
         sanitized["source"] = provider or "llm"
         sanitized["model"] = model_name

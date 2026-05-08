@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
+import uuid
 from typing import Any
 
 import joblib
@@ -33,12 +35,43 @@ class SoftwareArtifactStore:
     def _target_dir(self, target_column: str) -> Path:
         return self.root_dir / target_column
 
+    @staticmethod
+    def _atomic_write_text(path: Path, content: str) -> None:
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        tmp_path.write_text(content, encoding="utf-8")
+        os.replace(tmp_path, path)
+
+    def _latest_pointer_path(self, target_column: str) -> Path:
+        return self._target_dir(target_column) / "latest.json"
+
+    def latest_metadata(self, target_column: str) -> dict[str, Any]:
+        artifact_dir = self._resolve_artifact_dir(target_column)
+        metadata_path = artifact_dir / "metadata.json"
+        if not metadata_path.exists():
+            return {}
+        return json.loads(metadata_path.read_text(encoding="utf-8"))
+
+    def _resolve_artifact_dir(self, target_column: str) -> Path:
+        target_dir = self._target_dir(target_column)
+        latest_path = self._latest_pointer_path(target_column)
+        if latest_path.exists():
+            try:
+                pointer = json.loads(latest_path.read_text(encoding="utf-8"))
+                run_id = str(pointer.get("run_id") or "").strip()
+                if run_id:
+                    return target_dir / "runs" / run_id
+            except json.JSONDecodeError:
+                pass
+        return target_dir
+
     def save_training_result(
         self,
         result: SoftwareTrainingResult,
         upload_id: int | None = None,
     ) -> SoftwareModelArtifact:
-        artifact_dir = self._target_dir(result.target_column)
+        target_dir = self._target_dir(result.target_column)
+        run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + f"-{uuid.uuid4().hex[:8]}"
+        artifact_dir = target_dir / "runs" / run_id
         artifact_dir.mkdir(parents=True, exist_ok=True)
 
         model_path = artifact_dir / "model.joblib"
@@ -47,6 +80,7 @@ class SoftwareArtifactStore:
         metadata = {
             "department": "software",
             "upload_id": upload_id,
+            "run_id": run_id,
             "target_column": result.target_column,
             "model_name": result.model_name,
             "trained_at": datetime.now(timezone.utc).isoformat(),
@@ -59,9 +93,22 @@ class SoftwareArtifactStore:
         }
 
         joblib.dump(result.pipeline, model_path)
-        metadata_path.write_text(
+        self._atomic_write_text(
+            metadata_path,
             json.dumps(metadata, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        )
+        self._atomic_write_text(
+            self._latest_pointer_path(result.target_column),
+            json.dumps(
+                {
+                    "run_id": run_id,
+                    "artifact_dir": str(artifact_dir),
+                    "metadata_path": str(metadata_path),
+                    "trained_at": metadata["trained_at"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
         )
 
         return SoftwareModelArtifact(
@@ -75,7 +122,7 @@ class SoftwareArtifactStore:
         )
 
     def load(self, target_column: str) -> SoftwareModelArtifact:
-        artifact_dir = self._target_dir(target_column)
+        artifact_dir = self._resolve_artifact_dir(target_column)
         model_path = artifact_dir / "model.joblib"
         metadata_path = artifact_dir / "metadata.json"
 

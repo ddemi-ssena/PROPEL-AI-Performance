@@ -144,6 +144,7 @@ export interface SoftwareBulkPredictionResponse {
   low_risk_count: number
   department_narrative?: Record<string, any> | null
   team_narratives: Array<Record<string, any>>
+  team_analytics?: Array<Record<string, any>>
   items: SoftwarePredictionResponse[]
 }
 
@@ -212,6 +213,7 @@ export const analyticsApi = {
     upload_id: number
     target_column?: string
     use_llm_narrative?: boolean
+    llm_team?: string
   }): Promise<SoftwareBulkPredictionResponse> {
     const { data } = await apiClient.get<SoftwareBulkPredictionResponse>(
       '/analytics/departments/software/predictions/bulk',

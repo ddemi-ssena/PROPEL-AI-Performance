@@ -1,10 +1,15 @@
 import json
+import logging
+import time
 from typing import Optional
 
 import requests
 
 from app.core.config import settings
 from app.db.models.user import UserRole
+
+
+logger = logging.getLogger(__name__)
 
 
 class AIService:
@@ -14,6 +19,10 @@ class AIService:
     GEMINI_MODEL = settings.GEMINI_MODEL or "gemini-1.5-flash"
     _RESOLVED_OLLAMA_MODEL: Optional[str] = None
     _RESOLVED_GEMINI_MODEL: Optional[str] = None
+    _AVAILABLE_GEMINI_MODELS: Optional[list[str]] = None
+    LAST_LLM_ERROR: Optional[str] = None
+    _LLM_RETRY_COUNT = 2
+    _LLM_RETRY_BASE_SECONDS = 0.4
 
     DEPARTMENT_ROLE_MATRIX = {
         "Yazilim Gelistirme": {
@@ -340,31 +349,45 @@ class AIService:
         return prompt, required_terms
 
     @staticmethod
-    def _generate_with_ollama(prompt: str) -> Optional[str]:
-        model_name = AIService._resolve_ollama_model()
+    def _generate_with_ollama(prompt: str, timeout_seconds: int = 20, json_mode: bool = False) -> Optional[str]:
+        model_name = AIService._resolve_ollama_model(timeout_seconds=min(timeout_seconds, 10))
         if not model_name:
+            AIService.LAST_LLM_ERROR = "Ollama model bulunamadi."
             return None
-        try:
-            res = requests.post(
-                AIService.OLLAMA_URL,
-                json={"model": model_name, "prompt": prompt, "stream": False},
-                timeout=20,
-            )
-            if res.ok:
-                return (res.json().get("response") or "").strip() or None
-        except Exception:
-            return None
+        body = {"model": model_name, "prompt": prompt, "stream": False}
+        if json_mode:
+            body["format"] = "json"
+        for attempt in range(AIService._LLM_RETRY_COUNT + 1):
+            start = time.perf_counter()
+            try:
+                res = requests.post(
+                    AIService.OLLAMA_URL,
+                    json=body,
+                    timeout=timeout_seconds,
+                )
+                latency_ms = round((time.perf_counter() - start) * 1000)
+                if res.ok:
+                    logger.info("ollama_generate_ok", extra={"model": model_name, "latency_ms": latency_ms})
+                    AIService.LAST_LLM_ERROR = None
+                    return (res.json().get("response") or "").strip() or None
+                AIService.LAST_LLM_ERROR = f"Ollama {model_name} HTTP {res.status_code}: {res.text[:180]}"
+                if res.status_code < 500:
+                    return None
+            except requests.exceptions.RequestException as exc:
+                AIService.LAST_LLM_ERROR = f"Ollama {model_name} hata: {type(exc).__name__}"
+            if attempt < AIService._LLM_RETRY_COUNT:
+                time.sleep(AIService._LLM_RETRY_BASE_SECONDS * (2**attempt))
         return None
 
     @staticmethod
-    def _resolve_ollama_model() -> Optional[str]:
+    def _resolve_ollama_model(timeout_seconds: int = 10) -> Optional[str]:
         if AIService._RESOLVED_OLLAMA_MODEL:
             return AIService._RESOLVED_OLLAMA_MODEL
 
         configured_model = (AIService.OLLAMA_MODEL or "").strip()
         try:
             tags_url = AIService.OLLAMA_URL.rsplit("/", 1)[0] + "/tags"
-            res = requests.get(tags_url, timeout=10)
+            res = requests.get(tags_url, timeout=timeout_seconds)
             if not res.ok:
                 return configured_model or None
 
@@ -395,80 +418,138 @@ class AIService:
             return configured_model or None
 
     @staticmethod
-    def _generate_with_gemini(prompt: str) -> Optional[str]:
+    def _generate_with_gemini(
+        prompt: str,
+        timeout_seconds: int = 20,
+        json_mode: bool = False,
+        model_name_override: str | None = None,
+    ) -> Optional[str]:
         if not AIService.GEMINI_API_KEY:
+            AIService.LAST_LLM_ERROR = "Gemini API key ayarli degil."
             return None
-        model_name = AIService._resolve_gemini_model()
+        model_name = model_name_override or AIService._resolve_gemini_model(timeout_seconds=min(timeout_seconds, 15))
         if not model_name:
+            AIService.LAST_LLM_ERROR = "Gemini model bulunamadi."
             return None
-        try:
-            url = (
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{model_name}:generateContent?key={AIService.GEMINI_API_KEY}"
-            )
-            body = {"contents": [{"parts": [{"text": prompt}]}]}
-            res = requests.post(url, json=body, timeout=20)
-            if not res.ok:
+        for attempt in range(AIService._LLM_RETRY_COUNT + 1):
+            start = time.perf_counter()
+            try:
+                url = (
+                    "https://generativelanguage.googleapis.com/v1beta/models/"
+                    f"{model_name}:generateContent?key={AIService.GEMINI_API_KEY}"
+                )
+                body = {"contents": [{"parts": [{"text": prompt}]}]}
+                if json_mode:
+                    body["generationConfig"] = {"responseMimeType": "application/json"}
+                res = requests.post(url, json=body, timeout=timeout_seconds)
+                latency_ms = round((time.perf_counter() - start) * 1000)
+                if not res.ok:
+                    AIService.LAST_LLM_ERROR = f"Gemini {model_name} HTTP {res.status_code}: {res.text[:180]}"
+                    if res.status_code in {400, 401, 403, 404}:
+                        return None
+                    if attempt >= AIService._LLM_RETRY_COUNT:
+                        return None
+                    time.sleep(AIService._LLM_RETRY_BASE_SECONDS * (2**attempt))
+                    continue
+                candidates = res.json().get("candidates", [])
+                if not candidates:
+                    AIService.LAST_LLM_ERROR = "Gemini bos candidate dondurdu."
+                    return None
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if not parts:
+                    AIService.LAST_LLM_ERROR = "Gemini bos content dondurdu."
+                    return None
+                logger.info("gemini_generate_ok", extra={"model": model_name, "latency_ms": latency_ms})
+                AIService.LAST_LLM_ERROR = None
+                return (parts[0].get("text") or "").strip() or None
+            except requests.exceptions.RequestException as exc:
+                AIService.LAST_LLM_ERROR = f"Gemini {model_name} hata: {type(exc).__name__}"
+                if attempt < AIService._LLM_RETRY_COUNT:
+                    time.sleep(AIService._LLM_RETRY_BASE_SECONDS * (2**attempt))
+                    continue
                 return None
-            candidates = res.json().get("candidates", [])
-            if not candidates:
-                return None
-            parts = candidates[0].get("content", {}).get("parts", [])
-            if not parts:
-                return None
-            return (parts[0].get("text") or "").strip() or None
-        except Exception:
-            return None
+        return None
 
     @staticmethod
-    def _resolve_gemini_model() -> Optional[str]:
-        if AIService._RESOLVED_GEMINI_MODEL:
-            return AIService._RESOLVED_GEMINI_MODEL
+    def _gemini_generation_models(timeout_seconds: int = 15) -> list[str]:
+        if AIService._AVAILABLE_GEMINI_MODELS is not None:
+            return AIService._AVAILABLE_GEMINI_MODELS
 
-        configured_model = (AIService.GEMINI_MODEL or "").strip()
+        if not AIService.GEMINI_API_KEY:
+            AIService._AVAILABLE_GEMINI_MODELS = []
+            return []
+
         try:
             list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={AIService.GEMINI_API_KEY}"
-            res = requests.get(list_url, timeout=15)
+            res = requests.get(list_url, timeout=timeout_seconds)
             if not res.ok:
-                return configured_model or None
+                AIService._AVAILABLE_GEMINI_MODELS = []
+                return []
 
-            models = []
+            models: list[str] = []
             for item in res.json().get("models", []):
                 name = (item.get("name") or "").replace("models/", "").strip()
                 methods = item.get("supportedGenerationMethods", [])
                 if name and "generateContent" in methods:
                     models.append(name)
 
-            if not models:
-                return configured_model or None
-
-            if configured_model in models:
-                AIService._RESOLVED_GEMINI_MODEL = configured_model
-                return configured_model
-
-            prefix_match = next(
-                (name for name in models if configured_model and name.startswith(configured_model)),
-                None,
-            )
-            if prefix_match:
-                AIService._RESOLVED_GEMINI_MODEL = prefix_match
-                return prefix_match
-
-            preferred_match = next(
-                (name for name in models if name.startswith("gemini-2.5-flash")),
-                None,
-            ) or next(
-                (name for name in models if name.startswith("gemini-2.0-flash")),
-                None,
-            )
-            if preferred_match:
-                AIService._RESOLVED_GEMINI_MODEL = preferred_match
-                return preferred_match
-
-            AIService._RESOLVED_GEMINI_MODEL = models[0]
-            return models[0]
+            AIService._AVAILABLE_GEMINI_MODELS = models
+            return models
         except Exception:
-            return configured_model or None
+            AIService._AVAILABLE_GEMINI_MODELS = []
+            return []
+
+    @staticmethod
+    def _preferred_gemini_models(timeout_seconds: int = 15) -> list[str]:
+        models = AIService._gemini_generation_models(timeout_seconds=timeout_seconds)
+        configured_model = (AIService.GEMINI_MODEL or "").strip()
+        ordered: list[str] = []
+
+        def add_exact(model_name: str | None) -> None:
+            if model_name and model_name in models and model_name not in ordered:
+                ordered.append(model_name)
+
+        def add_prefix(prefix: str) -> None:
+            match = next((name for name in models if name.startswith(prefix) and name not in ordered), None)
+            if match:
+                ordered.append(match)
+
+        add_exact(configured_model)
+        if configured_model:
+            add_prefix(configured_model)
+
+        for preferred in (
+            "gemini-2.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-2.0-flash-lite",
+            "gemini-2.0-flash-lite-001",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-001",
+            "gemini-flash-latest",
+            "gemini-1.5-flash",
+        ):
+            add_exact(preferred)
+            add_prefix(preferred)
+
+        for model_name in models:
+            if model_name.startswith("gemini-") and model_name not in ordered:
+                ordered.append(model_name)
+
+        return ordered
+
+    @staticmethod
+    def _resolve_gemini_model(timeout_seconds: int = 15) -> Optional[str]:
+        if AIService._RESOLVED_GEMINI_MODEL:
+            return AIService._RESOLVED_GEMINI_MODEL
+
+        preferred_models = AIService._preferred_gemini_models(timeout_seconds=timeout_seconds)
+        if preferred_models:
+            AIService._RESOLVED_GEMINI_MODEL = preferred_models[0]
+            return preferred_models[0]
+
+        configured_model = (AIService.GEMINI_MODEL or "").strip()
+        return configured_model or None
 
     @staticmethod
     def _clean_generated_question(raw_text: str) -> Optional[str]:

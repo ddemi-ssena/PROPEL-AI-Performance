@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +11,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.analytics.artifacts.software import SoftwareArtifactStore
+from app.analytics.features.software import SoftwareFeatureBuilder
 from app.analytics.prediction.software import SoftwarePredictionService
 from app.analytics.training.software import SoftwareBaselineTrainer
 from app.db.models.data_upload import DataUpload
@@ -30,6 +33,7 @@ TARGET_LABELS = {
     "performance_band": "Performans",
     "attrition_risk_band": "Ayrilma Riski",
 }
+logger = logging.getLogger(__name__)
 
 
 class SoftwareMLService:
@@ -86,6 +90,23 @@ class SoftwareMLService:
     @staticmethod
     def _dataset_employee_code(employee_id: int) -> str:
         return f"SE-{employee_id:03d}"
+
+    @staticmethod
+    def _normalize_employee_key(value: Any) -> str | None:
+        if value in (None, ""):
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.upper().startswith("SE-"):
+            try:
+                return str(int(text.split("-", 1)[1]))
+            except ValueError:
+                return text.upper()
+        try:
+            return str(int(float(text)))
+        except ValueError:
+            return text
 
     @staticmethod
     def _employee_profile(db: Session, employee_id: int, row: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -196,13 +217,13 @@ class SoftwareMLService:
 
         for target_column in sorted(SUPPORTED_TARGETS):
             artifact_dir = store.root_dir / target_column
-            metadata_path = artifact_dir / "metadata.json"
             metadata: dict[str, Any] = {}
-            if metadata_path.exists():
-                try:
-                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-                except json.JSONDecodeError:
-                    metadata = {}
+            try:
+                metadata = store.latest_metadata(target_column)
+                if metadata.get("run_id"):
+                    artifact_dir = artifact_dir / "runs" / str(metadata["run_id"])
+            except (FileNotFoundError, json.JSONDecodeError):
+                metadata = {}
 
             artifact_upload_id = metadata.get("upload_id")
             states.append(
@@ -261,9 +282,21 @@ class SoftwareMLService:
                 return [payload]
             raise HTTPException(status_code=400, detail="JSON icerigi liste veya nesne formatinda olmali.")
 
+        if ext == ".xlsx":
+            try:
+                import pandas as pd
+            except ImportError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="XLSX okuma icin pandas backend ortaminda kurulu olmali.",
+                ) from exc
+            dataframe = pd.read_excel(path)
+            dataframe = dataframe.where(dataframe.notna(), None)
+            return dataframe.to_dict(orient="records")
+
         raise HTTPException(
             status_code=400,
-            detail="ML egitimi icin su anda CSV veya JSON upload destekleniyor.",
+            detail="ML egitimi icin CSV, XLSX veya JSON upload destekleniyor.",
         )
 
     @staticmethod
@@ -278,7 +311,12 @@ class SoftwareMLService:
                     candidate_ids.add(str(int(numeric_part)))
                 except ValueError:
                     pass
-        return candidate_ids
+        normalized_ids = {
+            normalized
+            for candidate in candidate_ids
+            if (normalized := SoftwareMLService._normalize_employee_key(candidate))
+        }
+        return candidate_ids | normalized_ids
 
     @staticmethod
     def train_from_upload(
@@ -296,6 +334,7 @@ class SoftwareMLService:
             raise HTTPException(status_code=400, detail="test_period_count en az 1 olmali.")
 
         upload = SoftwareMLService._resolve_upload(db, upload_id)
+        start = time.perf_counter()
         rows = SoftwareMLService._load_rows(SoftwareMLService._upload_path(upload))
 
         try:
@@ -306,6 +345,15 @@ class SoftwareMLService:
                 test_period_count=test_period_count,
             )
             artifact = SoftwareArtifactStore().save_training_result(result, upload_id=upload_id)
+            logger.info(
+                "software_model_train_ok",
+                extra={
+                    "upload_id": upload_id,
+                    "target_column": target_column,
+                    "model_name": model_name,
+                    "latency_ms": round((time.perf_counter() - start) * 1000),
+                },
+            )
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -335,12 +383,14 @@ class SoftwareMLService:
             raise HTTPException(status_code=400, detail=f"Desteklenmeyen target_column: {target_column}")
 
         upload = SoftwareMLService._resolve_upload(db, upload_id)
+        start = time.perf_counter()
         rows = SoftwareMLService._load_rows(SoftwareMLService._upload_path(upload))
         candidate_employee_ids = SoftwareMLService._candidate_employee_ids(db, employee_id)
         employee_rows = [
             row
             for row in rows
-            if str(row.get("employee_id")) in candidate_employee_ids
+            if SoftwareMLService._normalize_employee_key(row.get("employee_id")) in candidate_employee_ids
+            or str(row.get("employee_id")) in candidate_employee_ids
         ]
         if not employee_rows:
             raise HTTPException(
@@ -376,11 +426,13 @@ class SoftwareMLService:
         upload_id: int,
         target_column: str,
         use_llm_narrative: bool = False,
+        llm_team: str | None = None,
     ) -> SoftwareBulkPredictionResponse:
         if target_column not in SUPPORTED_TARGETS:
             raise HTTPException(status_code=400, detail=f"Desteklenmeyen target_column: {target_column}")
 
         upload = SoftwareMLService._resolve_upload(db, upload_id)
+        start = time.perf_counter()
         rows = SoftwareMLService._load_rows(SoftwareMLService._upload_path(upload))
         grouped_rows: dict[int, list[dict[str, Any]]] = {}
 
@@ -440,6 +492,7 @@ class SoftwareMLService:
         )
         top_reasons = SoftwareMLService._top_driver_counts(items)
         team_summaries = SoftwareMLService._team_summaries(items)
+        team_analytics = SoftwareMLService._team_analytics(rows, artifact, target_column)
         from app.services.software_narrative_service import SoftwareNarrativeService
 
         department_narrative = SoftwareNarrativeService.build_department_narrative(
@@ -450,12 +503,24 @@ class SoftwareMLService:
             low_risk_count=low_risk_count,
             top_reasons=top_reasons,
             team_summaries=team_summaries,
-            allow_llm=use_llm_narrative,
+            allow_llm=use_llm_narrative and not llm_team,
         )
         team_narratives = SoftwareNarrativeService.build_team_narratives(
             target_column=target_column,
             team_summaries=team_summaries,
             allow_llm=use_llm_narrative,
+            llm_team=llm_team,
+        )
+        logger.info(
+            "software_bulk_predict_ok",
+            extra={
+                "upload_id": upload_id,
+                "target_column": target_column,
+                "prediction_count": len(items),
+                "use_llm_narrative": use_llm_narrative,
+                "llm_team": llm_team,
+                "latency_ms": round((time.perf_counter() - start) * 1000),
+            },
         )
 
         return SoftwareBulkPredictionResponse(
@@ -468,6 +533,7 @@ class SoftwareMLService:
             low_risk_count=low_risk_count,
             department_narrative=department_narrative,
             team_narratives=team_narratives,
+            team_analytics=team_analytics,
             items=items,
         )
 
@@ -510,3 +576,71 @@ class SoftwareMLService:
                 }
             )
         return sorted(summaries, key=lambda item: (item["high"], item["medium"], item["total"]), reverse=True)
+
+    @staticmethod
+    def _probability_risk_score(target_column: str, probabilities: dict[str, float], predicted_band: str | None = None) -> int:
+        if target_column == "attrition_risk_band":
+            score = (
+                probabilities.get("Yuksek", 0.0) * 100
+                + probabilities.get("Orta", 0.0) * 55
+                + probabilities.get("Dusuk", 0.0) * 15
+            )
+            if not probabilities and predicted_band:
+                score = {"Yuksek": 85, "Orta": 55, "Dusuk": 20}.get(predicted_band, 50)
+            return int(round(score))
+
+        score = (
+            probabilities.get("Riskli", 0.0) * 100
+            + probabilities.get("Stabil", 0.0) * 55
+            + probabilities.get("Yuksek", 0.0) * 20
+            + probabilities.get("Guclu", 0.0) * 10
+        )
+        if not probabilities and predicted_band:
+            score = {"Riskli": 85, "Stabil": 55, "Yuksek": 20, "Guclu": 10}.get(predicted_band, 50)
+        return int(round(score))
+
+    @staticmethod
+    def _team_analytics(rows: list[dict[str, Any]], artifact: Any, target_column: str) -> list[dict[str, Any]]:
+        dataset = SoftwareFeatureBuilder.build_from_rows(rows)
+        if not dataset.feature_rows:
+            return []
+
+        classifier = artifact.pipeline.named_steps.get("classifier")
+        classes = [str(label) for label in getattr(classifier, "classes_", [])]
+        period_scores: dict[str, dict[str, list[int]]] = {}
+
+        for feature_row, metadata in zip(dataset.feature_rows, dataset.metadata_rows):
+            team = str(metadata.get("team") or "Takim bilgisi yok")
+            period_date = str(metadata.get("period_date") or "")
+            period = period_date[:7] if period_date else ""
+            predicted_band = str(artifact.pipeline.predict([feature_row])[0])
+            probabilities: dict[str, float] = {}
+            if hasattr(artifact.pipeline, "predict_proba"):
+                probability_values = artifact.pipeline.predict_proba([feature_row])[0]
+                probabilities = {
+                    label: round(float(probability), 6)
+                    for label, probability in zip(classes, probability_values)
+                }
+            score = SoftwareMLService._probability_risk_score(target_column, probabilities, predicted_band)
+            period_scores.setdefault(team, {}).setdefault(period, []).append(score)
+
+        analytics: list[dict[str, Any]] = []
+        for team, periods in period_scores.items():
+            ordered_periods = sorted(period for period in periods if period)[-6:]
+            trend_values = [
+                int(round(sum(periods[period]) / len(periods[period])))
+                for period in ordered_periods
+                if periods[period]
+            ]
+            latest_score = trend_values[-1] if trend_values else 0
+            analytics.append(
+                {
+                    "team": team,
+                    "risk_score": latest_score,
+                    "trend_values": trend_values,
+                    "trend_periods": ordered_periods,
+                    "trend_basis": "model_probability_by_period",
+                }
+            )
+
+        return sorted(analytics, key=lambda item: item["risk_score"], reverse=True)

@@ -1,0 +1,5 @@
+# Optional local NLP sentiment model dependencies.
+# Install these only when ENABLE_LOCAL_SENTIMENT_MODEL=true is needed.
+transformers==4.35.2
+torch==2.1.1
+tf-keras==2.15.1

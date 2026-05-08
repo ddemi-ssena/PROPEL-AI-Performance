@@ -118,6 +118,7 @@ def get_bulk_software_predictions(
     upload_id: int,
     target_column: str = "performance_band",
     use_llm_narrative: bool = False,
+    llm_team: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -128,4 +129,5 @@ def get_bulk_software_predictions(
         upload_id=upload_id,
         target_column=target_column,
         use_llm_narrative=use_llm_narrative,
+        llm_team=llm_team,
     )

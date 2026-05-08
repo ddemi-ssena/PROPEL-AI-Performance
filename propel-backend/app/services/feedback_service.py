@@ -937,35 +937,7 @@ class FeedbackService:
             db.refresh(question)
             return question
 
-        # 3) AI basarisizsa haftaya ve role gore deterministic akilli fallback uret
-        template_question = AIService.build_template_question(
-            dept_name,
-            receiver.user.role,
-            category,
-        )
-        existing_template = db.query(FeedbackQuestion).filter(
-            FeedbackQuestion.week_number == week_number,
-            FeedbackQuestion.direction == raw_direction,
-            FeedbackQuestion.department_id == target_department_id,
-            FeedbackQuestion.question_text == template_question,
-        ).order_by(FeedbackQuestion.id.desc()).first()
-        if existing_template:
-            return existing_template
-
-        question = FeedbackQuestion(
-            week_number=week_number,
-            direction=raw_direction,
-            category=category,
-            department_id=target_department_id,
-            question_text=template_question,
-            is_ai_generated=False,
-        )
-        db.add(question)
-        db.commit()
-        db.refresh(question)
-        return question
-
-        # 4) Son care: once tam yonlu seed/genel havuzdan getir
+        # 3) AI basarisizsa once tam yonlu seed/genel havuzdan getir
         fallback = db.query(FeedbackQuestion).filter(
             FeedbackQuestion.week_number == week_number,
             FeedbackQuestion.direction == raw_direction,
@@ -996,13 +968,27 @@ class FeedbackService:
             if fallback:
                 return fallback
 
-        # 5) Hic soru yoksa basit fallback soru olustur
+        # 4) Seed havuzunda da yoksa haftaya ve role gore deterministic akilli fallback uret
+        template_question = AIService.build_template_question(
+            dept_name,
+            receiver.user.role,
+            category,
+        )
+        existing_template = db.query(FeedbackQuestion).filter(
+            FeedbackQuestion.week_number == week_number,
+            FeedbackQuestion.direction == raw_direction,
+            FeedbackQuestion.department_id == target_department_id,
+            FeedbackQuestion.question_text == template_question,
+        ).order_by(FeedbackQuestion.id.desc()).first()
+        if existing_template:
+            return existing_template
+
         question = FeedbackQuestion(
             week_number=week_number,
             direction=raw_direction,
             category=category,
             department_id=target_department_id,
-            question_text=f"Bu hafta {category} temasinda bu kisinin en kritik davranis veya destek ihtiyaci neydi?",
+            question_text=template_question,
             is_ai_generated=False,
         )
         db.add(question)

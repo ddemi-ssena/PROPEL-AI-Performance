@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "123456"
+    POSTGRES_PASSWORD: Optional[str] = None
     POSTGRES_SERVER: str = "db"
     POSTGRES_PORT: str = "5432"
     POSTGRES_DB: str = "propel_db"
@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: Optional[str] = None
+    ENABLE_LOCAL_SENTIMENT_MODEL: bool = False
     EMBEDDING_PROVIDER: str = "hash"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
     EMBEDDING_DIMENSION: int = 128
@@ -41,6 +42,8 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def build_database_url(self):
         if not self.DATABASE_URL:
+            if not self.POSTGRES_PASSWORD:
+                raise ValueError("POSTGRES_PASSWORD veya DATABASE_URL environment uzerinden ayarlanmali.")
             self.DATABASE_URL = (
                 f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
                 f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
