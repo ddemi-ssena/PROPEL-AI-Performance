@@ -11,10 +11,37 @@ from app.schemas.analytics import DepartmentAnalyticsConfigResponse, DepartmentA
 
 class AnalyticsService:
     @staticmethod
-    def list_department_configs() -> list[DepartmentAnalyticsConfigResponse]:
+    def list_department_configs(current_user: User) -> list[DepartmentAnalyticsConfigResponse]:
+        from app.db.models.user import UserRole
+        from app.db.models.employee import Employee
+        from app.db.session import SessionLocal
+
         configs: list[DepartmentAnalyticsConfigResponse] = []
+        
+        # Determine allowed department keys
+        allowed_keys = None
+        if current_user.role == UserRole.department_manager:
+            db = SessionLocal()
+            try:
+                employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+                if employee and employee.department:
+                    # Map department name to analytics key
+                    # This is a bit brittle, but works for Software/Sales
+                    dept_name = employee.department.name.lower()
+                    if "yazilim" in dept_name or "software" in dept_name:
+                        allowed_keys = ["software"]
+                    elif "satis" in dept_name or "sales" in dept_name:
+                        allowed_keys = ["sales"]
+            finally:
+                db.close()
+
         for adapter in list_department_adapters():
             definition = adapter.definition
+            
+            # Skip if not in allowed keys (for managers)
+            if allowed_keys is not None and definition.key not in allowed_keys:
+                continue
+
             configs.append(
                 DepartmentAnalyticsConfigResponse(
                     key=definition.key,

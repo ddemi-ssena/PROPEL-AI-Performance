@@ -7,6 +7,15 @@
       </div>
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <select
+          v-if="isAdmin"
+          v-model="selectedDepartment"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
+        >
+          <option v-for="dept in departments" :key="dept.id" :value="dept.id">
+            {{ dept.name }}
+          </option>
+        </select>
+        <select
           v-model="selectedTeam"
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
         >
@@ -383,6 +392,8 @@ import StatCard from '@/components/dashboard/StatCard.vue'
 import LineChart from '@/components/dashboard/LineChart.vue'
 import BarChart from '@/components/dashboard/BarChart.vue'
 import { feedbackApi, type Department360SummaryReportResponse, type DepartmentMonthlyDeepAnalysisResponse, type DepartmentMonthlyRAGReportResponse, type DepartmentNLPChartsResponse, type SummaryMetric } from '@/services/api/feedback.api'
+import { employeeApi } from '@/services/api/employee.api'
+import { useAuthStore } from '@/stores/auth'
 
 const departmentReport = ref<Department360SummaryReportResponse | null>(null)
 const departmentCharts = ref<DepartmentNLPChartsResponse | null>(null)
@@ -392,6 +403,12 @@ const today = new Date()
 const selectedMonth = ref<number>(today.getMonth() + 1)
 const selectedYear = ref<number>(today.getFullYear())
 const selectedTeam = ref<string>('all')
+
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.user?.role === 'admin' || localStorage.getItem('role') === 'admin')
+const departments = ref<any[]>([])
+const employees = ref<any[]>([])
+const selectedDepartment = ref<number | null>(null)
 
 const monthOptions = [
   { value: 1, label: 'Ocak' },
@@ -413,10 +430,18 @@ const yearOptions = computed(() => {
   return [baseYear - 1, baseYear, baseYear + 1]
 })
 
-const teamOptions = ['Backend', 'Frontend', 'DevOps', 'QA']
+const teamOptions = computed(() => {
+  if (!employees.value.length) return []
+  const teams = new Set(employees.value.map(e => e.team).filter(t => t && t !== 'Yonetim'))
+  return Array.from(teams).sort()
+})
 
 function currentTeamParam() {
   return selectedTeam.value === 'all' ? undefined : selectedTeam.value
+}
+
+function currentDepartmentParam() {
+  return isAdmin.value ? (selectedDepartment.value || undefined) : undefined
 }
 
 function getMetric(report: { metrics: SummaryMetric[] } | null, label: string) {
@@ -548,7 +573,7 @@ const riskThemeValues = computed(() => departmentCharts.value?.top_risk_themes.m
 
 async function loadDepartmentReport() {
   try {
-    departmentReport.value = await feedbackApi.getDepartment360SummaryReport({ team: currentTeamParam() })
+    departmentReport.value = await feedbackApi.getDepartment360SummaryReport({ department_id: currentDepartmentParam(), team: currentTeamParam() })
   } catch (error) {
     console.error('Departman 360 raporu yuklenemedi:', error)
     departmentReport.value = null
@@ -557,7 +582,7 @@ async function loadDepartmentReport() {
 
 async function loadDepartmentCharts() {
   try {
-    departmentCharts.value = await feedbackApi.getDepartmentNlpCharts({ team: currentTeamParam() })
+    departmentCharts.value = await feedbackApi.getDepartmentNlpCharts({ department_id: currentDepartmentParam(), team: currentTeamParam() })
   } catch (error) {
     console.error('Departman NLP grafikleri yuklenemedi:', error)
     departmentCharts.value = null
@@ -567,11 +592,13 @@ async function loadDepartmentCharts() {
 async function loadMonthlyDeepAnalysis() {
   try {
     monthlyDeepAnalysis.value = await feedbackApi.getDepartmentMonthlyDeepAnalysis({
+      department_id: currentDepartmentParam(),
       team: currentTeamParam(),
       year: selectedYear.value,
       month: selectedMonth.value,
     })
     monthlyRagReport.value = await feedbackApi.getDepartmentMonthlyRagReport({
+      department_id: currentDepartmentParam(),
       team: currentTeamParam(),
       year: selectedYear.value,
       month: selectedMonth.value,
@@ -583,13 +610,39 @@ async function loadMonthlyDeepAnalysis() {
   }
 }
 
-watch([selectedMonth, selectedYear, selectedTeam], async () => {
+async function loadDepartments() {
+  try {
+    if (isAdmin.value) {
+      departments.value = await employeeApi.getDepartments()
+      if (departments.value.length > 0 && !selectedDepartment.value) {
+        selectedDepartment.value = departments.value[0].id
+      }
+    } else {
+      // Manager is already restricted to their department in the backend,
+      // but we fetch the employee list to get the teams.
+    }
+    
+    // Fetch employees to determine teams
+    const employeesData = await employeeApi.getEmployees()
+    employees.value = employeesData
+    
+    // For non-admin, use the department of the first employee (self/department)
+    if (!isAdmin.value && employeesData.length > 0) {
+      selectedDepartment.value = employeesData[0].department_id
+    }
+  } catch (error) {
+    console.error('Veriler yuklenemedi:', error)
+  }
+}
+
+watch([selectedMonth, selectedYear, selectedTeam, selectedDepartment], async () => {
   await loadDepartmentReport()
   await loadDepartmentCharts()
   await loadMonthlyDeepAnalysis()
 })
 
 onMounted(async () => {
+  await loadDepartments()
   await loadDepartmentReport()
   await loadDepartmentCharts()
   await loadMonthlyDeepAnalysis()

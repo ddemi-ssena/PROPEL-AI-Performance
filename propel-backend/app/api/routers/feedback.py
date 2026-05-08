@@ -1,7 +1,7 @@
 # propel-backend/app/api/routers/feedback.py
 # 360° Geri Bildirim Modülü — API Endpoints
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
@@ -38,11 +38,6 @@ def create_feedback(
 ):
     """
     Bir çalışana 360° geri bildirim gönder.
-    - **reviewee_id**: Feedback verilen kişinin employee ID'si
-    - **feedback_type**: manager_to_employee / employee_to_manager / peer_to_peer / self_assessment
-    - **period_date**: Hangi dönem için (örn: 2024-03-01)
-    - Skorlar 1-5 arası (opsiyonel)
-    - Metin alanları NLP analizi için kullanılacak
     """
     return FeedbackService.create_feedback(db, feedback_data, current_employee.id)
 
@@ -54,14 +49,35 @@ def create_feedback(
 )
 def get_feedback_candidates(
     db: Session = Depends(get_db),
-    current_employee: Employee = Depends(get_current_employee_record)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Kullanıcının feedback verebileceği kişileri listeler.
-    - Kendi kaydı hariç tutulur
-    - Kendi departmanındaki çalışanlar ve yöneticiler döner
+    - Admin: Tüm çalışanları görebilir
+    - Manager: Kendi departmanını
+    - Employee: Kendi departmanını
     """
-    return FeedbackService.get_feedback_candidates(db, current_employee.id)
+    current_employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+    current_employee_id = current_employee.id if current_employee else -1
+    
+    query = db.query(Employee).join(Employee.user).filter(
+        Employee.id != current_employee_id
+    )
+
+    if current_user.role == UserRole.admin:
+        return query.order_by(User.role.desc(), User.full_name.asc()).all()
+
+    if not current_employee:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bu kullanıcının çalışan kaydı bulunamadı"
+        )
+
+    allowed_roles = [UserRole.employee, UserRole.department_manager]
+    return query.filter(
+        Employee.department_id == current_employee.department_id,
+        User.role.in_(allowed_roles)
+    ).order_by(User.role.desc(), User.full_name.asc()).all()
 
 
 @router.get(
@@ -102,8 +118,7 @@ def get_my_feedback_summary(
     current_employee: Employee = Depends(get_current_employee_record)
 ):
     """
-    Kendi feedback özetim — ortalama skorlar ve rozetler.
-    Dashboard'da kullanılacak.
+    Kendi feedback özetim.
     """
     return FeedbackService.get_feedback_summary(db, current_employee.id, period_date)
 
@@ -121,28 +136,18 @@ def get_employee_feedback_summary(
 ):
     """
     Belirli bir çalışanın feedback özeti.
-    - Admin: Herkesi görebilir
-    - Manager: Sadece kendi departmanını
     """
-    # Admin herkesi görebilir
     if current_user.role == UserRole.admin:
         return FeedbackService.get_feedback_summary(db, employee_id, period_date)
 
-    # Manager sadece kendi departmanını görebilir
-    current_employee = db.query(Employee).filter(
-        Employee.user_id == current_user.id
-    ).first()
-    target_employee = db.query(Employee).filter(
-        Employee.id == employee_id
-    ).first()
+    current_employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+    target_employee = db.query(Employee).filter(Employee.id == employee_id).first()
 
     if not current_employee or not target_employee:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Çalışan bulunamadı")
 
     if current_user.role == UserRole.department_manager:
         if target_employee.department_id != current_employee.department_id:
-            from fastapi import HTTPException
             raise HTTPException(status_code=403, detail="Bu çalışanın verilerine erişim yetkiniz yok")
 
     return FeedbackService.get_feedback_summary(db, employee_id, period_date)
@@ -161,15 +166,11 @@ def get_department_feedbacks(
 ):
     """Bir departmandaki tüm feedbackleri listele"""
     if current_user.role == UserRole.employee:
-        from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Yetkiniz yok")
 
     if current_user.role == UserRole.department_manager:
-        current_employee = db.query(Employee).filter(
-            Employee.user_id == current_user.id
-        ).first()
+        current_employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
         if not current_employee or current_employee.department_id != department_id:
-            from fastapi import HTTPException
             raise HTTPException(status_code=403, detail="Sadece kendi departmanınızı görebilirsiniz")
 
     return FeedbackService.get_department_feedbacks(db, department_id, period_date)
@@ -188,7 +189,6 @@ def get_all_feedbacks(
 ):
     """Sistemdeki tüm feedbackleri listele — sadece admin"""
     if current_user.role != UserRole.admin:
-        from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Sadece admin erişebilir")
     return FeedbackService.get_all_feedbacks(db, skip, limit)
 
@@ -237,9 +237,7 @@ def update_request_status(
     current_employee: Employee = Depends(get_current_employee_record)
 ):
     """Gelen feedback talebini kabul et (completed) veya reddet (declined)"""
-    return FeedbackService.update_request_status(
-        db, request_id, update_data, current_employee.id
-    )
+    return FeedbackService.update_request_status(db, request_id, update_data, current_employee.id)
 
 
 # ──────────────────────────────────────────────

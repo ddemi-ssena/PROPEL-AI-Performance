@@ -48,50 +48,59 @@ export const useAuthStore = defineStore('auth', () => {
   function tryMockLogin(credentials: LoginCredentials): boolean {
     const mockUsers: Record<string, User> = {
       'admin@propel.com': {
-        id: 1,
+        id: 153,
         email: 'admin@propel.com',
-        full_name: 'System Admin',
+        full_name: 'Sistem Yoneticisi',
         role: 'admin',
         is_active: true,
-        department_id: 1,
+        department_id: 17,
         created_at: new Date().toISOString()
       },
       'manager.yazilim@propel.com': {
-        id: 2,
+        id: 154,
         email: 'manager.yazilim@propel.com',
-        full_name: 'Yazılım Müdürü',
+        full_name: 'Ahmet Yilmaz',
         role: 'department_manager',
         is_active: true,
-        department_id: 2,
+        department_id: 17,
+        created_at: new Date().toISOString()
+      },
+      'manager.satis@propel.com': {
+        id: 155,
+        email: 'manager.satis@propel.com',
+        full_name: 'Mehmet Satis',
+        role: 'department_manager',
+        is_active: true,
+        department_id: 18,
         created_at: new Date().toISOString()
       },
       'developer1@propel.com': {
-        id: 3,
+        id: 156,
         email: 'developer1@propel.com',
         full_name: 'Canan Dagdelen',
         role: 'employee',
         is_active: true,
-        department_id: 2,
+        department_id: 17,
         created_at: new Date().toISOString()
       },
-      'se001@propel.com': {
-        id: 3,
-        email: 'developer1@propel.com',
-        full_name: 'Canan Dagdelen',
+      'sl-001@propel.com': {
+        id: 186,
+        email: 'sl-001@propel.com',
+        full_name: 'Ali Yilmaz',
         role: 'employee',
         is_active: true,
-        department_id: 2,
+        department_id: 18,
         created_at: new Date().toISOString()
       }
     }
 
     const mockUser = mockUsers[credentials.username]
 
-    // Basit şifre kontrolü (herkes için generic şifreler veya mock şifreler)
     if (mockUser) {
       token.value = 'mock-token-' + credentials.username
       user.value = mockUser
       localStorage.setItem('token', token.value)
+      localStorage.setItem('role', mockUser.role)
       return true
     }
 
@@ -100,46 +109,53 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function fetchCurrentUser() {
     try {
-      // Eğer mock token ise API'ye gitme
       if (token.value?.startsWith('mock-token-')) {
-        // User zaten login sırasında set edildi, ancak refresh durumunda:
         if (!user.value) {
           const email = token.value.replace('mock-token-', '')
           const mockUsers: Record<string, User> = {
             'admin@propel.com': {
-              id: 1,
+              id: 153,
               email: 'admin@propel.com',
-              full_name: 'System Admin',
+              full_name: 'Sistem Yoneticisi',
               role: 'admin',
               is_active: true,
-              department_id: 1,
+              department_id: 17,
               created_at: new Date().toISOString()
             },
             'manager.yazilim@propel.com': {
-              id: 2,
+              id: 154,
               email: 'manager.yazilim@propel.com',
-              full_name: 'Yazılım Müdürü',
+              full_name: 'Ahmet Yilmaz',
               role: 'department_manager',
               is_active: true,
-              department_id: 2,
+              department_id: 17,
+              created_at: new Date().toISOString()
+            },
+            'manager.satis@propel.com': {
+              id: 155,
+              email: 'manager.satis@propel.com',
+              full_name: 'Mehmet Satis',
+              role: 'department_manager',
+              is_active: true,
+              department_id: 18,
               created_at: new Date().toISOString()
             },
             'developer1@propel.com': {
-              id: 3,
+              id: 156,
               email: 'developer1@propel.com',
               full_name: 'Canan Dagdelen',
               role: 'employee',
               is_active: true,
-              department_id: 2,
+              department_id: 17,
               created_at: new Date().toISOString()
             },
-            'se001@propel.com': {
-              id: 3,
-              email: 'developer1@propel.com',
-              full_name: 'Canan Dagdelen',
+            'sl-001@propel.com': {
+              id: 186,
+              email: 'sl-001@propel.com',
+              full_name: 'Ali Yilmaz',
               role: 'employee',
               is_active: true,
-              department_id: 2,
+              department_id: 18,
               created_at: new Date().toISOString()
             }
           }

@@ -8,5 +8,9 @@ export const employeeApi = {
   getEmployees: async () => {
     const response = await apiClient.get('/employees/')
     return response.data
+  },
+  getDepartments: async () => {
+    const response = await apiClient.get('/departments/')
+    return response.data
   }
 }
