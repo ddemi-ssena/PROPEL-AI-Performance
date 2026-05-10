@@ -433,7 +433,13 @@ class SoftwareMLService:
 
         upload = SoftwareMLService._resolve_upload(db, upload_id)
         start = time.perf_counter()
+        timings_ms: dict[str, int] = {}
+
+        stage_start = time.perf_counter()
         rows = SoftwareMLService._load_rows(SoftwareMLService._upload_path(upload))
+        timings_ms["load_rows_ms"] = round((time.perf_counter() - stage_start) * 1000)
+
+        stage_start = time.perf_counter()
         grouped_rows: dict[int, list[dict[str, Any]]] = {}
 
         for row in rows:
@@ -445,10 +451,12 @@ class SoftwareMLService:
             except (TypeError, ValueError):
                 continue
             grouped_rows.setdefault(employee_id, []).append(row)
+        timings_ms["group_rows_ms"] = round((time.perf_counter() - stage_start) * 1000)
 
         if not grouped_rows:
             raise HTTPException(status_code=404, detail="Upload icinde tahmin icin employee_id bulunamadi.")
 
+        stage_start = time.perf_counter()
         try:
             artifact = SoftwareArtifactStore().load(target_column)
         except FileNotFoundError as exc:
@@ -456,7 +464,9 @@ class SoftwareMLService:
                 status_code=404,
                 detail=f"{target_column} icin egitilmis software model artifact'i bulunamadi.",
             ) from exc
+        timings_ms["load_artifact_ms"] = round((time.perf_counter() - stage_start) * 1000)
 
+        stage_start = time.perf_counter()
         items: list[SoftwarePredictionResponse] = []
         for employee_id, employee_rows in grouped_rows.items():
             try:
@@ -472,7 +482,9 @@ class SoftwareMLService:
                     allow_llm_narrative=False,
                 )
             )
+        timings_ms["employee_predictions_ms"] = round((time.perf_counter() - stage_start) * 1000)
 
+        stage_start = time.perf_counter()
         items.sort(
             key=lambda item: (
                 SoftwareMLService._risk_rank(item.target_column, item.predicted_band),
@@ -492,9 +504,15 @@ class SoftwareMLService:
         )
         top_reasons = SoftwareMLService._top_driver_counts(items)
         team_summaries = SoftwareMLService._team_summaries(items)
+        timings_ms["summaries_ms"] = round((time.perf_counter() - stage_start) * 1000)
+
+        stage_start = time.perf_counter()
         team_analytics = SoftwareMLService._team_analytics(rows, artifact, target_column)
+        timings_ms["team_analytics_ms"] = round((time.perf_counter() - stage_start) * 1000)
+
         from app.services.software_narrative_service import SoftwareNarrativeService
 
+        stage_start = time.perf_counter()
         department_narrative = SoftwareNarrativeService.build_department_narrative(
             target_column=target_column,
             prediction_count=len(items),
@@ -511,16 +529,24 @@ class SoftwareMLService:
             allow_llm=use_llm_narrative,
             llm_team=llm_team,
         )
+        timings_ms["narratives_ms"] = round((time.perf_counter() - stage_start) * 1000)
+        timings_ms["total_ms"] = round((time.perf_counter() - start) * 1000)
+
+        timing_payload = {
+            "upload_id": upload_id,
+            "target_column": target_column,
+            "row_count": len(rows),
+            "employee_group_count": len(grouped_rows),
+            "prediction_count": len(items),
+            "team_count": len(team_summaries),
+            "use_llm_narrative": use_llm_narrative,
+            "llm_team": llm_team,
+            **timings_ms,
+        }
         logger.info(
-            "software_bulk_predict_ok",
-            extra={
-                "upload_id": upload_id,
-                "target_column": target_column,
-                "prediction_count": len(items),
-                "use_llm_narrative": use_llm_narrative,
-                "llm_team": llm_team,
-                "latency_ms": round((time.perf_counter() - start) * 1000),
-            },
+            "software_bulk_predict_timing %s",
+            json.dumps(timing_payload, ensure_ascii=False, sort_keys=True),
+            extra=timing_payload,
         )
 
         return SoftwareBulkPredictionResponse(
@@ -607,16 +633,22 @@ class SoftwareMLService:
 
         classifier = artifact.pipeline.named_steps.get("classifier")
         classes = [str(label) for label in getattr(classifier, "classes_", [])]
+        predictions = [str(label) for label in artifact.pipeline.predict(dataset.feature_rows)]
+        probability_rows = (
+            artifact.pipeline.predict_proba(dataset.feature_rows)
+            if hasattr(artifact.pipeline, "predict_proba")
+            else []
+        )
         period_scores: dict[str, dict[str, list[int]]] = {}
 
-        for feature_row, metadata in zip(dataset.feature_rows, dataset.metadata_rows):
+        for index, metadata in enumerate(dataset.metadata_rows):
             team = str(metadata.get("team") or "Takim bilgisi yok")
             period_date = str(metadata.get("period_date") or "")
             period = period_date[:7] if period_date else ""
-            predicted_band = str(artifact.pipeline.predict([feature_row])[0])
+            predicted_band = predictions[index]
             probabilities: dict[str, float] = {}
-            if hasattr(artifact.pipeline, "predict_proba"):
-                probability_values = artifact.pipeline.predict_proba([feature_row])[0]
+            if len(probability_rows):
+                probability_values = probability_rows[index]
                 probabilities = {
                     label: round(float(probability), 6)
                     for label, probability in zip(classes, probability_values)

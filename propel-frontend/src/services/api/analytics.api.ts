@@ -148,6 +148,21 @@ export interface SoftwareBulkPredictionResponse {
   items: SoftwarePredictionResponse[]
 }
 
+export interface TeamReportExportPayload {
+  team: string
+  report_date: string
+  report_type: string
+  metrics: Array<{ label: string; value: string }>
+  main_issue_title: string
+  main_issue_description: string
+  main_reason: string
+  actions: Array<Record<string, any>>
+  members: Array<Record<string, any>>
+  trend: Array<{ period: string; risk_score: number }>
+  risk_factors: Array<Record<string, any>>
+  talking_points: string[]
+}
+
 export const analyticsApi = {
   async getDepartmentConfigs(): Promise<DepartmentAnalyticsConfigResponse[]> {
     const { data } = await apiClient.get<DepartmentAnalyticsConfigResponse[]>('/analytics/departments')
@@ -218,6 +233,15 @@ export const analyticsApi = {
     const { data } = await apiClient.get<SoftwareBulkPredictionResponse>(
       '/analytics/departments/software/predictions/bulk',
       { params }
+    )
+    return data
+  },
+
+  async exportSoftwareTeamReport(payload: TeamReportExportPayload): Promise<Blob> {
+    const { data } = await apiClient.post<Blob>(
+      '/analytics/departments/software/team-report/export',
+      payload,
+      { responseType: 'blob' }
     )
     return data
   },

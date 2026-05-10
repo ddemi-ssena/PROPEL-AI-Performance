@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -15,7 +16,9 @@ from app.schemas.analytics import (
     SoftwareModelTrainResponse,
     SoftwarePredictionResponse,
 )
+from app.schemas.team_report import TeamReportExportRequest
 from app.services.analytics_service import AnalyticsService
+from app.services.team_report_export_service import TeamReportExportService
 
 router = APIRouter()
 
@@ -130,4 +133,20 @@ def get_bulk_software_predictions(
         target_column=target_column,
         use_llm_narrative=use_llm_narrative,
         llm_team=llm_team,
+    )
+
+
+@router.post("/departments/software/team-report/export")
+def export_software_team_report(
+    payload: TeamReportExportRequest,
+    current_user: User = Depends(get_current_user),
+):
+    stream = TeamReportExportService.build_workbook(payload)
+    safe_team = "".join(char if char.isalnum() else "_" for char in payload.team).strip("_") or "Takim"
+    safe_date = payload.report_date.replace(".", "_").replace("/", "_").replace(" ", "_")
+    filename = f"{safe_team}_Takim_Analizi_{safe_date}.xlsx"
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
