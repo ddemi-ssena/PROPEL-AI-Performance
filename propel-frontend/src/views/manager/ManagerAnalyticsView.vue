@@ -1173,6 +1173,7 @@
                       <button
                         class="action-button interactive-button inline-flex items-center justify-center gap-2 rounded-lg border border-violet-500 px-6 py-3 text-sm font-semibold text-violet-700 hover:bg-violet-500 hover:text-white"
                         type="button"
+                        @click="openTeamMeetingPlanner"
                       >
                         <span aria-hidden="true">+</span>
                         Toplanti Planla
@@ -1180,12 +1181,21 @@
                       <button
                         class="action-button interactive-button inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                         type="button"
+                        :disabled="exportLoading || !selectedTeamAnalysis"
+                        @click="downloadSelectedTeamExcel"
                       >
                         <span aria-hidden="true">XLS</span>
-                        Excel Indir
+                        {{ exportLoading ? 'Hazirlaniyor...' : 'Excel Indir' }}
                       </button>
                     </div>
                   </div>
+                  <p
+                    v-if="exportStatus"
+                    class="mt-3 text-right text-xs font-semibold"
+                    :class="exportStatus.includes('hazirlandi') ? 'text-emerald-700' : 'text-rose-700'"
+                  >
+                    {{ exportStatus }}
+                  </p>
                 </div>
               </section>
             </div>
@@ -1805,6 +1815,139 @@
     <div v-if="error" class="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700 shadow-sm">
       {{ error }}
     </div>
+
+    <div
+      v-if="showMeetingPlanner"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="team-meeting-title"
+    >
+      <div class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div class="border-b border-slate-200 px-6 py-5">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">Takim Toplantisi</p>
+              <h3 id="team-meeting-title" class="mt-1 text-xl font-bold text-slate-950">
+                {{ meetingDraft.title }}
+              </h3>
+              <p class="mt-2 text-sm leading-6 text-slate-500">
+                Toplanti taslagi secili takim risk sinyalleri, aksiyon plani ve konusulacaklar listesinden olusturuldu.
+              </p>
+            </div>
+            <button
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-sm font-bold text-slate-500 hover:bg-slate-50"
+              type="button"
+              aria-label="Toplanti planlama penceresini kapat"
+              @click="closeTeamMeetingPlanner"
+            >
+              x
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-5 px-6 py-5 lg:grid-cols-[1fr_280px]">
+          <div class="space-y-4">
+            <label class="block">
+              <span class="text-xs font-semibold text-slate-500">Baslik</span>
+              <input
+                v-model="meetingDraft.title"
+                class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 shadow-sm"
+                type="text"
+              />
+            </label>
+
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label class="block">
+                <span class="text-xs font-semibold text-slate-500">Tarih</span>
+                <input
+                  v-model="meetingDraft.date"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 shadow-sm"
+                  type="date"
+                />
+              </label>
+              <label class="block">
+                <span class="text-xs font-semibold text-slate-500">Saat</span>
+                <input
+                  v-model="meetingDraft.time"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 shadow-sm"
+                  type="time"
+                />
+              </label>
+              <label class="block">
+                <span class="text-xs font-semibold text-slate-500">Sure</span>
+                <select
+                  v-model="meetingDraft.duration"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 shadow-sm"
+                >
+                  <option value="30">30 dk</option>
+                  <option value="45">45 dk</option>
+                  <option value="60">60 dk</option>
+                </select>
+              </label>
+            </div>
+
+            <label class="block">
+              <span class="text-xs font-semibold text-slate-500">Yoneticinin notu</span>
+              <textarea
+                v-model="meetingDraft.note"
+                class="mt-1 min-h-[110px] w-full rounded-lg border border-slate-200 px-3 py-2 text-sm leading-6 text-slate-800 shadow-sm"
+              ></textarea>
+            </label>
+
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Gundem</p>
+              <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                <li v-for="item in meetingAgendaItems" :key="item">- {{ item }}</li>
+              </ul>
+            </div>
+          </div>
+
+          <aside class="rounded-xl border border-slate-200 bg-white p-4">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Katilimcilar</p>
+            <p class="mt-2 text-sm font-bold text-slate-900">
+              {{ meetingAttendees.length }} takim uyesi
+            </p>
+            <div class="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+              <div
+                v-for="attendee in meetingAttendees"
+                :key="attendee.key"
+                class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
+              >
+                <p class="truncate text-sm font-semibold text-slate-800">{{ attendee.name }}</p>
+                <p class="truncate text-xs text-slate-500">{{ attendee.role }}</p>
+              </div>
+            </div>
+            <p class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+              Onay verdiginizde toplanti kaydi olusturulur ve listedeki takim uyelerine uygulama ici bildirim gonderilir.
+            </p>
+          </aside>
+        </div>
+
+        <div class="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-sm font-semibold" :class="meetingPlanStatus ? 'text-emerald-700' : 'text-slate-500'">
+            {{ meetingPlanStatus || 'Taslak hazir. Onaylayinca toplanti planlanir ve bildirimler gonderilir.' }}
+          </p>
+          <div class="flex flex-col gap-2 sm:flex-row">
+            <button
+              class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              type="button"
+              @click="closeTeamMeetingPlanner"
+            >
+              Vazgec
+            </button>
+            <button
+              class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              type="button"
+              :disabled="meetingSubmitting || !meetingAttendees.length"
+              @click="confirmTeamMeetingDraft"
+            >
+              {{ meetingSubmitting ? 'Gonderiliyor...' : 'Toplantiyi Planla ve Bildir' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1833,7 +1976,9 @@ import {
   type SoftwareModelStateResponse,
   type SoftwareModelTrainResponse,
   type SoftwarePredictionResponse,
+  type TeamReportExportPayload,
 } from '@/services/api/analytics.api'
+import { meetingsApi } from '@/services/api/meetings.api'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
@@ -1862,6 +2007,18 @@ const expandedTalkingPoints = ref<Record<string, boolean>>({ 0: true })
 const completedTalkingPoints = ref<Record<string, boolean>>({})
 const selectedTeamTimeRange = ref<'1m' | '3m' | '6m' | '1y' | 'all' | 'custom'>('6m')
 const selectedRiskFilters = ref<string[]>(['low', 'medium', 'high'])
+const showMeetingPlanner = ref(false)
+const meetingPlanStatus = ref('')
+const meetingSubmitting = ref(false)
+const exportLoading = ref(false)
+const exportStatus = ref('')
+const meetingDraft = ref({
+  title: '',
+  date: '',
+  time: '10:00',
+  duration: '45',
+  note: '',
+})
 const showRiskFilterMenu = ref(false)
 const showDateRangePanel = ref(false)
 const customDateStart = ref('')
@@ -2110,6 +2267,20 @@ const selectedTeamPeople = computed(() => {
     .slice(0, 6)
 })
 
+const meetingAttendees = computed(() =>
+  selectedTeamAllPeople.value.map((person) => ({
+    key: String(person.employee_id),
+    datasetEmployeeId: Number(person.employee_id),
+    dbEmployeeId: Number(person.summary_payload?.db_employee_id || 0) || null,
+    name: String(
+      person.summary_payload?.employee_name
+      || person.summary_payload?.display_label
+      || `Dataset #${person.employee_id}`
+    ),
+    role: String(person.summary_payload?.position || person.summary_payload?.role || 'Rol yok'),
+  }))
+)
+
 const selectedTeamHighRiskCount = computed(() =>
   selectedTeamPeople.value.filter((person) => predictionRiskTone(person.predicted_band, person.target_column) === 'high').length
 )
@@ -2307,6 +2478,16 @@ const selectedTeamTalkingPointItems = computed(() => {
       ],
     }
   })
+})
+
+const meetingAgendaItems = computed(() => {
+  const team = selectedTeamAnalysis.value
+  const agenda = [
+    team ? `${team.team} icin ${teamRiskCategory(team)} durumunu ve ${team.topReason} sinyalini birlikte okumak.` : '',
+    ...selectedTeamTalkingPointItems.value.map((item) => item.detail),
+    ...selectedTeamAiActionCards.value.map((item) => item.title),
+  ].filter(Boolean)
+  return Array.from(new Set(agenda)).slice(0, 5)
 })
 
 const teamReasonDistribution = computed(() => {
@@ -2731,6 +2912,296 @@ function talkingPointPriorityClass(priority: string) {
   if (priority === 'high') return 'bg-rose-100 text-rose-700'
   if (priority === 'medium') return 'bg-amber-100 text-amber-700'
   return 'bg-emerald-100 text-emerald-700'
+}
+
+function defaultMeetingDate() {
+  const date = new Date()
+  date.setDate(date.getDate() + 1)
+  if (date.getDay() === 0) date.setDate(date.getDate() + 1)
+  if (date.getDay() === 6) date.setDate(date.getDate() + 2)
+  return date.toISOString().slice(0, 10)
+}
+
+function openTeamMeetingPlanner() {
+  const team = selectedTeamAnalysis.value
+  if (!team) return
+  meetingPlanStatus.value = ''
+  meetingDraft.value = {
+    title: `${team.team} haftalik risk ve destek toplantisi`,
+    date: defaultMeetingDate(),
+    time: '10:00',
+    duration: team.high > 0 ? '60' : '45',
+    note: selectedTeamProblemDescription.value,
+  }
+  showMeetingPlanner.value = true
+}
+
+function closeTeamMeetingPlanner() {
+  showMeetingPlanner.value = false
+}
+
+async function confirmTeamMeetingDraft() {
+  const team = selectedTeamAnalysis.value
+  if (!team) return
+  meetingSubmitting.value = true
+  meetingPlanStatus.value = ''
+  try {
+    const response = await meetingsApi.createTeamRiskMeeting({
+      team: team.team,
+      title: meetingDraft.value.title,
+      scheduled_date: meetingDraft.value.date,
+      scheduled_time: meetingDraft.value.time,
+      duration_minutes: Number(meetingDraft.value.duration),
+      note: meetingDraft.value.note,
+      agenda_items: meetingAgendaItems.value,
+      attendees: meetingAttendees.value.map((attendee) => ({
+        dataset_employee_id: attendee.datasetEmployeeId,
+        db_employee_id: attendee.dbEmployeeId,
+        name: attendee.name,
+        role: attendee.role,
+      })),
+    })
+    const unresolved = response.unresolved_attendee_count
+      ? ` ${response.unresolved_attendee_count} kisi dataset kaydi olarak saklandi.`
+      : ''
+    meetingPlanStatus.value = `Toplanti #${response.id} planlandi; ${response.notification_count} bildirim olusturuldu.${unresolved}`
+  } catch (err: any) {
+    meetingPlanStatus.value = err.response?.data?.detail || 'Toplanti planlanamadi.'
+  } finally {
+    meetingSubmitting.value = false
+  }
+}
+
+function selectedTeamReportPayload(): TeamReportExportPayload | null {
+  const team = selectedTeamAnalysis.value
+  if (!team) return null
+  const low = Math.max(0, team.total - team.high - team.medium)
+  const riskScore = Math.round(teamRiskScore(team) / 10)
+  const watchRatio = team.total ? Math.round(((team.high + team.medium) / team.total) * 100) : 0
+  const driverCounts = topEntries(
+    countBy(selectedTeamAllPeople.value, (person) => String(person.top_drivers?.[0]?.metric_name || team.topReason || 'KPI sinyali')),
+    8
+  )
+  const trendValues = selectedTeamWeeklyRiskValues.value
+  return {
+    team: team.team,
+    report_date: new Date().toLocaleDateString('tr-TR'),
+    report_type: 'Haftalik Risk Analizi',
+    metrics: [
+      { label: 'Toplam Kisi Sayisi', value: String(team.total) },
+      { label: 'Takim Risk Skoru', value: `${riskScore}/10` },
+      { label: 'Yuksek Riskli Kisi', value: String(team.high) },
+      { label: 'Orta Riskli Kisi', value: String(team.medium) },
+      { label: 'Dusuk Riskli Kisi', value: String(low) },
+      { label: 'Sprint Kapasitesi Durumu', value: `+%${selectedTeamSprintOverage.value} asim` },
+      { label: 'Izleme Orani', value: `%${watchRatio}` },
+    ],
+    main_issue_title: `${team.topReason} kritik seviyede`,
+    main_issue_description: selectedTeamProblemDescription.value,
+    main_reason: team.topReason,
+    actions: selectedTeamAiActionCards.value.map((action) => {
+      const item = action as Record<string, any>
+      const index = selectedTeamAiActionCards.value.indexOf(action)
+      return {
+        title: String(item.title || 'Takim aksiyonu'),
+        reason: String(item.reason || ''),
+        owner: String(item.owner || 'Takim lideri'),
+        timeframe: String(item.timeframe || 'Bu hafta'),
+        target_date: actionTargetDate(index),
+        priority: actionPriority(index),
+        status: '⏳ Bekle',
+        expected_impact: String(item.expected_impact || ''),
+      }
+    }),
+    members: selectedTeamAllPeople.value.map((person) => {
+      const tone = predictionRiskTone(person.predicted_band, person.target_column)
+      const riskScore = employeeReportRiskScore(person)
+      return {
+        employee_id: person.employee_id,
+        name: String(person.summary_payload?.employee_name || person.summary_payload?.display_label || `Dataset #${person.employee_id}`),
+        role: String(person.summary_payload?.position || person.summary_payload?.role || 'Rol yok'),
+        department_code: String(person.summary_payload?.external_employee_code || `SE-${String(person.employee_id).padStart(3, '0')}`),
+        risk_score: riskScore,
+        predicted_band: person.predicted_band,
+        risk_level: riskToneLabel(tone),
+        status: employeeReportStatus(tone, riskScore),
+        confidence: person.confidence,
+        top_reason: String(person.top_drivers?.[0]?.metric_name || 'KPI sinyali'),
+        action: person.recommended_actions?.[0] || '',
+        motivation_score: driverNumericValue(person, ['motivasyon'], 'score10'),
+        completion_rate: driverNumericValue(person, ['tamamlama', 'completion'], 'percent'),
+        absence_days: driverNumericValue(person, ['devamsizlik', 'devamsızlık', 'absence'], 'raw'),
+      }
+    }),
+    trend: trendValues.map((value, index) => {
+      const motivation = teamMotivationTrendValue(value, index, trendValues.length)
+      return {
+        period: `Hafta ${index + 1}`,
+        date: trendPointDate(index, trendValues.length),
+        risk_score: value,
+        motivation_avg: motivation,
+        capacity_usage: teamCapacityTrendValue(value, index, trendValues.length),
+      }
+    }),
+    risk_factors: driverCounts.map(([name, count]) => ({
+      name,
+      count,
+      severity: name === team.topReason ? 'high' : count > 1 ? 'medium' : 'low',
+      impact_level: name === team.topReason ? 'high' : count > 1 ? 'medium' : 'low',
+      probability: riskFactorProbability(name, count, team),
+      priority: riskFactorPriority(name, count, team),
+      note: name === team.topReason ? 'Secili takimin ana nedeni' : 'Takim uyelerinde tekrar eden sinyal',
+      current_state: riskFactorCurrentState(name, count, team),
+      target_state: riskFactorTargetState(name),
+      gap: riskFactorGap(name, team),
+      affected_people: `${count} kisi`,
+      expected_result: riskFactorExpectedResult(name),
+    })),
+    talking_points: selectedTeamTalkingPointItems.value.map((item) => item.detail),
+  }
+}
+
+function actionTargetDate(index: number) {
+  const date = new Date()
+  date.setDate(date.getDate() + 2 + (index * 2))
+  return date.toLocaleDateString('tr-TR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function actionPriority(index: number) {
+  if (index <= 1) return 'P0'
+  if (index <= 3) return 'P1'
+  return 'P2'
+}
+
+function riskFactorProbability(name: string, count: number, team: { topReason: string; high: number; medium: number; total: number }) {
+  if (name === team.topReason) return Math.min(100, Math.max(90, 80 + count * 3))
+  if (count >= team.high) return 100
+  if (count > 1) return Math.min(85, 55 + count * 5)
+  return 60
+}
+
+function riskFactorPriority(name: string, count: number, team: { topReason: string; high: number }) {
+  if (name === team.topReason) return 'P0 - Acil'
+  if (count >= Math.max(1, team.high)) return 'P1 - Yuksek'
+  return count > 1 ? 'P2 - Orta' : 'P3 - Dusuk'
+}
+
+function riskFactorCurrentState(name: string, count: number, team: { topReason: string; high: number; medium: number }) {
+  if (name === team.topReason) return `${count} kiside ana sinyal olarak one cikiyor`
+  return `${count} kiside tekrar eden risk sinyali`
+}
+
+function riskFactorTargetState(name: string) {
+  const normalized = name.toLowerCase()
+  if (normalized.includes('motivasyon')) return 'Motivasyon skorunu 7.0/10 bandina tasimak'
+  if (normalized.includes('kapasite') || normalized.includes('yuk') || normalized.includes('toplanti')) return 'Kapasite kullanimini %100 altina indirmek'
+  return 'Risk sinyalini dusuk/orta banda indirmek'
+}
+
+function riskFactorGap(name: string, team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[]; high: number; medium: number; total: number }) {
+  const normalized = name.toLowerCase()
+  if (normalized.includes('motivasyon')) return 'Yaklasik 3 puan'
+  if (normalized.includes('kapasite') || normalized.includes('yuk')) return `%${selectedTeamSprintOverage.value} kapasite asimi`
+  return `${team.high + team.medium} kisi izleme listesinde`
+}
+
+function riskFactorExpectedResult(name: string) {
+  const normalized = name.toLowerCase()
+  if (normalized.includes('motivasyon')) return 'Performans dususu ve devir riskinde artis'
+  if (normalized.includes('kapasite') || normalized.includes('yuk')) return 'Burnout riski ve kalite dususu'
+  if (normalized.includes('iletisim')) return 'Takim ici koordinasyon ve geri bildirim kalitesinde dusus'
+  return 'Takip edilmezse risk sinyalinin yayilmasi'
+}
+
+function trendPointDate(index: number, total: number) {
+  const date = new Date()
+  const weeksBack = Math.max(0, total - index - 1)
+  date.setDate(date.getDate() - (weeksBack * 7))
+  return date.toLocaleDateString('tr-TR', {
+    day: '2-digit',
+    month: 'short',
+    year: '2-digit',
+  })
+}
+
+function teamMotivationTrendValue(riskValue: number, index: number, total: number) {
+  const base = Math.max(2, Math.min(9, 10 - riskValue + 1.2))
+  const drift = total > 1 ? (index / (total - 1)) * 0.8 : 0
+  return Math.round(Math.max(1, base - drift) * 10) / 10
+}
+
+function teamCapacityTrendValue(riskValue: number, index: number, total: number) {
+  const progress = total > 1 ? index / (total - 1) : 1
+  const capacity = 78 + (riskValue * 4.3) + (progress * selectedTeamSprintOverage.value)
+  return Math.round(Math.max(60, Math.min(140, capacity)))
+}
+
+function employeeReportRiskScore(person: SoftwarePredictionResponse) {
+  const probabilities = person.probabilities || {}
+  if (person.target_column === 'attrition_risk_band') {
+    return Math.round(
+      (Number(probabilities.Yuksek || 0) * 10)
+      + (Number(probabilities.Orta || 0) * 6)
+      + (Number(probabilities.Dusuk || 0) * 2)
+    ) || Math.round(person.confidence * 10)
+  }
+  return Math.round(
+    (Number(probabilities.Riskli || 0) * 10)
+    + (Number(probabilities.Stabil || 0) * 6)
+    + (Number(probabilities.Yuksek || 0) * 2)
+    + (Number(probabilities.Guclu || 0) * 1)
+  ) || Math.round(person.confidence * 10)
+}
+
+function employeeReportStatus(tone: string, riskScore: number) {
+  if (tone === 'high') return riskScore >= 9 ? 'Acil Mudahale' : 'Takip Gerekli'
+  if (tone === 'medium') return riskScore >= 6 ? 'Izleniyor' : 'Stabil'
+  return 'Stabil'
+}
+
+function driverNumericValue(person: SoftwarePredictionResponse, keywords: string[], mode: 'raw' | 'score10' | 'percent') {
+  const driver = (person.top_drivers || []).find((item) => {
+    const name = String(item.metric_name || item.feature || '').toLowerCase()
+    return keywords.some((keyword) => name.includes(keyword))
+  })
+  const rawValue = Number(driver?.current_value ?? driver?.value)
+  if (!Number.isFinite(rawValue)) return null
+  if (mode === 'score10') return rawValue <= 1 ? rawValue * 10 : rawValue
+  if (mode === 'percent') return rawValue <= 1 ? rawValue * 100 : rawValue
+  return rawValue
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
+async function downloadSelectedTeamExcel() {
+  const payload = selectedTeamReportPayload()
+  if (!payload) return
+  exportLoading.value = true
+  exportStatus.value = ''
+  try {
+    const blob = await analyticsApi.exportSoftwareTeamReport(payload)
+    const safeTeam = payload.team.replace(/[^a-zA-Z0-9_-]+/g, '_') || 'Takim'
+    const safeDate = new Date().toISOString().slice(0, 10).replace(/-/g, '_')
+    downloadBlob(blob, `${safeTeam}_Takim_Analizi_${safeDate}.xlsx`)
+    exportStatus.value = 'Excel raporu hazirlandi.'
+  } catch (err: any) {
+    exportStatus.value = err.response?.data?.detail || 'Excel raporu indirilemedi.'
+  } finally {
+    exportLoading.value = false
+  }
 }
 
 async function selectTeamForAnalysis(teamName: string) {

@@ -122,6 +122,7 @@ export interface EmployeeForFeedback {
   position?: string
   experience_years?: number
   user_id: number
+  department_id: number
   department: { id: number; name: string }
   user: { id: number; email: string; full_name: string; role: string }
 }
