@@ -151,3 +151,15 @@
 - Sheet 5 altina `AKSIYON DETAYLARI` ve `KONUSULACAK KONULAR` bolumleri eklendi.
 - Aksiyonlar icin frontend payload'i genisletildi: `target_date`, `priority`, `status`; `talking_points` export payload'ina eklendi.
 - Dogrulama: backend `py_compile` ve frontend `npm.cmd run type-check` basarili. Manuel export dosyasi 12643 byte uretildi; Sheet 4/5 basliklari ve detay bolumleri XML icinde dogrulandi. Test dosyasi silindi.
+
+## 2026-05-10 Rapor Gonder Akisi
+
+- Kullanici `Rapor Gonder` butonunun takim lideri, admin ve departman yoneticisine gondermesini istedi.
+- Backend `POST /api/v1/notifications/team-report` endpoint'i eklendi.
+- Endpoint secili takim icin alicilari gruplara gore turetiyor: adminler, departman yoneticileri, takim icindeki `lead` pozisyonlu kisiler.
+- Frontend'e `notifications.api.ts` eklendi.
+- `Rapor Gonder` butonu modal acacak sekilde baglandi; modalda `Takim lideri`, `Admin`, `Departman yoneticileri` checkbox'lari var.
+- Onayla aksiyonu `shareSelectedTeamReport` ile backend'e POST atiyor ve olusan bildirim sayisini gosteriyor.
+- Dogrulama: backend `py_compile` ve frontend `npm.cmd run type-check` basarili. Docker backend/frontend yeniden baslatildi.
+- Manuel API testi: Backend raporu icin 3 bildirim olustu: Admin Kullanici, Ahmet Yilmaz (Departman yoneticisi), Murat Kaya (Takim lideri).
+- DB ozetinde `team_report=3`, `meeting_invite=39` gorundu. Canli Vite modulunde `showReportShareModal`, `shareSelectedTeamReport`, `notificationsApi`, `Raporu Gonder` dogrulandi.

@@ -48,6 +48,21 @@ class NotificationResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TeamReportShareRequest(BaseModel):
+    team: str = Field(..., min_length=1, max_length=100)
+    report_title: str = Field(..., min_length=1, max_length=255)
+    summary: str = Field(..., min_length=1)
+    include_admins: bool = True
+    include_department_managers: bool = True
+    include_team_leads: bool = True
+
+
+class TeamReportShareResponse(BaseModel):
+    team: str
+    notification_count: int
+    recipients: list[NotificationResponse]
+
+
 class TeamMeetingCreateResponse(BaseModel):
     id: int
     team: str

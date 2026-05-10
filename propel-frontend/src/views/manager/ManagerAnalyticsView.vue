@@ -1166,6 +1166,7 @@
                       <button
                         class="action-button interactive-button inline-flex items-center justify-center gap-2 rounded-lg border border-blue-500 px-6 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-500 hover:text-white"
                         type="button"
+                        @click="openReportShareModal"
                       >
                         <span aria-hidden="true">@</span>
                         Rapor Gonder
@@ -1948,6 +1949,85 @@
         </div>
       </div>
     </div>
+
+    <div
+      v-if="showReportShareModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="team-report-share-title"
+    >
+      <div class="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
+        <div class="border-b border-slate-200 px-6 py-5">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-500">Rapor Paylasimi</p>
+              <h3 id="team-report-share-title" class="mt-1 text-xl font-bold text-slate-950">
+                {{ selectedTeamAnalysis?.team || 'Takim' }} analiz raporunu gonder
+              </h3>
+              <p class="mt-2 text-sm leading-6 text-slate-500">
+                Secili takim icin risk ozeti ve aksiyon planini uygulama ici bildirim olarak paylasir.
+              </p>
+            </div>
+            <button
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-sm font-bold text-slate-500 hover:bg-slate-50"
+              type="button"
+              aria-label="Rapor gonderme penceresini kapat"
+              @click="closeReportShareModal"
+            >
+              x
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-4 px-6 py-5">
+          <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <input v-model="reportShareRecipients.teamLeads" class="mt-1 h-4 w-4" type="checkbox" />
+            <span>
+              <span class="block text-sm font-bold text-slate-900">Takim lideri</span>
+              <span class="mt-1 block text-xs leading-5 text-slate-500">Secili takimdaki lead pozisyonlu kisilere gider.</span>
+            </span>
+          </label>
+          <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <input v-model="reportShareRecipients.admins" class="mt-1 h-4 w-4" type="checkbox" />
+            <span>
+              <span class="block text-sm font-bold text-slate-900">Admin</span>
+              <span class="mt-1 block text-xs leading-5 text-slate-500">Sistem adminlerine rapor bildirimi olusturur.</span>
+            </span>
+          </label>
+          <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <input v-model="reportShareRecipients.departmentManagers" class="mt-1 h-4 w-4" type="checkbox" />
+            <span>
+              <span class="block text-sm font-bold text-slate-900">Departman yoneticileri</span>
+              <span class="mt-1 block text-xs leading-5 text-slate-500">Yonetici rolundeki kullanicilara ozet bildirimi gonderir.</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-sm font-semibold" :class="reportShareStatus ? 'text-emerald-700' : 'text-slate-500'">
+            {{ reportShareStatus || 'Alıcıları secin, rapor bildirimi olusturalim.' }}
+          </p>
+          <div class="flex flex-col gap-2 sm:flex-row">
+            <button
+              class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              type="button"
+              @click="closeReportShareModal"
+            >
+              Vazgec
+            </button>
+            <button
+              class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              type="button"
+              :disabled="reportShareSubmitting || !canShareReport"
+              @click="shareSelectedTeamReport"
+            >
+              {{ reportShareSubmitting ? 'Gonderiliyor...' : 'Raporu Gonder' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1979,6 +2059,7 @@ import {
   type TeamReportExportPayload,
 } from '@/services/api/analytics.api'
 import { meetingsApi } from '@/services/api/meetings.api'
+import { notificationsApi } from '@/services/api/notifications.api'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
@@ -2008,10 +2089,18 @@ const completedTalkingPoints = ref<Record<string, boolean>>({})
 const selectedTeamTimeRange = ref<'1m' | '3m' | '6m' | '1y' | 'all' | 'custom'>('6m')
 const selectedRiskFilters = ref<string[]>(['low', 'medium', 'high'])
 const showMeetingPlanner = ref(false)
+const showReportShareModal = ref(false)
 const meetingPlanStatus = ref('')
+const reportShareStatus = ref('')
 const meetingSubmitting = ref(false)
+const reportShareSubmitting = ref(false)
 const exportLoading = ref(false)
 const exportStatus = ref('')
+const reportShareRecipients = ref({
+  teamLeads: true,
+  admins: true,
+  departmentManagers: true,
+})
 const meetingDraft = ref({
   title: '',
   date: '',
@@ -2490,6 +2579,15 @@ const meetingAgendaItems = computed(() => {
   return Array.from(new Set(agenda)).slice(0, 5)
 })
 
+const canShareReport = computed(() =>
+  Boolean(selectedTeamAnalysis.value)
+  && (
+    reportShareRecipients.value.teamLeads
+    || reportShareRecipients.value.admins
+    || reportShareRecipients.value.departmentManagers
+  )
+)
+
 const teamReasonDistribution = computed(() => {
   const counts = countBy(filteredTeamRiskSummaries.value, (team) => team.topReason)
   const entries = topEntries(counts, 4)
@@ -2938,6 +3036,38 @@ function openTeamMeetingPlanner() {
 
 function closeTeamMeetingPlanner() {
   showMeetingPlanner.value = false
+}
+
+function openReportShareModal() {
+  if (!selectedTeamAnalysis.value) return
+  reportShareStatus.value = ''
+  showReportShareModal.value = true
+}
+
+function closeReportShareModal() {
+  showReportShareModal.value = false
+}
+
+async function shareSelectedTeamReport() {
+  const team = selectedTeamAnalysis.value
+  if (!team) return
+  reportShareSubmitting.value = true
+  reportShareStatus.value = ''
+  try {
+    const response = await notificationsApi.shareTeamReport({
+      team: team.team,
+      report_title: `${team.team} takim analiz raporu`,
+      summary: selectedTeamProblemDescription.value,
+      include_admins: reportShareRecipients.value.admins,
+      include_department_managers: reportShareRecipients.value.departmentManagers,
+      include_team_leads: reportShareRecipients.value.teamLeads,
+    })
+    reportShareStatus.value = `${response.notification_count} kisiye rapor bildirimi gonderildi.`
+  } catch (err: any) {
+    reportShareStatus.value = err.response?.data?.detail || 'Rapor gonderilemedi.'
+  } finally {
+    reportShareSubmitting.value = false
+  }
 }
 
 async function confirmTeamMeetingDraft() {
