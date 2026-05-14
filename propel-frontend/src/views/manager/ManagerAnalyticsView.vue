@@ -915,14 +915,17 @@
                       <Line :data="selectedTeamRiskTrendChartData" :options="selectedTeamRiskTrendChartOptions" />
                     </div>
 
-                    <div class="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                      <span class="inline-flex items-center gap-1.5">
-                        <span class="h-2.5 w-2.5 rounded-full bg-blue-500"></span>
-                        Hafta 8: Sprint baslangici
-                      </span>
-                      <span class="inline-flex items-center gap-1.5">
-                        <span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
-                        Hafta 10: Kapasite asimi
+                    <div
+                      v-if="selectedTeamRiskLegendHints.length"
+                      class="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500"
+                    >
+                      <span
+                        v-for="(hint, hintIndex) in selectedTeamRiskLegendHints"
+                        :key="`risk-hint-${hintIndex}`"
+                        class="inline-flex items-center gap-1.5"
+                      >
+                        <span class="h-2.5 w-2.5 rounded-full" :class="hint.dotClass"></span>
+                        {{ hint.text }}
                       </span>
                     </div>
                   </article>
@@ -1069,7 +1072,10 @@
                         >
                           <div class="mt-4 border-l-4 border-blue-500 bg-blue-50/40 p-4">
                             <p class="text-sm leading-6 text-slate-700">{{ item.detail }}</p>
-                            <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                            <ul
+                              v-if="item.bullets.length"
+                              class="mt-3 space-y-2 text-sm leading-6 text-slate-600"
+                            >
                               <li v-for="bullet in item.bullets" :key="bullet">- {{ bullet }}</li>
                             </ul>
                           </div>
@@ -2045,7 +2051,7 @@ import {
 } from 'chart.js'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Line } from 'vue-chartjs'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   analyticsApi,
   type DepartmentAnalyticsConfigResponse,
@@ -2064,6 +2070,7 @@ import { notificationsApi } from '@/services/api/notifications.api'
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
 const route = useRoute()
+const router = useRouter()
 const departmentConfigs = ref<DepartmentAnalyticsConfigResponse[]>([])
 const overview = ref<DepartmentAnalyticsOverviewResponse | null>(null)
 const selectedDepartment = ref('software')
@@ -2412,6 +2419,18 @@ const selectedTeamWeeklyRiskValues = computed(() => {
   return normalized.map((value) => Math.max(0, Math.min(10, Math.round((value / 10) * 10) / 10)))
 })
 
+const selectedTeamRiskTrendAxisLabels = computed(() => {
+  const team = selectedTeamAnalysis.value
+  const values = selectedTeamWeeklyRiskValues.value
+  const n = values.length
+  if (!n || !team) return []
+  const periods = filterPeriodsByTeamRange(team.trendPeriods || [])
+  return Array.from({ length: n }, (_, i) => {
+    if (i < periods.length) return formatTrendAxisLabel(periods[i])
+    return `D${i + 1}`
+  })
+})
+
 const selectedTeamTrendChangeLabel = computed(() => {
   const values = selectedTeamWeeklyRiskValues.value
   if (values.length < 8) return 'Trend verisi izleniyor'
@@ -2426,38 +2445,31 @@ const selectedTeamTrendChangeLabel = computed(() => {
   return 'Stabil trend son 4 haftada'
 })
 
-const selectedTeamRiskTrendChartData = computed(() => {
-  const labels = Array.from({ length: 12 }, (_, index) => `Hafta ${index + 1}`)
-  return {
-    labels,
-    datasets: [{
-      label: selectedTeamAnalysis.value?.team || 'Takim',
-      data: selectedTeamWeeklyRiskValues.value,
-      borderColor: '#EF4444',
-      backgroundColor: (context: any) => {
-        const chart = context.chart
-        const area = chart.chartArea
-        if (!area) return 'rgba(239, 68, 68, 0.18)'
-        const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom)
-        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.32)')
-        gradient.addColorStop(1, 'rgba(239, 68, 68, 0)')
-        return gradient
-      },
-      borderWidth: 3,
-      pointRadius: (context: any) => ([7, 9].includes(context.dataIndex) ? 5 : 2),
-      pointHoverRadius: 6,
-      pointBackgroundColor: (context: any) => {
-        if (context.dataIndex === 7) return '#3B82F6'
-        if (context.dataIndex === 9) return '#F59E0B'
-        return '#EF4444'
-      },
-      pointBorderColor: '#FFFFFF',
-      pointBorderWidth: 2,
-      tension: 0.42,
-      fill: true,
-    }],
-  }
-})
+const selectedTeamRiskTrendChartData = computed(() => ({
+  labels: selectedTeamRiskTrendAxisLabels.value,
+  datasets: [{
+    label: selectedTeamAnalysis.value?.team || 'Takim',
+    data: selectedTeamWeeklyRiskValues.value,
+    borderColor: '#EF4444',
+    backgroundColor: (context: any) => {
+      const chart = context.chart
+      const area = chart.chartArea
+      if (!area) return 'rgba(239, 68, 68, 0.18)'
+      const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom)
+      gradient.addColorStop(0, 'rgba(239, 68, 68, 0.32)')
+      gradient.addColorStop(1, 'rgba(239, 68, 68, 0)')
+      return gradient
+    },
+    borderWidth: 3,
+    pointRadius: 2,
+    pointHoverRadius: 6,
+    pointBackgroundColor: '#EF4444',
+    pointBorderColor: '#FFFFFF',
+    pointBorderWidth: 2,
+    tension: 0.42,
+    fill: true,
+  }],
+}))
 
 const selectedTeamRiskTrendChartOptions = computed<ChartOptions<'line'>>(() => ({
   responsive: true,
@@ -2478,10 +2490,9 @@ const selectedTeamRiskTrendChartOptions = computed<ChartOptions<'line'>>(() => (
       cornerRadius: 8,
       callbacks: {
         title: (items: any[]) => {
-          const index = items?.[0]?.dataIndex
-          if (index === 7) return 'Hafta 8 - Sprint baslangici'
-          if (index === 9) return 'Hafta 10 - Kapasite asimi'
-          return items?.[0]?.label || 'Hafta'
+          const idx = items?.[0]?.dataIndex ?? 0
+          const labels = selectedTeamRiskTrendAxisLabels.value
+          return String(labels[idx] || `Donem ${idx + 1}`)
         },
         label: (context: any) => `Risk skoru: ${context.parsed.y}/10`,
       },
@@ -2513,6 +2524,41 @@ const selectedTeamRiskTrendChartOptions = computed<ChartOptions<'line'>>(() => (
   },
 }))
 
+const selectedTeamRiskLegendHints = computed(() => {
+  const values = selectedTeamWeeklyRiskValues.value
+  const team = selectedTeamAnalysis.value
+  if (values.length < 2 || !team) return []
+  const periods = filterPeriodsByTeamRange(team.trendPeriods || [])
+  const hints: { dotClass: string; text: string }[] = []
+  let maxRise = 0
+  let maxRiseIdx = 1
+  for (let i = 1; i < values.length; i++) {
+    const rise = values[i] - values[i - 1]
+    if (rise > maxRise) {
+      maxRise = rise
+      maxRiseIdx = i
+    }
+  }
+  if (maxRise > 0.12) {
+    const label = periods[maxRiseIdx] ? formatTrendAxisLabel(periods[maxRiseIdx]) : `D${maxRiseIdx + 1}`
+    hints.push({ dotClass: 'bg-rose-500', text: `${label}: Risk artisi (+${maxRise.toFixed(1)})` })
+  }
+  let maxDrop = 0
+  let maxDropIdx = 1
+  for (let i = 1; i < values.length; i++) {
+    const drop = values[i - 1] - values[i]
+    if (drop > maxDrop) {
+      maxDrop = drop
+      maxDropIdx = i
+    }
+  }
+  if (maxDrop > 0.12) {
+    const label = periods[maxDropIdx] ? formatTrendAxisLabel(periods[maxDropIdx]) : `D${maxDropIdx + 1}`
+    hints.push({ dotClass: 'bg-emerald-500', text: `${label}: Risk dususu (-${maxDrop.toFixed(1)})` })
+  }
+  return hints.slice(0, 2)
+})
+
 const selectedTeamAiActionCards = computed(() => {
   const narrativeActions = aggregateActionPlan(selectedTeamNarrative.value).slice(0, 2)
   if (narrativeActions.length >= 2) return narrativeActions
@@ -2532,15 +2578,17 @@ const selectedTeamAiActionCards = computed(() => {
   return [...narrativeActions, ...fallback].slice(0, 2)
 })
 
-const selectedTeamUpdatedAt = computed(() =>
-  new Date().toLocaleString('tr-TR', {
+const selectedTeamUpdatedAt = computed(() => {
+  const raw = bulkPredictionResult.value?.generated_at
+  if (!raw) return '-'
+  return new Date(raw).toLocaleString('tr-TR', {
     day: '2-digit',
-    month: 'long',
+    month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })
-)
+})
 
 const selectedTeamTalkingPointItems = computed(() => {
   const team = selectedTeamAnalysis.value
@@ -2561,10 +2609,7 @@ const selectedTeamTalkingPointItems = computed(() => {
       detail: point,
       priority,
       priorityLabel: priority === 'high' ? 'Yuksek' : priority === 'medium' ? 'Orta' : 'Dusuk',
-      bullets: [
-        'Somut ornek ve son hafta verisiyle konusmayi baslatin.',
-        'Engel, sahiplik ve takip tarihini toplantida yazili hale getirin.',
-      ],
+      bullets: talkingPointBulletsFromNarrative(selectedTeamNarrative.value, index),
     }
   })
 })
@@ -2632,96 +2677,155 @@ const teamComparisonInsight = computed(() => {
   }
 })
 
-const teamKpiCards = computed(() => [
-  {
-    label: 'Toplam Takim',
-    value: '4 takim',
-    trend: '+0%',
-    direction: 'up',
-    change: 'Son 4 hafta stabil',
-    badgeClass: 'bg-blue-50 text-blue-700',
-    trendClass: 'text-slate-500',
-    sparkClass: 'text-blue-500',
-    sparkline: '4,24 40,18 78,18 116,14',
-  },
-  {
-    label: 'Ortalama Risk Skoru',
-    value: '88.2/100',
-    trend: '+8%',
-    direction: 'up',
-    change: 'Risk yukseliyor',
-    badgeClass: 'bg-rose-50 text-rose-700',
-    trendClass: 'text-rose-600',
-    sparkClass: 'text-rose-500',
-    sparkline: '4,28 40,22 78,15 116,8',
-  },
-  {
-    label: 'Yuksek Riskli Takimlar',
-    value: '3 takim',
-    trend: '+1',
-    direction: 'up',
-    change: 'Yakindan izlenmeli',
-    badgeClass: 'bg-amber-50 text-amber-700',
-    trendClass: 'text-amber-600',
-    sparkClass: 'text-amber-500',
-    sparkline: '4,26 40,26 78,16 116,12',
-  },
-  {
-    label: 'Bu Ay Trend',
-    value: '-5%',
-    valueDirection: 'down',
-    trend: '-5%',
-    direction: 'down',
-    change: 'Performans dususu',
-    badgeClass: 'bg-rose-50 text-rose-700',
-    trendClass: 'text-rose-600',
-    sparkClass: 'text-rose-500',
-    sparkline: '4,8 40,13 78,20 116,28',
-  },
-])
-
-const teamTrendChartLabels = computed(() => {
-  const labels = Array.from(new Set(
-    filteredTeamRiskSummaries.value.flatMap((team) => filterPeriodsByTeamRange(team.trendPeriods || []))
-  )).sort()
-
-  if (labels.length) return labels.slice(-6).map((period) => formatMonthLabel(period))
-  return ["Ara '24", "Oca '25", "Sub '25", "Mar '25", "Nis '25", "May '25"]
-})
+function valuesToSparklinePoints(values: number[]): string {
+  if (!values.length) return '4,18 116,18'
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = Math.max(1e-9, max - min)
+  const w = 112
+  const h = 28
+  const pad = 4
+  return values.map((v, i, arr) => {
+    const x = pad + (i / Math.max(1, arr.length - 1)) * w
+    const y = pad + h - ((v - min) / span) * h
+    return `${Math.round(x)},${Math.round(y)}`
+  }).join(' ')
+}
 
 const teamTrendChartData = computed(() => {
+  const teams = filteredTeamRiskSummaries.value.filter((team) => visibleTrendTeams.value[team.team] !== false)
   const rawPeriods = Array.from(new Set(
-    filteredTeamRiskSummaries.value.flatMap((team) => filterPeriodsByTeamRange(team.trendPeriods || []))
+    teams.flatMap((team) => filterPeriodsByTeamRange(team.trendPeriods || []))
   )).sort()
-  const fallbackLabels = ["Ara '24", "Oca '25", "Sub '25", "Mar '25", "Nis '25", "May '25"]
-  const labels = rawPeriods.length ? rawPeriods.map((period) => formatMonthLabel(period)) : fallbackLabels
+
+  const fallbackLen = Math.max(
+    1,
+    ...teams.map((team) => normalizeTrendSeries(team.trendValues || [teamRiskScore(team)], 12).length),
+  )
+  const labels = rawPeriods.length
+    ? rawPeriods.map((period) => formatMonthLabel(period))
+    : Array.from({ length: Math.min(12, fallbackLen) }, (_, i) => `D${i + 1}`)
 
   return {
     labels,
-    datasets: filteredTeamRiskSummaries.value
-      .filter((team) => visibleTrendTeams.value[team.team] !== false)
-      .map((team) => {
-        const valuesByPeriod = new Map(
-          (team.trendPeriods || []).map((period: string, index: number) => [period, team.trendValues?.[index] ?? teamRiskScore(team)])
-        )
-        const data = rawPeriods.length
-          ? rawPeriods.map((period) => Number(valuesByPeriod.get(period) ?? null))
-          : normalizeTrendSeries(team.trendValues || [teamRiskScore(team)], labels.length)
+    datasets: teams.map((team) => {
+      const valuesByPeriod = new Map(
+        (team.trendPeriods || []).map((period: string, index: number) => [period, team.trendValues?.[index] ?? teamRiskScore(team)])
+      )
+      const data = rawPeriods.length
+        ? rawPeriods.map((period) => Number(valuesByPeriod.get(period) ?? null))
+        : normalizeTrendSeries(team.trendValues || [teamRiskScore(team)], labels.length)
 
-        return {
-          label: team.team,
-          data,
-          borderColor: teamLineColor(team.team),
-          backgroundColor: teamLineColor(team.team),
-          borderWidth: 3,
-          pointRadius: 0,
-          pointHoverRadius: 5,
-          tension: 0.42,
-          fill: false,
-          spanGaps: true,
-        }
-      }),
+      return {
+        label: team.team,
+        data,
+        borderColor: teamLineColor(team.team),
+        backgroundColor: teamLineColor(team.team),
+        borderWidth: 3,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        tension: 0.42,
+        fill: false,
+        spanGaps: true,
+      }
+    }),
   }
+})
+
+const aggregateDepartmentRiskSeries = computed(() => {
+  const data = teamTrendChartData.value
+  const n = data.labels.length
+  if (!n || !data.datasets.length) return []
+  const out: number[] = []
+  for (let i = 0; i < n; i++) {
+    const vals = data.datasets
+      .map((d) => Number((d as { data: unknown[] }).data[i]))
+      .filter((v) => Number.isFinite(v))
+    if (vals.length) out.push(vals.reduce((a, b) => a + b, 0) / vals.length)
+  }
+  return out
+})
+
+const teamKpiCards = computed(() => {
+  const teams = teamRiskSummaries.value
+  const bulk = bulkPredictionResult.value
+  if (!teams.length || !bulk) return []
+
+  const totalTeams = teams.length
+  const avgRisk = Math.round(
+    teams.reduce((sum, t) => sum + teamRiskScore(t), 0) / Math.max(1, totalTeams),
+  )
+  const highRiskTeams = teams.filter((t) => t.high > 0).length
+  const series = aggregateDepartmentRiskSeries.value
+  let trendPct = 0
+  if (series.length >= 2) {
+    const first = series[0]
+    const last = series[series.length - 1]
+    if (Number.isFinite(first) && first !== 0) trendPct = Math.round(((last - first) / first) * 100)
+  }
+  const watchRatio = bulk.prediction_count
+    ? Math.round(((bulk.high_risk_count + bulk.medium_risk_count) / bulk.prediction_count) * 100)
+    : 0
+
+  const teamScores = teams.map((t) => teamRiskScore(t))
+  const sparkSeries = series.length >= 2 ? series : teamScores
+
+  const fmtSignedPct = (pct: number) => {
+    if (pct > 0) return `+${pct}%`
+    if (pct < 0) return `${pct}%`
+    return '0%'
+  }
+
+  return [
+    {
+      label: 'Toplam Takim',
+      value: `${totalTeams} takim`,
+      trend: '—',
+      direction: 'up' as const,
+      change: `Toplu tahmin: ${bulk.prediction_count} kisi`,
+      badgeClass: 'bg-blue-50 text-blue-700',
+      trendClass: 'text-slate-500',
+      sparkClass: 'text-blue-500',
+      sparkline: valuesToSparklinePoints(teamScores.length >= 2 ? teamScores : [...teamScores, ...teamScores]),
+    },
+    {
+      label: 'Ortalama Risk Skoru',
+      value: `${avgRisk}/100`,
+      valueDirection: trendPct > 0 ? ('up' as const) : trendPct < 0 ? ('down' as const) : undefined,
+      trend: series.length >= 2 ? fmtSignedPct(trendPct) : '—',
+      direction: trendPct > 0 ? ('up' as const) : trendPct < 0 ? ('down' as const) : ('up' as const),
+      change: series.length >= 2 ? 'Coklu takim ortalama risk serisi (ilk-son donem)' : 'Donem serisi yok; anlik takim ortalamasi',
+      badgeClass: avgRisk >= 67 ? 'bg-rose-50 text-rose-700' : avgRisk >= 34 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700',
+      trendClass: trendPct > 0 ? 'text-rose-600 font-semibold' : trendPct < 0 ? 'text-emerald-600 font-semibold' : 'text-slate-500',
+      sparkClass: 'text-rose-500',
+      sparkline: valuesToSparklinePoints(sparkSeries.length ? sparkSeries : [avgRisk, avgRisk, avgRisk, avgRisk]),
+    },
+    {
+      label: 'Yuksek Riskli Takimlar',
+      value: `${highRiskTeams} takim`,
+      trend: highRiskTeams ? String(highRiskTeams) : '0',
+      direction: 'up' as const,
+      change: 'En az bir yuksek riskli uyeye sahip takim sayisi',
+      badgeClass: highRiskTeams ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700',
+      trendClass: highRiskTeams ? 'text-amber-600' : 'text-emerald-600',
+      sparkClass: 'text-amber-500',
+      sparkline: valuesToSparklinePoints(teams.map((t) => t.high)),
+    },
+    {
+      label: 'Izleme Kapsami',
+      value: `%${watchRatio}`,
+      valueDirection: watchRatio >= 35 ? ('up' as const) : watchRatio <= 10 ? ('down' as const) : undefined,
+      trend: `${bulk.high_risk_count}Y / ${bulk.medium_risk_count}O`,
+      direction: 'up' as const,
+      change: `Toplam ${bulk.prediction_count} tahminden yuksek+orta risk payi`,
+      badgeClass: watchRatio >= 40 ? 'bg-rose-50 text-rose-700' : watchRatio >= 15 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700',
+      trendClass: 'text-slate-600',
+      sparkClass: 'text-rose-500',
+      sparkline: valuesToSparklinePoints(
+        teams.map((t) => (t.total ? Math.round(((t.high + t.medium) / t.total) * 100) : 0)),
+      ),
+    },
+  ]
 })
 
 const teamTrendChartOptions = computed<ChartOptions<'line'>>(() => ({
@@ -2935,7 +3039,15 @@ function aggregateActionPlan(narrative?: Record<string, any> | null) {
 function aggregateTalkingPoints(narrative?: Record<string, any> | null) {
   const points = narrative?.leadership_talking_points
   if (Array.isArray(points) && points.length) return points.map((item) => String(item))
-  return ['Risk sinyalini takim ritmi, kapasite ve blokajlarla birlikte degerlendirin.']
+  return []
+}
+
+function talkingPointBulletsFromNarrative(narrative: Record<string, any> | null, index: number): string[] {
+  const plan = narrative?.action_plan
+  if (!Array.isArray(plan) || !plan[index]) return []
+  const raw = plan[index].manager_talking_points
+  if (Array.isArray(raw) && raw.length) return raw.map((item: unknown) => String(item)).filter(Boolean)
+  return []
 }
 
 function teamNarrative(teamName: string) {
@@ -3164,13 +3276,17 @@ function selectedTeamReportPayload(): TeamReportExportPayload | null {
       }
     }),
     trend: trendValues.map((value, index) => {
-      const motivation = teamMotivationTrendValue(value, index, trendValues.length)
+      const periods = filterPeriodsByTeamRange(team.trendPeriods || [])
+      const periodKey = periods[index]
+      const period = periodKey ? formatTrendAxisLabel(periodKey) : `Donem ${index + 1}`
+      const date =
+        periodKey && periodKey.length >= 7
+          ? formatPeriod(periodKey.length === 7 ? `${periodKey}-01` : periodKey)
+          : undefined
       return {
-        period: `Hafta ${index + 1}`,
-        date: trendPointDate(index, trendValues.length),
+        period,
+        date,
         risk_score: value,
-        motivation_avg: motivation,
-        capacity_usage: teamCapacityTrendValue(value, index, trendValues.length),
       }
     }),
     risk_factors: driverCounts.map(([name, count]) => ({
@@ -3207,11 +3323,9 @@ function actionPriority(index: number) {
   return 'P2'
 }
 
-function riskFactorProbability(name: string, count: number, team: { topReason: string; high: number; medium: number; total: number }) {
-  if (name === team.topReason) return Math.min(100, Math.max(90, 80 + count * 3))
-  if (count >= team.high) return 100
-  if (count > 1) return Math.min(85, 55 + count * 5)
-  return 60
+function riskFactorProbability(_name: string, count: number, team: { topReason: string; high: number; medium: number; total: number }) {
+  if (!team.total) return 0
+  return Math.min(100, Math.max(5, Math.round((count / team.total) * 100)))
 }
 
 function riskFactorPriority(name: string, count: number, team: { topReason: string; high: number }) {
@@ -3234,9 +3348,9 @@ function riskFactorTargetState(name: string) {
 
 function riskFactorGap(name: string, team: { riskScore?: number; trendValues?: number[]; trendPeriods?: string[]; high: number; medium: number; total: number }) {
   const normalized = name.toLowerCase()
-  if (normalized.includes('motivasyon')) return 'Yaklasik 3 puan'
-  if (normalized.includes('kapasite') || normalized.includes('yuk')) return `%${selectedTeamSprintOverage.value} kapasite asimi`
-  return `${team.high + team.medium} kisi izleme listesinde`
+  if (normalized.includes('motivasyon')) return 'KPI hedefi: model ve kayitli motivasyon sinyali arasindaki fark'
+  if (normalized.includes('kapasite') || normalized.includes('yuk')) return `Izleme listesi: ${team.high + team.medium}/${team.total || 0} kisi`
+  return `${team.high + team.medium} kisi izleme bandinda`
 }
 
 function riskFactorExpectedResult(name: string) {
@@ -3247,28 +3361,6 @@ function riskFactorExpectedResult(name: string) {
   return 'Takip edilmezse risk sinyalinin yayilmasi'
 }
 
-function trendPointDate(index: number, total: number) {
-  const date = new Date()
-  const weeksBack = Math.max(0, total - index - 1)
-  date.setDate(date.getDate() - (weeksBack * 7))
-  return date.toLocaleDateString('tr-TR', {
-    day: '2-digit',
-    month: 'short',
-    year: '2-digit',
-  })
-}
-
-function teamMotivationTrendValue(riskValue: number, index: number, total: number) {
-  const base = Math.max(2, Math.min(9, 10 - riskValue + 1.2))
-  const drift = total > 1 ? (index / (total - 1)) * 0.8 : 0
-  return Math.round(Math.max(1, base - drift) * 10) / 10
-}
-
-function teamCapacityTrendValue(riskValue: number, index: number, total: number) {
-  const progress = total > 1 ? index / (total - 1) : 1
-  const capacity = 78 + (riskValue * 4.3) + (progress * selectedTeamSprintOverage.value)
-  return Math.round(Math.max(60, Math.min(140, capacity)))
-}
 
 function employeeReportRiskScore(person: SoftwarePredictionResponse) {
   const probabilities = person.probabilities || {}
@@ -3500,6 +3592,12 @@ function formatMonthLabel(period: string) {
   const date = new Date(year, month - 1, 1)
   const label = date.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' })
   return label.replace('.', '').replace(' ', " '")
+}
+
+function formatTrendAxisLabel(period: string) {
+  const key = period.length >= 7 ? period.slice(0, 7) : period
+  if (/^\d{4}-\d{2}/.test(key)) return formatMonthLabel(key)
+  return period
 }
 
 function teamRangeLimit() {
@@ -3763,9 +3861,48 @@ async function loadPrediction(useLlmNarrative = false) {
 }
 
 async function openEmployeeAnalysis(person: SoftwarePredictionResponse) {
-  mlEmployeeId.value = person.employee_id
-  predictionResult.value = person
-  await loadPrediction(true)
+  await router.push({
+    name: 'manager-kpi-ml-analysis',
+    query: {
+      section: 'watchlist',
+      employeeId: String(person.employee_id),
+      uploadId: String(person.upload_id),
+    },
+  })
+}
+
+async function applyEmployeeDeepLinkFromRoute() {
+  const employeeRaw = route.query.employeeId
+  if (employeeRaw === undefined || employeeRaw === null || String(employeeRaw) === '') return
+
+  const employeeIdNum = Number(employeeRaw)
+  if (!Number.isFinite(employeeIdNum)) return
+
+  const uploadRaw = route.query.uploadId
+  const uploadIdNum =
+    uploadRaw !== undefined && uploadRaw !== null && String(uploadRaw) !== ''
+      ? Number(uploadRaw)
+      : NaN
+
+  if (
+    Number.isFinite(uploadIdNum) &&
+    softwareDatasets.value.some((u) => u.id === uploadIdNum) &&
+    mlUploadId.value !== uploadIdNum
+  ) {
+    mlUploadId.value = uploadIdNum
+  }
+
+  if (!mlUploadId.value) return
+
+  if (!datasetEmployees.value.some((e) => e.employee_id === employeeIdNum)) {
+    await loadDatasetEmployees()
+  }
+  if (!datasetEmployees.value.some((e) => e.employee_id === employeeIdNum)) return
+
+  if (mlEmployeeId.value === employeeIdNum && predictionResult.value?.employee_id === employeeIdNum) return
+
+  mlEmployeeId.value = employeeIdNum
+  await loadPrediction(false)
 }
 
 async function loadBulkPredictions(useLlmNarrative = false, llmTeam?: string) {
@@ -3855,6 +3992,20 @@ watch(
   () => route.query.section,
   (section) => syncAnalyticsSectionFromRoute(section),
   { immediate: true }
+)
+
+watch(
+  [
+    () => route.query.employeeId,
+    () => route.query.uploadId,
+    datasetEmployees,
+    mlUploadId,
+    softwareDatasets,
+  ],
+  async () => {
+    await applyEmployeeDeepLinkFromRoute()
+  },
+  { flush: 'post' }
 )
 
 onMounted(async () => {

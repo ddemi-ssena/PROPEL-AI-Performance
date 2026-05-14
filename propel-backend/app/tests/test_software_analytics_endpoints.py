@@ -144,6 +144,7 @@ def test_software_train_state_bulk_prediction_endpoint_flow(analytics_client):
     assert len(bulk["items"]) == 3
     assert len(bulk["team_narratives"]) == 3
     assert bulk["department_narrative"]["source"] == "deterministic"
+    assert "generated_at" in bulk
 
 
 def test_admin_upload_then_software_train_and_predict_flow(analytics_client):

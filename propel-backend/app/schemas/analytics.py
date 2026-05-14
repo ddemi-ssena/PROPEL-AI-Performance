@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -66,6 +66,94 @@ class DepartmentAnalyticsOverviewResponse(BaseModel):
     employee_summaries: list[EmployeeAnalyticsSnapshotResponse]
     notes: list[str]
     sprint_focus: list[str]
+
+
+class PerformanceStrengthResponse(BaseModel):
+    label: str
+    tooltip: str
+
+
+class PerformanceEmployeeRowResponse(BaseModel):
+    employee_id: int
+    employee_name: str
+    external_employee_code: Optional[str] = None
+    department_id: int
+    department_name: str
+    team: Optional[str] = None
+    position: Optional[str] = None
+    experience_years: Optional[float] = None
+    role_level: str
+    kpi_score: Optional[float] = None
+    trend: Optional[float] = None
+    sparkline_values: list[float] = []
+    strength: Optional[PerformanceStrengthResponse] = None
+    status: str
+    latest_period: Optional[date] = None
+    record_count: int = 0
+    has_kpi_data: bool = False
+
+
+class PerformanceTeamSummaryResponse(BaseModel):
+    team: str
+    employee_count: int
+    analyzed_count: int
+    average_kpi: Optional[float] = None
+    average_trend: Optional[float] = None
+    declining_count: int = 0
+    top_performer_count: int = 0
+
+
+class PerformanceRoleSummaryResponse(BaseModel):
+    role_level: str
+    label: str
+    employee_count: int
+    analyzed_count: int
+    average_kpi: Optional[float] = None
+    average_trend: Optional[float] = None
+    highest_employee_name: Optional[str] = None
+    highest_kpi: Optional[float] = None
+    lowest_employee_name: Optional[str] = None
+    lowest_kpi: Optional[float] = None
+
+
+class PerformanceKpiSummaryResponse(BaseModel):
+    total_employees: int
+    analyzed_employees: int
+    team_count: int
+    average_kpi: Optional[float] = None
+    average_trend: Optional[float] = None
+    top_performer_count: int
+    declining_count: int
+    junior_average: Optional[float] = None
+    junior_count: int
+    senior_average: Optional[float] = None
+    senior_count: int
+
+
+class PerformanceInsightResponse(BaseModel):
+    title: str
+    icon: str
+    text: str
+    tone: str
+
+
+class PerformanceActionGroupResponse(BaseModel):
+    title: str
+    items: list[str]
+
+
+class DepartmentPerformanceSummaryResponse(BaseModel):
+    scope_department_id: Optional[int] = None
+    scope_team: Optional[str] = None
+    latest_period: Optional[date] = None
+    summary: PerformanceKpiSummaryResponse
+    employees: list[PerformanceEmployeeRowResponse]
+    teams: list[PerformanceTeamSummaryResponse]
+    roles: list[PerformanceRoleSummaryResponse]
+    insights: list[PerformanceInsightResponse]
+    risk_people: list[PerformanceEmployeeRowResponse]
+    success_people: list[PerformanceEmployeeRowResponse]
+    action_groups: list[PerformanceActionGroupResponse]
 
 
 class SoftwareModelTrainRequest(AnalyticsBaseModel):
@@ -150,6 +238,7 @@ class SoftwareBulkPredictionResponse(BaseModel):
     high_risk_count: int
     medium_risk_count: int
     low_risk_count: int
+    generated_at: datetime
     department_narrative: Optional[dict] = None
     team_narratives: list[dict] = []
     team_analytics: list[dict] = []

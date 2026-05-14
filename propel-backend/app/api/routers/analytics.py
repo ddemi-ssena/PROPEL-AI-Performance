@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.schemas.analytics import (
     DepartmentAnalyticsConfigResponse,
     DepartmentAnalyticsOverviewResponse,
+    DepartmentPerformanceSummaryResponse,
     SoftwareBulkPredictionResponse,
     SoftwareDatasetEmployeeResponse,
     SoftwareDatasetResponse,
@@ -133,6 +134,21 @@ def get_bulk_software_predictions(
         target_column=target_column,
         use_llm_narrative=use_llm_narrative,
         llm_team=llm_team,
+    )
+
+
+@router.get("/performance/summary", response_model=DepartmentPerformanceSummaryResponse)
+def get_performance_summary(
+    department_id: int | None = None,
+    team: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return AnalyticsService.get_performance_summary(
+        db=db,
+        current_user=current_user,
+        department_id=department_id,
+        team=team,
     )
 
 
