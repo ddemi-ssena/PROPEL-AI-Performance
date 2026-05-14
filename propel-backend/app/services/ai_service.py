@@ -131,6 +131,32 @@ class AIService:
         },
     }
 
+    NLP_READY_QUESTION_EVIDENCE_CUES = [
+        "somut",
+        "ornek",
+        "gozlem",
+        "hangi durumda",
+        "bu hafta",
+        "son hafta",
+        "davranis",
+    ]
+
+    NLP_READY_QUESTION_SIGNAL_CUES = [
+        "etki",
+        "risk",
+        "motivasyon",
+        "guven",
+        "aidiyet",
+        "tukenmis",
+        "kopma",
+        "destek",
+        "blokaj",
+        "gelisim",
+        "yavaslat",
+        "zorlayici",
+        "enerji",
+    ]
+
     WEEKLY_ANALYSIS_JSON_CONTRACT = {
         "sentiment_label": "positive | neutral | negative",
         "sentiment_score": "number between -1 and 1",
@@ -283,8 +309,8 @@ class AIService:
 
         prompt = (
             "SISTEM TALIMATI:\n"
-            "Sen her departmanin uzmanlik dilini konusabilen kidemli bir IK stratejisti ve organizasyon psikologusun.\n"
-            "Gorevin, haftalik 360 geri bildirim akisi icin kisa, analitik, aksiyon odakli Turkce soru uretmektir.\n\n"
+            "Sen her departmanin uzmanlik dilini konusabilen kidemli bir IK stratejisti, organizasyon psikologu ve NLP veri tasarim uzmanisin.\n"
+            "Gorevin, haftalik 360 geri bildirim akisi icin cevabi NLP analizine uygun, kisa, spesifik ve aksiyon odakli Turkce soru uretmektir.\n\n"
             "DEGERLENDIRILEN KISI BAGLAMI:\n"
             f"- Departman: {normalized_dept}\n"
             f"- Rol: {role_label_tr}\n"
@@ -294,17 +320,24 @@ class AIService:
             f"- Rol odagi: {role_focus}\n"
             f"- Davranissal/NLP sinyal odagi: {signal_focus}\n"
             f"- Zorunlu odak kelimeleri: {hint}\n\n"
+            "NLP ANALIZ HEDEFI:\n"
+            "- Cevap metninden duygu tonu, motivasyon, psikolojik guven, is birligi, destek ihtiyaci, burnout/flight risk ve aksiyon onerisi cikarilabilmeli.\n"
+            "- Soru, kisiyi genel ovgu yerine gozlenebilir bir olay/davranis ve bunun etkisini anlatmaya yonlendirmeli.\n"
+            "- Cevapta en az bir somut ornek, etki ve risk/destek sinyali dogal olarak olusmali.\n\n"
             "SORU URETIM KURALLARI:\n"
-            "- Cikti maksimum 2 cumle olsun.\n"
+            "- Cikti 1 veya 2 soru cumlesi olsun; toplam 18-34 kelime araliginda kal.\n"
             "- Yalnizca soru cumlesini don, aciklama ekleme.\n"
-            "- Her soruda yalnizca TEK spesifik yetkinlik veya davranisa odaklan.\n"
+            "- Her soruda yalnizca TEK spesifik yetkinlik, olay veya davranisa odaklan.\n"
             "- Ayni soruda birden fazla ana yetkinligi birlestirme.\n"
-            "- Soyut kavramlar yerine somut ve gozlemlenebilir davranis sor.\n"
+            "- Soyut kavramlar yerine somut, son hafta icinde gozlenebilir davranis sor.\n"
+            "- Mutlaka 'somut ornek', 'etkisi' veya 'hangi durumda' gibi kanit isteyen bir ifade kullan.\n"
+            "- Mutlaka destek ihtiyaci, motivasyon, psikolojik guven, blokaj, risk, aidiyet veya gelisim sinyallerinden birini yokla.\n"
             "- En az bir zorunlu odak kelimesini aynen kullan.\n"
-            "- Sorunun icinde motivasyon kaybi, aidiyet zayiflamasi, tukenmislik veya flight risk sinyali yakalanabilecek bir nufans olsun.\n"
+            "- Sorunun icinde motivasyon kaybi, aidiyet zayiflamasi, tukenmislik veya flight risk sinyali yakalanabilecek bir nufans olsun; ama suclayici dil kullanma.\n"
             "- Yonetici icin soru, mentorluk kalitesi veya ekibin onunu acma becerisine odaklansin.\n"
             "- Calisan icin soru, uygulama disiplini veya ekip uyumuna odaklansin.\n"
-            "- Soru 1-5 ile puanlanabilir veya kisa gozlemle desteklenebilir bir yapi tasiyabilir.\n"
+            "- Soru 1-5 ile puanlanabilir ve kisa gozlemle desteklenebilir bir yapi tasiyabilsin.\n"
+            "- 'Nasil degerlendirirsin?' tek basina yeterli degil; yanita kanit ve etki istet.\n"
             "- Genel ve geveze kaliplardan kacin.\n"
             "- Enum, degisken adi, markdown veya sistem etiketi yazma.\n"
         )
@@ -330,7 +363,7 @@ class AIService:
         role_focus = AIService.ROLE_BEHAVIOR_GUIDANCE.get(role_bucket, "uygulama disiplini")
         signal_focus = AIService.WEEK_SIGNAL_GUIDANCE.get(normalized_theme, "motivasyon veya performans sinyali")
         prompt = (
-            "Tek gorevin tek cumlelik Turkce bir haftalik geri bildirim sorusu yazmak.\n"
+            "Tek gorevin NLP analizine uygun tek veya iki cumlelik Turkce haftalik 360 geri bildirim sorusu yazmak.\n"
             f"Departman: {normalized_dept}\n"
             f"Rol: {role_label_tr}\n"
             f"Tema: {normalized_theme}\n"
@@ -340,11 +373,12 @@ class AIService:
             f"Zorunlu ifade: {focus_term}\n"
             "Kurallar:\n"
             "- Sadece soruyu yaz.\n"
-            "- Maksimum 2 cumle olsun.\n"
+            "- 18-34 kelime araliginda kal.\n"
             "- Tek bir davranis veya yetkinlige odaklan.\n"
             "- Soruda zorunlu ifade aynen gecsin.\n"
-            "- Soru somut, gozlemlenebilir ve kisa olsun.\n"
-            "- Tukenmislik, aidiyet kaybi veya flight risk sinyali yakalanabilecek nufans tasiyabilsin.\n"
+            "- Soru son haftadan somut ornek veya hangi durum bilgisini istesin.\n"
+            "- Soru davranisin etkisini sordursun.\n"
+            "- Destek ihtiyaci, motivasyon, psikolojik guven, tukenmislik, aidiyet kaybi veya flight risk sinyali yakalanabilecek nufans tasiyabilsin.\n"
         )
         return prompt, required_terms
 
@@ -606,6 +640,21 @@ class AIService:
             if term_tokens and sum(token in lowered for token in term_tokens) >= max(1, min(2, len(term_tokens))):
                 return True
         return False
+
+    @staticmethod
+    def is_question_nlp_ready(question: str, terms: Optional[list[str]] = None) -> bool:
+        normalized = AIService._normalize_text(question or "").lower()
+        tokens = [token for token in normalized.replace("?", " ").split() if token]
+        if not normalized.endswith("?"):
+            return False
+        if len(tokens) < 12 or len(tokens) > 42:
+            return False
+        if terms and not AIService._matches_required_terms(question, terms):
+            return False
+
+        has_evidence_cue = any(cue in normalized for cue in AIService.NLP_READY_QUESTION_EVIDENCE_CUES)
+        has_signal_cue = any(cue in normalized for cue in AIService.NLP_READY_QUESTION_SIGNAL_CUES)
+        return has_evidence_cue and has_signal_cue
 
     @staticmethod
     def _extract_json_object(raw_text: str) -> Optional[dict]:
@@ -1320,44 +1369,44 @@ class AIService:
         if normalized_theme == "Surecler & Blokajlar":
             if role_bucket == "manager":
                 return (
-                    f"Yoneticinin bu hafta ekipteki blokajlari kaldirma hizini, ozellikle {focus_term} konusunda ekibin onunu acma becerisi acisindan nasil degerlendirirsin? "
-                    "Eksik kaldigini dusundugun somut bir nokta var mi?"
+                    f"Bu hafta {focus_term} sirasinda yoneticinin kaldirdigi veya kaldiramadigi en somut blokaj neydi? "
+                    "Bunun ekip akisi ve guven hissi uzerindeki etkisini hangi ornekle aciklarsin?"
                 )
             return (
-                f"Bu kisinin bu hafta {focus_term} konusunda sergiledigi uygulama disiplini, ekibin is akisini yavaslatacak veya teknik borc biriktirecek bir risk tasiyor mu? "
-                "Gozlemini paylas."
+                f"Bu kisinin bu hafta {focus_term} konusunda is akisini hizlandiran veya yavaslatan en somut davranisi neydi? "
+                "Bu davranisin risk ya da destek ihtiyacina etkisini hangi ornekle anlatirsin?"
             )
 
         if normalized_theme == "Motivasyon & Psikolojik Durum":
             if role_bucket == "manager":
                 return (
-                    f"Yoneticinin bu hafta {focus_term} tarafindaki destegi, seni ve ekibi ne kadar guvende hissettirdi? "
-                    "Motivasyon kaybi veya kopma riski olusturan bir eksiklik gozlemledin mi?"
+                    f"Yoneticinin bu hafta {focus_term} tarafindaki hangi somut davranisi ekipte guven veya motivasyon yaratti? "
+                    "Tersi bir etki ya da kopma riski gozlemlediysen ornekle aciklar misin?"
                 )
             return (
-                f"Bu kisinin bu hafta {focus_term} sirasindaki istekliligi ve ekip hedeflerine olan inanci, motivasyon dususu veya kopma sinyali veriyor mu? "
-                "Gozlemini paylas."
+                f"Bu kisinin bu hafta {focus_term} sirasindaki hangi somut davranisi motivasyonunu veya aidiyetini gosterdi? "
+                "Enerji dususu ya da destek ihtiyaci sinyali varsa hangi durumda fark ettin?"
             )
 
         if normalized_theme == "Is Birligi & Seffaflik":
             if role_bucket == "manager":
                 return (
-                    f"Yoneticinin {focus_term} konusundaki iletisim tarzi ve ekibin onunu acma becerisi, ekip ici guveni ve acikligi guclendiriyor mu? "
-                    "Kisa gozlemini paylas."
+                    f"Yoneticinin bu hafta {focus_term} konusunda ekip ici guveni guclendiren veya zayiflatan en somut davranisi neydi? "
+                    "Bunun seffaflik ve destek ihtiyacina etkisini ornekle aciklar misin?"
                 )
             return (
-                f"Bu kisinin bu hafta {focus_term} sirasindaki iletisimi ve ekip uyumu, takim enerjisini olumlu mu yoksa zorlayici mi etkiledi? "
-                "Gozlemini paylas."
+                f"Bu kisinin bu hafta {focus_term} sirasindaki hangi somut iletisim davranisi takim enerjisini etkiledi? "
+                "Olumlu ya da zorlayici etkisini hangi ornekle anlatirsin?"
             )
 
         if role_bucket == "manager":
             return (
-                f"Yoneticinin bu hafta {focus_term} alanindaki mentorluk kalitesi, ekibin gelisim hizini gercekten destekliyor mu? "
-                "Eksik kaldigini dusundugun bir nokta var mi?"
+                f"Yoneticinin bu hafta {focus_term} alaninda gelisimi destekleyen veya yavaslatan en somut mentorluk davranisi neydi? "
+                "Bunun motivasyon ve guven uzerindeki etkisini ornekle aciklar misin?"
             )
         return (
-            f"Bu kisinin bu hafta {focus_term} alanindaki ogrenme istegi ve gelisim disiplini, sahiplenme gucunu mu gosteriyor yoksa durgunluk sinyali mi veriyor? "
-            "Gozlemini paylas."
+            f"Bu kisinin bu hafta {focus_term} alaninda gelisim istegini veya durgunluk riskini gosteren en somut davranisi neydi? "
+            "Bu davranisin ekip destegi ihtiyacina etkisini ornekle aciklar misin?"
         )
 
     @staticmethod
@@ -1394,6 +1443,8 @@ class AIService:
             if not cleaned:
                 continue
             if terms and not AIService._matches_required_terms(cleaned, terms):
+                continue
+            if not AIService.is_question_nlp_ready(cleaned, terms):
                 continue
             return cleaned
         return None

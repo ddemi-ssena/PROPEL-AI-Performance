@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from datetime import date, datetime, timedelta
 from math import ceil
 import random
+import logging
 
 from app.db.models.feedback import (
     Feedback, FeedbackRequest, EmployeeBadge,
@@ -25,6 +26,10 @@ from app.services.ai_service import AIService
 from app.services.nlp_service import NLPService
 from app.services.rag_service import RAGService
 from app.db.models.nlp import NLPPeriodType
+from app.db.session import SessionLocal
+
+
+logger = logging.getLogger(__name__)
 
 
 class FeedbackService:
@@ -887,6 +892,20 @@ class FeedbackService:
         fallback_direction = FeedbackService._normalize_direction_for_question(raw_direction)
         category = FeedbackService.WEEKLY_THEME_BY_WEEK[week_number]
         target_department_id = receiver.department_id
+        dept_name = "Genel"
+        if target_department_id:
+            dept = db.query(Department).filter(Department.id == target_department_id).first()
+            if dept:
+                dept_name = dept.name
+        normalized_dept = AIService._normalize_text(dept_name)
+        role_bucket = AIService._role_bucket(receiver.user.role)
+        required_terms = AIService.DEPARTMENT_ROLE_MATRIX.get(
+            normalized_dept,
+            {},
+        ).get(
+            role_bucket,
+            ["is birligi", "surec disiplini", "gelisim ihtiyaci"],
+        )
 
         # 1) Once tam baglama gore AI-generated cache varsa onu kullan
         question = db.query(FeedbackQuestion).filter(
@@ -896,7 +915,7 @@ class FeedbackService:
             FeedbackQuestion.is_ai_generated.is_(True),
         ).order_by(FeedbackQuestion.id.desc()).first()
 
-        if question:
+        if question and AIService.is_question_nlp_ready(question.question_text, required_terms):
             return question
 
         # 1b) Peer varyantlari icin normalize edilmis eski cache de varsa onu kullan
@@ -907,16 +926,10 @@ class FeedbackService:
                 FeedbackQuestion.department_id == target_department_id,
                 FeedbackQuestion.is_ai_generated.is_(True),
             ).order_by(FeedbackQuestion.id.desc()).first()
-            if question:
+            if question and AIService.is_question_nlp_ready(question.question_text, required_terms):
                 return question
 
         # 2) AI ile uretmeyi dene (degerlendirilen kisinin departmani ve rolune gore)
-        dept_name = "Genel"
-        if target_department_id:
-            dept = db.query(Department).filter(Department.id == target_department_id).first()
-            if dept:
-                dept_name = dept.name
-
         ai_question = AIService.generate_weekly_question(
             dept_name,
             receiver.user.role,
@@ -949,7 +962,7 @@ class FeedbackService:
             FeedbackQuestion.department_id.is_(None).asc(),
             FeedbackQuestion.id.asc(),
         ).first()
-        if fallback:
+        if fallback and AIService.is_question_nlp_ready(fallback.question_text, required_terms):
             return fallback
 
         # 3b) Tam yonlu soru yoksa normalize edilmis yonde ara
@@ -965,7 +978,7 @@ class FeedbackService:
                 FeedbackQuestion.department_id.is_(None).asc(),
                 FeedbackQuestion.id.asc(),
             ).first()
-            if fallback:
+            if fallback and AIService.is_question_nlp_ready(fallback.question_text, required_terms):
                 return fallback
 
         # 4) Seed havuzunda da yoksa haftaya ve role gore deterministic akilli fallback uret
@@ -1024,6 +1037,7 @@ class FeedbackService:
         score_teamwork: float,
         score_leadership: float,
         score_technical: float,
+        process_nlp_sync: bool = True,
     ) -> FeedbackResponse:
         if not response_text.strip():
             raise HTTPException(status_code=400, detail="Metin alanlari bos birakilamaz")
@@ -1083,71 +1097,102 @@ class FeedbackService:
         db.commit()
         db.refresh(row)
 
-        if receiver:
-            quality_payload = FeedbackService._detect_low_quality_feedback(row.response_text)
-            reciprocity_payload = FeedbackService._detect_reciprocity_bias(
-                db,
-                feedback_response=row,
-            )
-            dept_name = receiver.department.name if receiver.department else "Genel"
-            analysis_payload, model_provider, model_name = AIService.analyze_weekly_feedback(
-                dept_name=dept_name,
-                target_role=receiver.user.role,
-                week_theme=question.category,
-                direction_label_tr=FeedbackService._direction_label_tr(question.direction),
-                question_text=question.question_text,
-                response_text=row.response_text,
-                score_communication=float(row.score_communication),
-                score_teamwork=float(row.score_teamwork),
-                score_leadership=float(row.score_leadership),
-                score_technical=float(row.score_technical),
-            )
-
-            quality_flags: list[str] = []
-            if quality_payload["is_low_quality"]:
-                quality_flags.append("dusuk_veri_kalitesi")
-            if reciprocity_payload["reciprocity_bias_suspected"]:
-                quality_flags.append("karsilikli_puan_bias_suphesi")
-
-            existing_risk_flags = [
-                str(item).strip()
-                for item in (analysis_payload.get("risk_flags") or [])
-                if str(item).strip()
-            ]
-            analysis_payload["risk_flags"] = list(dict.fromkeys(existing_risk_flags + quality_flags))
-            analysis_payload["quality_signal"] = quality_payload
-            analysis_payload["reciprocity_signal"] = reciprocity_payload
-
-            NLPService.save_weekly_analysis(
-                db,
-                feedback_response=row,
-                analysis_payload=analysis_payload,
-                analysis_version="v1",
-                model_provider=model_provider,
-                model_name=model_name,
-            )
-            NLPService.rebuild_employee_profile(
-                db,
-                employee_id=receiver.id,
-                period_type=NLPPeriodType.weekly,
-                period_year=row.period_year,
-                period_month=row.period_month,
-                period_week=row.period_week,
-            )
-            NLPService.refresh_employee_monthly_badges(
-                db,
-                employee_id=receiver.id,
-                period_year=row.period_year,
-                period_month=row.period_month,
-            )
-            RAGService.upsert_weekly_feedback_memory(
-                db,
-                feedback_response=row,
-                analysis_payload=analysis_payload,
-            )
-            if mandatory_assignment and mandatory_assignment.status == FeedbackAssignmentStatus.pending and mandatory_assignment.target_id == receiver.id:
-                mandatory_assignment.status = FeedbackAssignmentStatus.completed
-                mandatory_assignment.completed_feedback_response_id = row.id
+        if mandatory_assignment and mandatory_assignment.status == FeedbackAssignmentStatus.pending and mandatory_assignment.target_id == receiver.id:
+            mandatory_assignment.status = FeedbackAssignmentStatus.completed
+            mandatory_assignment.completed_feedback_response_id = row.id
             db.commit()
             db.refresh(row)
+
+        if process_nlp_sync:
+            FeedbackService.process_weekly_feedback_analysis(db, row.id)
+            db.refresh(row)
         return row
+
+    @staticmethod
+    def process_weekly_feedback_analysis(db: Session, feedback_response_id: int) -> None:
+        row = db.query(FeedbackResponse).filter(FeedbackResponse.id == feedback_response_id).first()
+        if not row:
+            logger.warning("weekly_feedback_analysis_skipped_missing_row feedback_response_id=%s", feedback_response_id)
+            return
+        if row.nlp_record:
+            return
+
+        receiver = row.receiver
+        question = row.question
+        if not receiver or not question:
+            logger.warning("weekly_feedback_analysis_skipped_missing_context feedback_response_id=%s", feedback_response_id)
+            return
+
+        quality_payload = FeedbackService._detect_low_quality_feedback(row.response_text)
+        reciprocity_payload = FeedbackService._detect_reciprocity_bias(
+            db,
+            feedback_response=row,
+        )
+        dept_name = receiver.department.name if receiver.department else "Genel"
+        analysis_payload, model_provider, model_name = AIService.analyze_weekly_feedback(
+            dept_name=dept_name,
+            target_role=receiver.user.role,
+            week_theme=question.category,
+            direction_label_tr=FeedbackService._direction_label_tr(question.direction),
+            question_text=question.question_text,
+            response_text=row.response_text,
+            score_communication=float(row.score_communication),
+            score_teamwork=float(row.score_teamwork),
+            score_leadership=float(row.score_leadership),
+            score_technical=float(row.score_technical),
+        )
+
+        quality_flags: list[str] = []
+        if quality_payload["is_low_quality"]:
+            quality_flags.append("dusuk_veri_kalitesi")
+        if reciprocity_payload["reciprocity_bias_suspected"]:
+            quality_flags.append("karsilikli_puan_bias_suphesi")
+
+        existing_risk_flags = [
+            str(item).strip()
+            for item in (analysis_payload.get("risk_flags") or [])
+            if str(item).strip()
+        ]
+        analysis_payload["risk_flags"] = list(dict.fromkeys(existing_risk_flags + quality_flags))
+        analysis_payload["quality_signal"] = quality_payload
+        analysis_payload["reciprocity_signal"] = reciprocity_payload
+
+        NLPService.save_weekly_analysis(
+            db,
+            feedback_response=row,
+            analysis_payload=analysis_payload,
+            analysis_version="v1",
+            model_provider=model_provider,
+            model_name=model_name,
+        )
+        NLPService.rebuild_employee_profile(
+            db,
+            employee_id=receiver.id,
+            period_type=NLPPeriodType.weekly,
+            period_year=row.period_year,
+            period_month=row.period_month,
+            period_week=row.period_week,
+        )
+        NLPService.refresh_employee_monthly_badges(
+            db,
+            employee_id=receiver.id,
+            period_year=row.period_year,
+            period_month=row.period_month,
+        )
+        RAGService.upsert_weekly_feedback_memory(
+            db,
+            feedback_response=row,
+            analysis_payload=analysis_payload,
+        )
+        db.commit()
+
+    @staticmethod
+    def process_weekly_feedback_analysis_in_background(feedback_response_id: int) -> None:
+        db = SessionLocal()
+        try:
+            FeedbackService.process_weekly_feedback_analysis(db, feedback_response_id)
+        except Exception:
+            db.rollback()
+            logger.exception("weekly_feedback_analysis_background_failed feedback_response_id=%s", feedback_response_id)
+        finally:
+            db.close()

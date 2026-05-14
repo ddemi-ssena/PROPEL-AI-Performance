@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -101,6 +101,7 @@ def get_current_question(
 @router.post("/submit", response_model=SubmitFeedbackResponse, status_code=status.HTTP_201_CREATED)
 def submit_weekly_feedback(
     payload: SubmitFeedbackPayload,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_employee: Employee = Depends(get_current_employee_record),
 ):
@@ -113,6 +114,11 @@ def submit_weekly_feedback(
         score_teamwork=payload.score_teamwork,
         score_leadership=payload.score_leadership,
         score_technical=payload.score_technical,
+        process_nlp_sync=False,
+    )
+    background_tasks.add_task(
+        FeedbackService.process_weekly_feedback_analysis_in_background,
+        row.id,
     )
     return row
 
