@@ -1651,6 +1651,70 @@
       v-if="selectedDepartmentConfig && activeAnalyticsSection === 'department'"
       class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_360px] gap-6"
     >
+      <div class="xl:col-span-2 space-y-5">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <article
+            v-for="card in kpiDepartmentCards"
+            :key="card.label"
+            class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+          >
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ card.label }}</p>
+            <p
+              class="mt-3 text-3xl font-black"
+              :class="{
+                'text-slate-900': card.tone === 'slate',
+                'text-emerald-600': card.tone === 'emerald',
+                'text-amber-500': card.tone === 'amber',
+                'text-rose-600': card.tone === 'rose',
+              }"
+            >
+              {{ card.value }}
+            </p>
+            <p class="mt-2 text-sm font-medium text-slate-500">{{ card.hint }}</p>
+          </article>
+        </div>
+
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+          <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">KPI Rol Karsilastirmasi</p>
+                <h3 class="mt-1 text-lg font-bold text-slate-900">Rol bazli performans ve trend</h3>
+              </div>
+              <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                {{ kpiPerformanceEmployees.length }} analizli calisan
+              </span>
+            </div>
+            <div v-if="kpiPerformanceRoles.length" class="mt-5 h-[340px]">
+              <Bar :data="kpiRoleChartData" :options="kpiRoleChartOptions" />
+            </div>
+            <div v-else class="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+              KPI rol karsilastirmasi icin yeterli veri yok.
+            </div>
+          </section>
+
+          <aside class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Takim KPI Ozeti</p>
+            <div class="mt-4 space-y-3">
+              <div
+                v-for="team in kpiPerformanceTeams"
+                :key="team.team"
+                class="rounded-xl border border-slate-100 bg-slate-50 p-4"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-bold text-slate-900">{{ team.team }}</p>
+                  <span class="text-sm font-black text-slate-900">{{ team.average_kpi ?? '-' }}/100</span>
+                </div>
+                <p class="mt-2 text-xs text-slate-500">
+                  {{ team.analyzed_count }}/{{ team.employee_count }} analizli / trend {{ formatSigned(team.average_trend || 0) }}
+                </p>
+              </div>
+              <p v-if="!kpiPerformanceTeams.length" class="text-sm text-slate-500">Takim KPI verisi henuz yok.</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex items-start justify-between gap-4">
           <div>
@@ -1749,6 +1813,70 @@
       v-if="overview && activeAnalyticsSection === 'watchlist'"
       class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_360px] gap-6"
     >
+      <section class="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">KPI Calisan Tablosu</p>
+            <h3 class="mt-1 text-lg font-bold text-slate-900">Performans summary endpointinden gelen calisanlar</h3>
+          </div>
+          <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+            {{ kpiPerformanceEmployees.length }} analizli
+          </span>
+        </div>
+        <div class="mt-5 overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead>
+              <tr class="text-left text-slate-500">
+                <th class="pb-3 font-medium">Calisan</th>
+                <th class="pb-3 font-medium">Takim / Rol</th>
+                <th class="pb-3 font-medium">KPI</th>
+                <th class="pb-3 font-medium">Trend</th>
+                <th class="pb-3 font-medium">Guc</th>
+                <th class="pb-3 font-medium">Durum</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr
+                v-for="employee in kpiRiskPeople"
+                :key="employee.employee_id"
+                class="align-top"
+              >
+                <td class="py-3 pr-4">
+                  <p class="font-semibold text-slate-900">{{ employee.employee_name }}</p>
+                  <p class="text-xs text-slate-500">{{ employee.external_employee_code || '-' }}</p>
+                </td>
+                <td class="py-3 pr-4 text-slate-600">
+                  {{ employee.team || '-' }} / {{ employee.position || 'Rol yok' }}
+                </td>
+                <td class="py-3 pr-4">
+                  <div class="flex min-w-[150px] items-center gap-2">
+                    <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <div class="h-full rounded-full bg-blue-600" :style="{ width: `${Math.max(0, Math.min(100, employee.kpi_score || 0))}%` }"></div>
+                    </div>
+                    <span class="w-14 text-right font-bold text-slate-900">{{ employee.kpi_score ?? '-' }}</span>
+                  </div>
+                </td>
+                <td class="py-3 pr-4 font-semibold" :class="trendClass(employee.trend || 0)">
+                  {{ formatSigned(employee.trend || 0) }}
+                </td>
+                <td class="py-3 pr-4 text-slate-600">{{ employee.strength?.label || 'KPI sinyali' }}</td>
+                <td class="py-3">
+                  <span
+                    class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                    :class="employee.status === 'risk' ? 'bg-rose-50 text-rose-700' : employee.status === 'watch' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'"
+                  >
+                    {{ employee.status }}
+                  </span>
+                </td>
+              </tr>
+              <tr v-if="!kpiRiskPeople.length">
+                <td colspan="6" class="py-8 text-center text-sm text-slate-500">KPI calisan verisi henuz yok.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between gap-3">
           <div>
@@ -2044,18 +2172,20 @@ import {
   type ChartOptions,
   Filler,
   Legend,
+  BarElement,
   LineElement,
   LinearScale,
   PointElement,
   Tooltip,
 } from 'chart.js'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Line } from 'vue-chartjs'
+import { Bar, Line } from 'vue-chartjs'
 import { useRoute, useRouter } from 'vue-router'
 import {
   analyticsApi,
   type DepartmentAnalyticsConfigResponse,
   type DepartmentAnalyticsOverviewResponse,
+  type DepartmentPerformanceSummaryResponse,
   type SoftwareBulkPredictionResponse,
   type SoftwareDatasetEmployeeResponse,
   type SoftwareDatasetResponse,
@@ -2067,12 +2197,13 @@ import {
 import { meetingsApi } from '@/services/api/meetings.api'
 import { notificationsApi } from '@/services/api/notifications.api'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler)
 
 const route = useRoute()
 const router = useRouter()
 const departmentConfigs = ref<DepartmentAnalyticsConfigResponse[]>([])
 const overview = ref<DepartmentAnalyticsOverviewResponse | null>(null)
+const performanceSummary = ref<DepartmentPerformanceSummaryResponse | null>(null)
 const selectedDepartment = ref('software')
 const selectedTeam = ref('all')
 const selectedTeamAnalysisName = ref('')
@@ -2160,8 +2291,8 @@ const sectionMeta: Record<AnalyticsSectionKey, { eyebrow: string; title: string;
     action: 'Modeli Yenile',
   },
   department: {
-    eyebrow: 'Departman Analizi',
-    title: 'Software departmaninin haftalik risk resmi',
+    eyebrow: 'KPI Departman Analizi',
+    title: 'Departmanin KPI ve ML risk resmi',
     description: 'Departman seviyesinde toplam risk, tekrar eden KPI nedenleri, LLM yonetici yorumu ve haftalik aksiyon onerileri burada toplanir.',
     action: 'Departmani Yorumla',
   },
@@ -2172,8 +2303,8 @@ const sectionMeta: Record<AnalyticsSectionKey, { eyebrow: string; title: string;
     action: 'Takimlari Yorumla',
   },
   watchlist: {
-    eyebrow: 'Calisan Analizi',
-    title: 'Calisan listesi ve bireysel analiz girisi',
+    eyebrow: 'KPI Calisan Analizi',
+    title: 'Calisan listesi ve bireysel KPI analizi',
     description: 'Bu bolumde tum calisanlar listelenir. Bir calisan adina tiklayinca detayli bireysel KPI yorumu ve haftalik oneriler acilir.',
     action: 'Calisanlari Tara',
   },
@@ -2190,6 +2321,90 @@ const activeSectionMeta = computed(() => sectionMeta[activeAnalyticsSection.valu
 const activeSectionNeedsBulk = computed(() =>
   bulkSections.includes(activeAnalyticsSection.value) && !bulkPredictionResult.value
 )
+
+const kpiPerformanceSummary = computed(() => performanceSummary.value?.summary || null)
+const kpiPerformanceEmployees = computed(() =>
+  (performanceSummary.value?.employees || []).filter((employee) => employee.has_kpi_data)
+)
+const kpiPerformanceTeams = computed(() => performanceSummary.value?.teams || [])
+const kpiPerformanceRoles = computed(() => performanceSummary.value?.roles || [])
+const kpiRiskPeople = computed(() =>
+  (performanceSummary.value?.risk_people?.length ? performanceSummary.value.risk_people : kpiPerformanceEmployees.value)
+    .filter((employee) => employee.has_kpi_data)
+    .slice(0, 8)
+)
+
+const kpiDepartmentCards = computed(() => {
+  const summary = kpiPerformanceSummary.value
+  return [
+    {
+      label: 'Toplam Calisan',
+      value: summary ? `${summary.total_employees}` : '-',
+      hint: summary ? `${summary.team_count} takim` : 'KPI kapsami bekleniyor',
+      tone: 'slate',
+    },
+    {
+      label: 'Ortalama KPI',
+      value: summary?.average_kpi != null ? `${summary.average_kpi}/100` : '-',
+      hint: summary?.average_trend != null ? `4H trend ${formatSigned(summary.average_trend)}` : 'Trend yok',
+      tone: 'emerald',
+    },
+    {
+      label: 'Top Performers',
+      value: summary ? `${summary.top_performer_count}` : '-',
+      hint: 'Skor > 92',
+      tone: 'amber',
+    },
+    {
+      label: 'Dusus Gosteren',
+      value: summary ? `${summary.declining_count}` : '-',
+      hint: 'Son 4 haftada negatif trend',
+      tone: 'rose',
+    },
+  ]
+})
+
+const kpiRoleChartData = computed(() => ({
+  labels: kpiPerformanceRoles.value.map((role) => role.label),
+  datasets: [
+    {
+      label: 'Ortalama KPI',
+      data: kpiPerformanceRoles.value.map((role) => role.average_kpi ?? 0),
+      backgroundColor: '#2563EB',
+      borderRadius: 8,
+      yAxisID: 'y',
+    },
+    {
+      label: '4H Trend',
+      data: kpiPerformanceRoles.value.map((role) => role.average_trend ?? 0),
+      backgroundColor: kpiPerformanceRoles.value.map((role) => (Number(role.average_trend || 0) >= 0 ? '#10B981' : '#EF4444')),
+      borderRadius: 8,
+      yAxisID: 'trend',
+    },
+  ],
+}))
+
+const kpiRoleChartOptions = computed<ChartOptions<'bar'>>(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  scales: {
+    y: { min: 0, max: 100, grid: { color: '#EEF2F7' }, title: { display: true, text: 'KPI Skoru' } },
+    trend: { position: 'right', min: -10, max: 10, grid: { drawOnChartArea: false }, title: { display: true, text: 'Trend' } },
+    x: { grid: { display: false } },
+  },
+  plugins: {
+    legend: { position: 'bottom' },
+    tooltip: {
+      callbacks: {
+        afterLabel(context) {
+          const role = kpiPerformanceRoles.value[context.dataIndex]
+          if (!role) return ''
+          return `${role.employee_count} calisan / ${role.analyzed_count} analizli`
+        },
+      },
+    },
+  },
+}))
 
 const departmentNarrative = computed(() => bulkPredictionResult.value?.department_narrative || null)
 
@@ -3810,12 +4025,16 @@ async function loadOverview() {
   loading.value = true
   error.value = null
   try {
-    overview.value = await analyticsApi.getDepartmentOverview(
-      selectedDepartment.value,
-      { team: selectedTeam.value === 'all' ? undefined : selectedTeam.value }
-    )
+    const team = selectedTeam.value === 'all' ? undefined : selectedTeam.value
+    const [overviewResult, performanceResult] = await Promise.all([
+      analyticsApi.getDepartmentOverview(selectedDepartment.value, { team }),
+      analyticsApi.getPerformanceSummary({ team }).catch(() => null),
+    ])
+    overview.value = overviewResult
+    performanceSummary.value = performanceResult
   } catch (err: any) {
     error.value = err.response?.data?.detail || 'Analytics ozeti yuklenemedi.'
+    performanceSummary.value = null
   } finally {
     loading.value = false
   }
@@ -3861,8 +4080,11 @@ async function loadPrediction(useLlmNarrative = false) {
 }
 
 async function openEmployeeAnalysis(person: SoftwarePredictionResponse) {
+  const targetRouteName = String(route.name || '').startsWith('admin')
+    ? 'admin-kpi-ml-analysis'
+    : 'manager-kpi-ml-analysis'
   await router.push({
-    name: 'manager-kpi-ml-analysis',
+    name: targetRouteName,
     query: {
       section: 'watchlist',
       employeeId: String(person.employee_id),

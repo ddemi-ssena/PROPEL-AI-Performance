@@ -78,13 +78,54 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-2">Haftalik Ozel Yanit *</label>
-          <textarea
-            v-model="responseText"
-            rows="4"
-            placeholder="Bu haftanin sorusuna yanitinizi yazin..."
-            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
-          />
+          <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <label class="block text-sm font-medium text-slate-700">Haftalik Ozel Yanit *</label>
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                @click="toggleListening"
+                :disabled="!speechSupported"
+                class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50"
+                :class="isListening ? 'bg-rose-600 text-white hover:bg-rose-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
+              >
+                <StopCircleIcon v-if="isListening" class="h-4 w-4 animate-pulse" />
+                <MicrophoneIcon v-else class="h-4 w-4" />
+                {{ isListening ? 'Dinlemeyi Durdur' : 'Sesle Cevapla' }}
+              </button>
+              <button
+                v-if="responseText || interimTranscript"
+                type="button"
+                @click="clearResponse"
+                class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                <ArrowPathIcon class="h-4 w-4" />
+                Temizle
+              </button>
+            </div>
+          </div>
+          <div class="relative">
+            <textarea
+              v-model="responseText"
+              rows="5"
+              placeholder="Cevabinizi yazin veya mikrofonla soyleyin..."
+              class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+            />
+            <div
+              v-if="isListening && interimTranscript"
+              class="pointer-events-none absolute bottom-3 left-3 right-3 rounded-lg border border-indigo-100 bg-white/95 px-3 py-2 text-xs text-indigo-700 shadow-sm"
+            >
+              <span class="font-semibold">Dinleniyor:</span> {{ interimTranscript }}
+            </div>
+          </div>
+          <div class="mt-2 flex flex-col gap-1 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+            <span>{{ responseText.length }} / 2000 karakter</span>
+            <span v-if="isListening" class="font-semibold text-rose-600">Mikrofon acik, Turkce dinleniyor.</span>
+            <span v-else-if="speechSupported" class="text-slate-400">Sesle yanit tarayicida metne cevrilir; ses kaydi backend'e gitmez.</span>
+            <span v-else class="font-semibold text-amber-600">Bu tarayici Speech Recognition desteklemiyor.</span>
+          </div>
+          <div v-if="speechError" class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            {{ speechError }}
+          </div>
         </div>
 
         <div v-if="errorText" class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
@@ -104,7 +145,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { ArrowPathIcon, MicrophoneIcon, StopCircleIcon } from '@heroicons/vue/24/outline'
 import { feedbackApi, type EmployeeForFeedback, type WeeklyQuestionResponse, type WeeklyAssignmentStateResponse } from '@/services/api/feedback.api'
 
 const props = defineProps<{
@@ -121,9 +163,18 @@ const emit = defineEmits<{
 const receiverId = ref<number | null>(null)
 const currentQuestion = ref<WeeklyQuestionResponse | null>(null)
 const responseText = ref('')
+const interimTranscript = ref('')
+const isListening = ref(false)
+const speechError = ref('')
+const recognitionRef = ref<any | null>(null)
 const loadingQuestion = ref(false)
 const submitting = ref(false)
 const errorText = ref('')
+const speechSupported = computed(() => {
+  if (typeof window === 'undefined') return false
+  const win = window as any
+  return Boolean(win.SpeechRecognition || win.webkitSpeechRecognition)
+})
 const scoreFields = [
   { key: 'score_communication', label: 'Iletisim' },
   { key: 'score_teamwork', label: 'Takim Calismasi' },
@@ -218,11 +269,13 @@ async function loadQuestion() {
 }
 
 async function submit() {
+  stopListening()
   if (!receiverId.value) {
     errorText.value = 'Lutfen bir kisi secin'
     return
   }
-  if (!responseText.value.trim()) {
+  const finalResponseText = [responseText.value, interimTranscript.value].filter(Boolean).join(' ').trim()
+  if (!finalResponseText) {
     errorText.value = 'Lutfen haftalik soruya yanit yazin'
     return
   }
@@ -231,7 +284,7 @@ async function submit() {
   try {
     await feedbackApi.submitWeeklyFeedback({
       receiver_id: receiverId.value,
-      response_text: responseText.value.trim(),
+      response_text: finalResponseText,
       score_communication: scores.value.score_communication,
       score_teamwork: scores.value.score_teamwork,
       score_leadership: scores.value.score_leadership,
@@ -240,6 +293,7 @@ async function submit() {
     receiverId.value = null
     currentQuestion.value = null
     responseText.value = ''
+    interimTranscript.value = ''
     emit('submitted')
     emit('close')
   } catch (e: any) {
@@ -249,14 +303,101 @@ async function submit() {
   }
 }
 
+function getSpeechRecognition() {
+  const win = window as any
+  return win.SpeechRecognition || win.webkitSpeechRecognition
+}
+
+function startListening() {
+  if (!speechSupported.value) {
+    speechError.value = 'Tarayiciniz Speech Recognition desteklemiyor. Chrome veya Edge ile deneyebilirsiniz.'
+    return
+  }
+
+  speechError.value = ''
+  const SpeechRecognition = getSpeechRecognition()
+  const recognition = new SpeechRecognition()
+  recognitionRef.value = recognition
+
+  recognition.continuous = true
+  recognition.interimResults = true
+  recognition.lang = 'tr-TR'
+
+  recognition.onstart = () => {
+    isListening.value = true
+  }
+
+  recognition.onresult = (event: any) => {
+    let currentInterim = ''
+    let finalText = ''
+
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const transcript = event.results[i][0].transcript
+      if (event.results[i].isFinal) {
+        finalText += `${transcript} `
+      } else {
+        currentInterim += transcript
+      }
+    }
+
+    if (finalText.trim()) {
+      responseText.value = `${responseText.value}${responseText.value.trim() ? ' ' : ''}${finalText.trim()} `
+    }
+    interimTranscript.value = currentInterim.trim()
+  }
+
+  recognition.onerror = (event: any) => {
+    const error = event?.error || 'bilinmeyen_hata'
+    const messages: Record<string, string> = {
+      'not-allowed': 'Mikrofon izni verilmedi. Tarayici adres cubugundan mikrofon iznini acabilirsiniz.',
+      'no-speech': 'Ses algilanamadi. Biraz daha yakindan ve net konusmayi deneyin.',
+      'audio-capture': 'Mikrofon bulunamadi veya baska bir uygulama tarafindan kullaniliyor.',
+      network: 'Speech Recognition servisine ulasilamadi. Internet baglantisini kontrol edin.',
+    }
+    speechError.value = messages[error] ?? `Mikrofon hatasi: ${error}`
+  }
+
+  recognition.onend = () => {
+    isListening.value = false
+    interimTranscript.value = ''
+  }
+
+  recognition.start()
+}
+
+function stopListening() {
+  if (recognitionRef.value) {
+    recognitionRef.value.stop()
+    recognitionRef.value = null
+  }
+  isListening.value = false
+}
+
+function toggleListening() {
+  if (isListening.value) {
+    stopListening()
+  } else {
+    startListening()
+  }
+}
+
+function clearResponse() {
+  responseText.value = ''
+  interimTranscript.value = ''
+  speechError.value = ''
+}
+
 watch(receiverId, loadQuestion)
 watch(
   () => props.open,
   (isOpen) => {
     if (!isOpen) {
+      stopListening()
       receiverId.value = null
       currentQuestion.value = null
       responseText.value = ''
+      interimTranscript.value = ''
+      speechError.value = ''
       scores.value = {
         score_communication: 3,
         score_teamwork: 3,
@@ -279,4 +420,8 @@ watch(
   },
   { deep: true }
 )
+
+onBeforeUnmount(() => {
+  stopListening()
+})
 </script>
