@@ -4,6 +4,7 @@ import csv
 import json
 import logging
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -557,6 +558,7 @@ class SoftwareMLService:
             high_risk_count=high_risk_count,
             medium_risk_count=medium_risk_count,
             low_risk_count=low_risk_count,
+            generated_at=datetime.now(timezone.utc),
             department_narrative=department_narrative,
             team_narratives=team_narratives,
             team_analytics=team_analytics,

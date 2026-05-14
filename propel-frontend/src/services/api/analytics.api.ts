@@ -60,6 +60,94 @@ export interface DepartmentAnalyticsOverviewResponse {
   sprint_focus: string[]
 }
 
+export interface PerformanceStrengthResponse {
+  label: string
+  tooltip: string
+}
+
+export interface PerformanceEmployeeRowResponse {
+  employee_id: number
+  employee_name: string
+  external_employee_code?: string | null
+  department_id: number
+  department_name: string
+  team?: string | null
+  position?: string | null
+  experience_years?: number | null
+  role_level: 'junior' | 'mid' | 'senior' | 'lead' | string
+  kpi_score?: number | null
+  trend?: number | null
+  sparkline_values: number[]
+  strength?: PerformanceStrengthResponse | null
+  status: 'stable' | 'watch' | 'risk' | 'no_data' | string
+  latest_period?: string | null
+  record_count: number
+  has_kpi_data: boolean
+}
+
+export interface PerformanceTeamSummaryResponse {
+  team: string
+  employee_count: number
+  analyzed_count: number
+  average_kpi?: number | null
+  average_trend?: number | null
+  declining_count: number
+  top_performer_count: number
+}
+
+export interface PerformanceRoleSummaryResponse {
+  role_level: 'junior' | 'mid' | 'senior' | 'lead' | string
+  label: string
+  employee_count: number
+  analyzed_count: number
+  average_kpi?: number | null
+  average_trend?: number | null
+  highest_employee_name?: string | null
+  highest_kpi?: number | null
+  lowest_employee_name?: string | null
+  lowest_kpi?: number | null
+}
+
+export interface PerformanceKpiSummaryResponse {
+  total_employees: number
+  analyzed_employees: number
+  team_count: number
+  average_kpi?: number | null
+  average_trend?: number | null
+  top_performer_count: number
+  declining_count: number
+  junior_average?: number | null
+  junior_count: number
+  senior_average?: number | null
+  senior_count: number
+}
+
+export interface PerformanceInsightResponse {
+  title: string
+  icon: string
+  text: string
+  tone: string
+}
+
+export interface PerformanceActionGroupResponse {
+  title: string
+  items: string[]
+}
+
+export interface DepartmentPerformanceSummaryResponse {
+  scope_department_id?: number | null
+  scope_team?: string | null
+  latest_period?: string | null
+  summary: PerformanceKpiSummaryResponse
+  employees: PerformanceEmployeeRowResponse[]
+  teams: PerformanceTeamSummaryResponse[]
+  roles: PerformanceRoleSummaryResponse[]
+  insights: PerformanceInsightResponse[]
+  risk_people: PerformanceEmployeeRowResponse[]
+  success_people: PerformanceEmployeeRowResponse[]
+  action_groups: PerformanceActionGroupResponse[]
+}
+
 export interface SoftwareModelTrainRequest {
   upload_id: number
   target_column: string
@@ -142,6 +230,7 @@ export interface SoftwareBulkPredictionResponse {
   high_risk_count: number
   medium_risk_count: number
   low_risk_count: number
+  generated_at?: string
   department_narrative?: Record<string, any> | null
   team_narratives: Array<Record<string, any>>
   team_analytics?: Array<Record<string, any>>
@@ -175,6 +264,17 @@ export const analyticsApi = {
   ): Promise<DepartmentAnalyticsOverviewResponse> {
     const { data } = await apiClient.get<DepartmentAnalyticsOverviewResponse>(
       `/analytics/departments/${departmentKey}/overview`,
+      { params }
+    )
+    return data
+  },
+
+  async getPerformanceSummary(params?: {
+    department_id?: number
+    team?: string
+  }): Promise<DepartmentPerformanceSummaryResponse> {
+    const { data } = await apiClient.get<DepartmentPerformanceSummaryResponse>(
+      '/analytics/performance/summary',
       { params }
     )
     return data

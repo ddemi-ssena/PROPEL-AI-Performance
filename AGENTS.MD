@@ -189,3 +189,99 @@
 - İhtiyaca göre diğer departmanlar (IK, Pazarlama vb.) için de benzer tanımlamalar yapılabilir.
 - Takım Analizi ekranındaki LLM aksiyonları ve Excel export özellikleri yeni satış verileriyle test edilebilir.
 
+## 2026-05-14 Login Degisikligi Gorunmeme Analizi
+
+- Kullanici arkadasinin login ekraninda yaptigi degisikligi cektigini ama uygulamada gormedigini soyledi.
+- Kontrol sonucu aktif branch `ml-team-analytics`; `origin/master` ise daha ileride ve `53a081e Kutup redesign and sales department users added` commit'i login ekranini degistiriyor.
+- `git diff ml-team-analytics..origin/master` yalnizca `AGENTS.MD`, `propel-backend/seed_data.py` ve `propel-frontend/src/views/auth/LoginView.vue` farki gosterdi.
+- Aktif branch'teki ve Vite'in servis ettigi `LoginView.vue` eski `propel / Welcome Back` tasarimi; `origin/master` dosyasi yeni `KUTUP / Hos Geldiniz` tasarimini iceriyor.
+- Sonuc: degisiklikler localde mevcut remote branch'te var, fakat calisan uygulama `ml-team-analytics` branch'inden kalktigi icin login redesign gorunmuyor.
+- Dikkat: `/login` route'u `requiresGuest`; kullanici zaten login ise router login ekranini gostermek yerine role gore dashboard'a yonlendirir. Test icin logout/localStorage temizleme ya da gizli pencere gerekebilir.
+
+## 2026-05-14 Onerilen Sonraki Adim
+
+- Eger yeni login tasarimi bu calisma branch'inde de isteniyorsa `origin/master` `ml-team-analytics` icine merge edilmeli ya da en dar cozum olarak `propel-frontend/src/views/auth/LoginView.vue` master'dan alinmali.
+- Merge sonrasi frontend container/Vite yeniden baslatilip tarayicida hard refresh yapilmali; login'i gormek icin oturum aciksa cikis yapilmali.
+
+## 2026-05-14 Takim Analizi Detaylar Yonlendirmesi
+
+- Kullanici Takim Analizi ekranindaki uye kartlarinda `Detaylar` butonunun Calisan Analizi sayfasina yonlendirmesini istedi.
+- `ManagerAnalyticsView.vue` icinde `openEmployeeAnalysis` artik prediction payload'indaki `summary_payload.db_employee_id` ile `manager-employee-analysis` rotasina gider.
+- Yonlendirme query parametreleri: `employeeId` ve `team`; fallback olarak db employee id yoksa eski sayfa ici prediction akisi korunur.
+- `EmployeeAnalysisView.vue` route query okumaya basladi; sayfa acildiginda `employeeId` eslesirse ilgili calisan otomatik seciliyor, `team` eslesirse takim filtresi de ayarlaniyor.
+- Takim/departman filtresi degistiginde mevcut secili calisan filtre icinde kalmaya devam ediyorsa artik otomatik ilk calisana atlamiyor.
+- Dogrulama: `npm.cmd run type-check` basarili. Canli Vite modulunde `EmployeeAnalysisView` icin `routeEmployeeId`, `applyRouteSelection` ve query watcher kodu goruldu.
+
+## 2026-05-14 Departman Analizi KPI ML Ust Bolum
+
+- Kullanici KPI ML analizindeki iki yeni adimin Calisan Analizi yerine Departman Analizi sayfasina konmasini istedi; urun mantigi geregi departman seviyesine uygulandi.
+- `propel-frontend/src/views/manager/DepartmentAnalysisView.vue` icine sayfa ustunde 6 KPI karti eklendi: Toplam Calisan, Ortalama Performans, Top Performers, Dusus Gosteren, Junior Avg., Senior Avg.
+- KPI kartlari secili departman/takim kapsamindaki calisanlar ve `/kpis/records` verisi uzerinden hesaplanir; KPI kaydi yoksa ekranin bos kalmamasi icin deterministik fallback skor/trend kullanilir.
+- KPI kartlarinin altina Chart.js bubble chart eklendi: X ekseni KPI skoru, Y ekseni 4 haftalik trend, renkler takimlara gore; quadrant arka planlari ve X=90/Y=0 referans cizgileri var.
+- Bubble chart tooltip'i isim, rol, takim, KPI ve trend gosterir; noktaya tiklayinca calisan detay modal'i acilir.
+- Sag kolona gradient AI Analiz Ozeti paneli eklendi; genel durum, risk tespiti, basari hikayesi ve junior-senior farki canli metriklerden uretilir.
+- `Detayli LLM Analizi Iste` butonu modal aciyor; simdilik canli KPI metriklerinden deterministik analiz taslagi gosteriyor, gercek LLM cagrisi sonraki adimda baglanabilir.
+- Dogrulama: `npm.cmd run type-check` basarili. Frontend container yeniden baslatildi. `http://localhost:5173/admin/feedback-reports/department` uzerinde KPI kartlari, performans haritasi, AI paneli ve LLM modal'i in-app browser ile dogrulandi; konsol hatasi gorulmedi.
+
+## 2026-05-14 Calisan Analizi Modern Performans Tablosu
+
+- Kullanici Calisan Analizi sayfasina full-width modern performans tablosu eklenmesini istedi.
+- `propel-frontend/src/views/manager/EmployeeAnalysisView.vue` icinde iki kolonlu mevcut calisan secimi/detay bolumunun altina yeni KPI ML tablosu eklendi.
+- Tablo kolonlari: sira, calisan/avatar/kod, takim, rol badge, KPI progress bar, trend, 4 haftalik sparkline, guc badge ve durum badge.
+- Tablo verisi `feedbackApi.getFeedbackCandidates()` ve `kpiApi.getAllVisibleRecords()` sonucundan hesaplanir; KPI kaydi eksikse deterministic fallback skor/trend kullanilir.
+- Filtre bar eklendi: takim, rol, KPI alt sinir slider'i, trend ve durum filtreleri.
+- Siralama eklendi: sortable kolonlarda aktif kolon ve artan/azalan yon gosterimi var.
+- Pagination eklendi: 15/30/50 sayfa boyutu ve onceki/sonraki kontrolleri.
+- `Tabloyu Excel'e Indir` butonu HTML tabanli `.xls` export uretir.
+- Satir click aksiyonu hem sagdaki calisan detay secimini degistirir hem de KPI ozet modal'i acar.
+- Eksik `SparklesIcon` import'u eklendi.
+- Dogrulama: `npm.cmd run type-check` basarili. Frontend container yeniden baslatildi. `http://localhost:5173/admin/feedback-reports/employees` uzerinde tablo, pagination, export butonu ve satir modal'i in-app browser ile dogrulandi; runtime error gorulmedi.
+
+## 2026-05-14 Calisan Analizi Rol Bazli Karsilastirma Chart
+
+- Kullanici Calisan Analizi tablosunun altina rol bazli performans karsilastirma chart'i istedi.
+- `EmployeeAnalysisView.vue` icine full-width `Rol Bazli Performans Karsilastirmasi` section'i eklendi.
+- Chart.js / vue-chartjs ile grouped bar chart kuruldu: Junior, Mid, Senior, Lead rolleri icin ortalama KPI skoru ve 4 haftalik ortalama trend gosteriliyor.
+- KPI dataset'i mavi bar, trend dataset'i pozitifse yesil negatifse kirmizi bar olarak gosteriliyor; trend icin sag eksen kullaniliyor.
+- Genel KPI ortalamasi icin yatay kesikli referans cizgisi ve `Genel Ort.` etiketi eklendi.
+- Bar ustu deger etiketleri ve detayli tooltip eklendi: rol calisan sayisi, ortalama KPI, ortalama trend, en yuksek ve en dusuk calisan.
+- Sag tarafta istatistik sidebar'i eklendi: en yuksek fark, en hizli gelisen rol ve iyilestirme onerisi.
+- Dogrulama: `npm.cmd run type-check` basarili. Frontend container yeniden baslatildi. In-app browser ile chart basligi, istatistikler ve canvas render'i dogrulandi; console error yok.
+
+## 2026-05-14 Departman Analizi AI LLM Modal
+
+- Kullanici Adim 5 LLM analiz akisini Calisan Analizi yerine Departman Analizi sayfasina eklemeyi istedi.
+- `DepartmentAnalysisView.vue` ust sag filtre alanina gradient/pulse `AI ile Analiz` butonu eklendi.
+- Mevcut AI modal genisletildi: loading/progress, genel durum analizi, takim dagilimi, rol bazli bulgular, risk analizi, basari hikayeleri ve aksiyon checklistleri eklendi.
+- Modal verileri mevcut departman KPI hesaplarindan uretiliyor: `scopedEmployees`, `performanceEmployees`, `teamPerformanceStats`, `rolePerformanceStats`, `llmRiskPeople`, `llmSuccessPeople`, `llmActionGroups`.
+- Alt aksiyon butonlari UI olarak eklendi: PDF Indir, Email Gonder, Kaydet. Backend/gercek dosya-gonderim akisi henuz bagli degil.
+- Dogrulama: `npm.cmd run type-check` basarili. Frontend container yeniden baslatildi. In-app browser'da `AI ile Analiz` butonu ve modal bolumleri dogrulandi.
+
+## 2026-05-14 KPI ML Analizi Backend Baglantisi
+
+- Kullanici Departman Analizi ve Calisan Analizi ekranlarindaki yeni KPI/AI bolumlerinin hardcoded kalmamasini, backend'e baglanip gercek istatistikleri gostermesini istedi.
+- Backend'e `GET /api/v1/analytics/performance/summary` endpoint'i eklendi.
+- Yeni endpoint yetkiye gore calisan kapsamlarini uygular: admin icin opsiyonel `department_id`, departman yoneticisi icin kendi departmani, calisan icin kendi kaydi; `team` filtresi desteklenir.
+- `AnalyticsService.get_performance_summary` gercek `employees` ve tum yetkili `kpi_records` kayitlarindan hesaplama yapar; `/kpis/records` endpoint'indeki varsayilan 100 kayit limiti artik bu dashboard hesaplarini etkilemez.
+- Backend response'u calisan satirlari, takim ozetleri, rol ozetleri, KPI kart summary, AI insight metinleri, risk/success kisileri ve aksiyon gruplarini doner.
+- KPI skoru hesaplamasi KPI-18 `Genel Performans Skoru` varsa onu kullanir; yoksa KPI yonune gore normalize edilmis gercek KPI degerlerinden hesaplanir. KPI-19 `Ayrilma Riski Skoru` performans ortalamasina karistirilmaz.
+- Frontend `analytics.api.ts` yeni performans summary tipleri ve `getPerformanceSummary` metodu ile genisletildi.
+- `DepartmentAnalysisView.vue` KPI kartlari, bubble chart, AI paneli ve AI modal verileri artik yeni backend endpoint'inden geliyor; eski sahte skor/trend fallback'leri kaldirildi.
+- `EmployeeAnalysisView.vue` modern calisan tablosu ve rol bazli karsilastirma chart'i artik ayni backend performance summary endpoint'inden besleniyor; tablo KPI skoru, trend, sparkline, guc ve durum alanlarini backend hesaplarindan aliyor.
+- Dogrulama: backend `py_compile` basarili, frontend `npm.cmd run type-check` basarili. Docker `db`, `backend`, `frontend` servisleri ayaga kaldirildi.
+- Manuel API dogrulamasi: `admin@propel.com / admin123` ile `/analytics/performance/summary` cagrisi 30 calisan, 30 analiz edilen calisan, 4 takim, rol ortalamalari ve 4 insight dondurdu.
+- Not: Yerel Node ortaminda `playwright` paketi bulunmadigi icin otomatik browser smoke testi kosulamadi; API ve derleme dogrulamasi tamamlandi.
+
+## 2026-05-14 Takim Analizi - Detaylar rotasi (KPI ML Calisan Analizi)
+
+- Sorun: Takim Uyeleri kartinda `Detaylar` `manager-employee-analysis` (`/manager/feedback-reports/employees`, 360 raporlari) rotasina gidiyordu; KPI/ML tahmin sonuclari orada degil.
+- Cozum: `ManagerAnalyticsView.vue` icinde `openEmployeeAnalysis` artik `manager-kpi-ml-analysis` sayfasina `section=watchlist`, `employeeId` (dataset `employee_id`) ve `uploadId` query ile yonlendiriyor.
+- `applyEmployeeDeepLinkFromRoute` + watch: URL'deki `employeeId`/`uploadId` ile dogru dataset secilip `loadDatasetEmployees` ve `loadPrediction(false)` tetikleniyor.
+- Dogrulama: `npm.cmd run type-check` basarili.
+
+## 2026-05-14 Takim Analizi - Sabit verilerin kaldirilmasi ve backend zaman damgasi
+
+- Durum: Takim sekmesi buyuk olcude `getBulkSoftwarePredictions` + `team_analytics` ile bagliydi; buna karsin ust KPI kartlari, karsilastirmali trend grafiginde sahte ay etiketleri, risk grafigi tooltip/alt notlari, `Son guncelleme` (istemci saati), Excel export trendinde uydurma motivasyon/kapasite/tarih vardi.
+- Backend: `SoftwareBulkPredictionResponse` icine `generated_at` (UTC) eklendi; `predict_all_from_upload` donusunde set ediliyor. Testte `generated_at` anahtari dogrulaniyor.
+- Frontend: `teamKpiCards` toplu tahmin + `teamRiskSummaries` + `aggregateDepartmentRiskSeries` ile hesaplaniyor; sparkline polyline gercek serilerden. Coklu takim trend grafigi donem yoksa `D1..Dn` etiketleri (sahte takvim yok). Secili takim risk grafigi ekseni `trend_periods` ile hizalaniyor; tooltip ve opsiyonel `selectedTeamRiskLegendHints` veriden turetiliyor. `Son guncelleme` artik `generated_at`. Excel export trend satirlari donem etiketi + `risk_score`; sahte motivasyon/kapasite/tarih fonksiyonlari kaldirildi. Risk faktoru olasilik yuzdesi `count/total` ile. Konusulacaklar alt maddeleri yalnizca narrative `action_plan[].manager_talking_points` varsa gosteriliyor.
+- Dogrulama: `py_compile`, `npm.cmd run type-check` basarili. LLM yokken aksiyon/konusulacaklar metinleri hala KPI/takim alanlarindan turetilen kisa UX fallback'leri kullanabilir (tam metin icin LLM veya genisletilmis narrative gerekir).
