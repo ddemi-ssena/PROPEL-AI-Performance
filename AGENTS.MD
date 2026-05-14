@@ -163,3 +163,29 @@
 - Dogrulama: backend `py_compile` ve frontend `npm.cmd run type-check` basarili. Docker backend/frontend yeniden baslatildi.
 - Manuel API testi: Backend raporu icin 3 bildirim olustu: Admin Kullanici, Ahmet Yilmaz (Departman yoneticisi), Murat Kaya (Takim lideri).
 - DB ozetinde `team_report=3`, `meeting_invite=39` gorundu. Canli Vite modulunde `showReportShareModal`, `shareSelectedTeamReport`, `notificationsApi`, `Raporu Gonder` dogrulandi.
+
+## 2026-05-14 Uygulama Calistirma ve Seed Islemi
+
+- Eksik olan `propel-backend/.env` dosyasi olusturuldu ve Docker container'lari `docker compose up -d` ile baslatildi.
+- `seed_data.py` icindeki `create_employees` fonksiyonunda `NameError: name 'employees' is not defined` hatasi tespit edildi ve `employees = []` ilklendirmesi eklenerek duzeltildi.
+- Veritabani `docker exec propel_backend python seed_data.py` ile basariyla seed edildi (40 calisan, 5100 KPI kaydi, 1040 anket cevabi).
+- Uygulama `http://localhost:5173` uzerinden kontrol edildi; `admin@propel.com / admin123` ile giris yapildi ve Genel Mudur Paneli'nin dolu oldugu (40 personel, risk analizi, organizasyonel ag) dogrulandi.
+
+## 2026-05-14 Yeni Kullanıcı Erişimi ve Departman Tanımlama
+
+- `manager.satis@propel.com` (şifre: `manager123`) ve `satis.employee@propel.com` (şifre: `satis123`) hesapları sisteme eklendi.
+- `seed_data.py` güncellenerek:
+    - Yeni kullanıcıların login yetkileri tanımlandı.
+    - Her iki manager (`manager.yazilim` ve `manager.satis`) için `Employee` kayıtları (`team="Yonetim"`) oluşturuldu. Bu sayede yönetici dashboard'larındaki raporlama ve takım listesi özellikleri aktif hale geldi.
+    - `satis.employee@propel.com` için "Satış" departmanında `Senior Sales Executive` rolünde çalışan kaydı oluşturuldu.
+- Veritabanı `seed_data.py` ile yeniden baslatıldı; yeni kullanıcılar ve onlara ait veriler (KPI, anket vb.) başarıyla yüklendi.
+- Doğrulama:
+    - Satış Yöneticisi dashboard'unda departman "Satış" olarak ve ekip listesi (11 kişi) doğru şekilde görüntülendi.
+    - Satış Personeli dashboard'unda AI Koç ve metriklerin satış departmanına özel (Müşteri Takibi vb.) çalıştığı teyit edildi.
+
+## Sonraki Adımlar
+
+- Uygulama şu an Yazılım ve Satış departmanları için tam fonksiyonel durumda.
+- İhtiyaca göre diğer departmanlar (IK, Pazarlama vb.) için de benzer tanımlamalar yapılabilir.
+- Takım Analizi ekranındaki LLM aksiyonları ve Excel export özellikleri yeni satış verileriyle test edilebilir.
+

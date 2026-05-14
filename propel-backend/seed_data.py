@@ -194,6 +194,13 @@ def create_users() -> list[User]:
             role=UserRole.department_manager,
             is_active=True,
         ),
+        User(
+            email="satis.employee@propel.com",
+            hashed_password=get_password_hash("satis123"),
+            full_name="Satis Personeli",
+            role=UserRole.employee,
+            is_active=True,
+        ),
     ]
 
     for spec in EMPLOYEE_SPECS:
@@ -248,9 +255,47 @@ def create_departments() -> list[Department]:
 
 def create_employees(users: list[User], departments: list[Department]) -> list[Employee]:
     print("Calisanlar olusturuluyor...")
+    employees: list[Employee] = []
     user_map = {user.email: user for user in users}
     software_department = next(dept for dept in departments if dept.name == SOFTWARE_DEPARTMENT_NAME)
     sales_department = next(dept for dept in departments if dept.name == SALES_DEPARTMENT_NAME)
+
+    # Managerlar icin Employee kayitlari (Dashboardlarinin calismasi icin gerekli)
+    employees.append(
+        Employee(
+            user_id=user_map["manager.yazilim@propel.com"].id,
+            department_id=software_department.id,
+            external_employee_code="MGR-SW",
+            team="Yonetim",
+            position="Software Department Manager",
+            experience_years=12.0,
+            hire_date=date(2020, 1, 1),
+        )
+    )
+    employees.append(
+        Employee(
+            user_id=user_map["manager.satis@propel.com"].id,
+            department_id=sales_department.id,
+            external_employee_code="MGR-SL",
+            team="Yonetim",
+            position="Sales Department Manager",
+            experience_years=10.0,
+            hire_date=date(2020, 1, 1),
+        )
+    )
+
+    # Yeni satis calisani
+    employees.append(
+        Employee(
+            user_id=user_map["satis.employee@propel.com"].id,
+            department_id=sales_department.id,
+            external_employee_code="SL-EMP-01",
+            team="Kurumsal Satis",
+            position="Senior Sales Executive",
+            experience_years=4.5,
+            hire_date=date(2022, 1, 1),
+        )
+    )
 
     for index, spec in enumerate(EMPLOYEE_SPECS, start=1):
         email = employee_login_email(spec)
