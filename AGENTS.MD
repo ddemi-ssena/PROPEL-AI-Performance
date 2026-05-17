@@ -397,13 +397,49 @@ docker exec propel_backend python seed_data.py
 
 ## Test Kullanıcıları (seed_data.py)
 
-| Email | Şifre | Rol |
-|---|---|---|
-| admin@propel.com | admin123 | Admin |
-| manager.yazilim@propel.com | manager123 | Yazılım Yöneticisi |
-| manager.satis@propel.com | manager123 | Satış Yöneticisi |
-| developer1@propel.com | dev123 | Çalışan (Yazılım) |
-| satis.employee@propel.com | satis123 | Çalışan (Satış) |
+| Email | Şifre | Rol | Yönlendirme |
+|---|---|---|---|
+| admin@propel.com | admin123 | Admin | `/admin` |
+| manager.yazilim@propel.com | manager123 | Yazılım Yöneticisi | `/manager` → Yazılım nav |
+| manager.satis@propel.com | manager123 | Satış Yöneticisi | `/manager` → Satış nav |
+| developer1@propel.com | dev123 | Çalışan (Yazılım) | `/employee` |
+| satis.employee@propel.com | satis123 | Çalışan (Satış, SA-011) | `/employee/sales` |
+| sl-001@propel.com | satis123 | Çalışan (Satış, SA-001) | `/employee/sales` |
+
+**Satış Dataset Çalışanları** (SA-001..SA-030, hepsi şifre: `satis123`):
+
+| Kod | İsim | Bölge | Rol |
+|---|---|---|---|
+| SA-001 | Ali Yılmaz | Marmara | Senior |
+| SA-002 | Ayşe Demir | Ege | Junior |
+| SA-003 | Mehmet Kaya | Karadeniz | Manager |
+| SA-004 | Fatma Çelik | Marmara | Mid-Level |
+| SA-005 | Mustafa Koç | Karadeniz | Manager |
+| SA-006 | Zeynep Şahin | Doğu Anadolu | Manager |
+| SA-007 | Ahmet Öztürk | İç Anadolu | Senior |
+| SA-008 | Elif Aydın | Marmara | Mid-Level |
+| SA-009 | Caner Yıldız | Akdeniz | Mid-Level |
+| SA-010 | Burcu Arslan | Akdeniz | Junior |
+| SA-011 | Zeynep Kaya (satis.employee) | Akdeniz | Senior |
+| SA-012 | Kerem Arslan | Güneydoğu Anadolu | Team Lead |
+| SA-013 | Selin Yılmaz | İç Anadolu | Manager |
+| SA-014 | Tuncay Doğan | Doğu Anadolu | Senior |
+| SA-015 | Nihan Korkmaz | Doğu Anadolu | Junior |
+| SA-016 | Baran Özdemir | Güneydoğu Anadolu | Junior |
+| SA-017 | Derya Kaplan | Güneydoğu Anadolu | Team Lead |
+| SA-018 | Serhat Bulut | Doğu Anadolu | Senior |
+| SA-019 | Merve Polat | Akdeniz | Senior |
+| SA-020 | Ozan Çetin | Doğu Anadolu | Junior |
+| SA-021 | Gamze Kurt | Ege | Mid-Level |
+| SA-022 | Hakan Acar | İç Anadolu | Manager |
+| SA-023 | Rana Şimşek | Akdeniz | Junior |
+| SA-024 | Emre Yıldız | Marmara | Senior |
+| SA-025 | Pınar Gül | Marmara | Manager |
+| SA-026 | Tolga Kara | Akdeniz | Team Lead |
+| SA-027 | Aslı Erdoğan | Doğu Anadolu | Mid-Level |
+| SA-028 | Volkan Şahin | Ege | Manager |
+| SA-029 | İrem Özkan | Doğu Anadolu | Team Lead |
+| SA-030 | Burak Çalışkan | İç Anadolu | Mid-Level |
 
 ---
 
@@ -492,9 +528,50 @@ docker exec propel_backend python seed_data.py
 
 ---
 
+### 2026-05-17 Satış Departmanı Frontend Dashboard ★ BÜYÜK
+
+**Eklenen Frontend Dosyaları**:
+- `propel-frontend/src/views/sales/SalesAnalyticsView.vue` → Satış yöneticisi ML analiz ekranı (dataset seçimi, 4 target, model eğit/tahmin/toplu tara, takım tablosu, kişi kartları, narratif)
+- `propel-frontend/src/views/sales/SalesEmployeeDashboard.vue` → Satış çalışanı kişisel dashboard (emerald tema, 4 KPI kartı, 9 satış metriği, AI koç, nabız anketi, rozet)
+
+**Güncellenen Frontend Dosyaları**:
+- `services/api/analytics.api.ts` → Sales tipleri + 6 yeni API fonksiyonu (`getSalesDatasets`, `getSalesDatasetEmployees`, `getSalesModelState`, `trainSalesModel`, `getLatestSalesPrediction`, `getBulkSalesPredictions`)
+- `router/index.ts` → `/manager/sales-analytics`, `/admin/sales-analytics`, `/employee/sales` rotaları; login sonrası satış çalışanı otomatik `/employee/sales`'e yönlendirme
+- `layouts/AppLayout.vue` → `isSalesDept` computed (dept_id=2 veya 18); departmana göre dinamik sidebar nav (yazılım yöneticisi ≠ satış yöneticisi nav items)
+- `stores/auth.ts` → `satis.employee@propel.com` (Zeynep Kaya, dept_id=18) mock kullanıcısı eklendi
+- `views/auth/LoginView.vue` → Login sonrası `department_id` kontrolü ile satış çalışanı `/employee/sales`'e yönlendirildi
+
+**Güncellenen Backend Dosyaları**:
+- `schemas/user.py` → `UserResponse`'a `department_id: int | None = None` eklendi
+- `api/routers/auth.py` → `/me` endpoint'i `Employee` tablosuna join yaparak `department_id` dönüyor
+- `seed_data.py` → `SALES_EMPLOYEE_SPECS` SA-001..SA-030 (30 kişi) olarak güncellendi
+
+**Veritabanı Güncellemeleri**:
+- `external_employee_code` SA-001..SA-010 olarak güncellendi (SL-xxx → SA-xxx)
+- SA-011 (satis.employee) eklendi
+- SA-012..SA-030 arası 19 yeni kullanıcı + Employee kaydı oluşturuldu (email: `sa-12@propel.com`..`sa-30@propel.com`, şifre: `satis123`)
+
+**Navigasyon Mantığı** (`department_id` bazlı):
+- `dept_id=1` (Yazılım Yöneticisi) → KPI & ML Analizi grubu → `/manager/kpi-ml-analysis`
+- `dept_id=2` (Satış Yöneticisi) → Satış KPI & ML grubu → `/manager/sales-analytics`
+- Admin → her iki departman + Satış ML Analizi linki
+- Satış çalışanı → Satış Performansım → `/employee/sales`
+
+**ML Target Durumu** (upload_id=1, 30 çalışan × 52 hafta):
+- `Performance_Drop_Target` ✅ eğitildi — 8 riskli, 22 güvenli
+- `Burnout_Target` ❌ eğitilemez — dataset'te tek sınıf (tüm satırlar = 0)
+- `Resignation_Target` ✅ eğitildi — 0 riskli, 30 güvenli
+- `High_Risk_Target` ✅ eğitildi — 8 riskli, 22 güvenli
+
+**Önemli Keşif**: `/api/v1/auth/me` endpoint'i `department_id` döndürmüyordu → frontend sidebar nav ve login yönlendirmesi çalışmıyordu. Backend fix ile çözüldü.
+
+---
+
 ## Sonraki Adımlar / Roadmap
 
-- [ ] Satış departmanı frontend dashboard'u (Vue 3) — employee/manager/admin görünümleri
+- [x] Satış departmanı frontend dashboard'u (Vue 3) — employee/manager/admin görünümleri
+- [ ] `Burnout_Target` için dataset'e pozitif örnek ekleme veya UI'dan gizleme
+- [ ] Satış çalışanı dashboard KPI kartlarını backend'e bağla (`/kpis/records?employee_id=X`)
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri
 - [ ] LLM narrative endpoint'ini async/background job olarak ayır

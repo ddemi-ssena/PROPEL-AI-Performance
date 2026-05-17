@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.db.session import get_db
 from app.db.models.user import User, UserRole
+from app.db.models.employee import Employee
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserResponse
 from app.api.dependencies import get_current_user  # Import added
@@ -16,9 +17,20 @@ router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
 @router.get("/me", response_model=UserResponse)
-def read_users_me(current_user: User = Depends(get_current_user)):
+def read_users_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Mevcut kullanıcı bilgilerini getir"""
-    return current_user
+    employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+    # Pydantic için geçici nesne oluştur (User modeline department_id yok)
+    result = UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        role=current_user.role,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at,
+        department_id=employee.department_id if employee else None,
+    )
+    return result
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):

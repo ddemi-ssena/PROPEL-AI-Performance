@@ -68,6 +68,12 @@ const router = createRouter({
           component: () => import('@/views/manager/DepartmentAnalysisView.vue'),
           meta: { title: 'Departman Analizi' },
         },
+        {
+          path: 'sales-analytics',
+          name: 'admin-sales-analytics',
+          component: () => import('@/views/sales/SalesAnalyticsView.vue'),
+          meta: { title: 'Satis KPI & ML Analizi' },
+        },
       ],
     },
     {
@@ -110,6 +116,12 @@ const router = createRouter({
           name: 'manager-survey-results',
           component: () => import('@/views/shared/SurveyResults.vue'),
           meta: { title: 'Anket Sonuclari' },
+        },
+        {
+          path: 'sales-analytics',
+          name: 'manager-sales-analytics',
+          component: () => import('@/views/sales/SalesAnalyticsView.vue'),
+          meta: { title: 'Satis KPI & ML Analizi' },
         },
       ],
     },
@@ -157,6 +169,12 @@ const router = createRouter({
           component: () => import('@/views/employee/EmployeePulseView.vue'),
           meta: { title: 'Nabiz Anketi' },
         },
+        {
+          path: 'sales',
+          name: 'sales-employee-dashboard',
+          component: () => import('@/views/sales/SalesEmployeeDashboard.vue'),
+          meta: { title: 'Satis Performansim' },
+        },
       ],
     },
     {
@@ -185,10 +203,17 @@ router.beforeEach((to, from, next) => {
     next('/login')
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
     const role = authStore.userRole
-    if (role === 'admin') next('/admin')
-    else if (role === 'department_manager') next('/manager')
-    else if (role === 'employee') next('/employee')
-    else next('/dashboard')
+    const deptId = authStore.user?.department_id
+    if (role === 'admin') {
+      next('/admin')
+    } else if (role === 'department_manager') {
+      next('/manager')
+    } else if (role === 'employee') {
+      const isSales = deptId === 2 || deptId === 18
+      next(isSales ? '/employee/sales' : '/employee')
+    } else {
+      next('/dashboard')
+    }
   } else {
     next()
   }

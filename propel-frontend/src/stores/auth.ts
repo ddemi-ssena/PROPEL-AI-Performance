@@ -91,6 +91,15 @@ export const useAuthStore = defineStore('auth', () => {
         is_active: true,
         department_id: 18,
         created_at: new Date().toISOString()
+      },
+      'satis.employee@propel.com': {
+        id: 187,
+        email: 'satis.employee@propel.com',
+        full_name: 'Zeynep Kaya',
+        role: 'employee',
+        is_active: true,
+        department_id: 18,
+        created_at: new Date().toISOString()
       }
     }
 
@@ -153,6 +162,15 @@ export const useAuthStore = defineStore('auth', () => {
               id: 186,
               email: 'sl-001@propel.com',
               full_name: 'Ali Yilmaz',
+              role: 'employee',
+              is_active: true,
+              department_id: 18,
+              created_at: new Date().toISOString()
+            },
+            'satis.employee@propel.com': {
+              id: 187,
+              email: 'satis.employee@propel.com',
+              full_name: 'Zeynep Kaya',
               role: 'employee',
               is_active: true,
               department_id: 18,
