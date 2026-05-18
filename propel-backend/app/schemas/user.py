@@ -16,6 +16,7 @@ class UserResponse(UserBase):
     is_active: bool
     created_at: datetime
     department_id: int | None = None
+    department_name: str | None = None
 
     class Config:
         from_attributes = True

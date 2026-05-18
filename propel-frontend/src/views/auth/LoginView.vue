@@ -267,15 +267,16 @@ async function handleLogin() {
 
   if (success) {
     const role = authStore.user?.role
-    const deptId = authStore.user?.department_id
 
     if (role === 'admin') {
       router.push('/admin')
     } else if (role === 'department_manager') {
       router.push('/manager')
     } else if (role === 'employee') {
-      // dept_id=2 gerçek DB satış, dept_id=18 mock satış
-      const isSales = deptId === 2 || deptId === 18
+      const departmentName = authStore.user?.department_name?.toLocaleLowerCase('tr-TR') || ''
+      const normalizedDepartmentName = departmentName.replace(/\u0131/g, 'i').replace(/\u015f/g, 's')
+      const email = authStore.user?.email?.toLocaleLowerCase('tr-TR') || ''
+      const isSales = normalizedDepartmentName.includes('satis') || email.includes('satis') || email.startsWith('sa-')
       router.push(isSales ? '/employee/sales' : '/employee')
     } else {
       router.push('/dashboard')

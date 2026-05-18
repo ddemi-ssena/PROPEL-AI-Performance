@@ -240,6 +240,8 @@ def create_users() -> list[User]:
         )
 
     for spec in SALES_EMPLOYEE_SPECS:
+        if spec["code"] == "SA-011":
+            continue
         login_email = f"{spec['code'].lower()}@propel.com"
         login_password = "employee123"
         users.append(
@@ -335,6 +337,8 @@ def create_employees(users: list[User], departments: list[Department]) -> list[E
         )
 
     for index, spec in enumerate(SALES_EMPLOYEE_SPECS, start=1):
+        if spec["code"] == "SA-011":
+            continue
         email = f"{spec['code'].lower()}@propel.com"
         employees.append(
             Employee(

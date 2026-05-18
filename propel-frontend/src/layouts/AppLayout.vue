@@ -203,10 +203,11 @@ const authStore = useAuthStore()
 const isWeeklyPulseModalOpen = ref(false)
 
 const userRole = computed(() => authStore.user?.role || localStorage.getItem('role') || 'employee')
-// dept_id=2 gerçek DB, dept_id=18 mock fallback
 const isSalesDept = computed(() => {
-  const id = authStore.user?.department_id
-  return id === 2 || id === 18
+  const departmentName = authStore.user?.department_name?.toLocaleLowerCase('tr-TR') || ''
+  const normalizedDepartmentName = departmentName.replace(/\u0131/g, 'i').replace(/\u015f/g, 's')
+  const email = authStore.user?.email?.toLocaleLowerCase('tr-TR') || ''
+  return normalizedDepartmentName.includes('satis') || email.includes('satis') || email.startsWith('sa-')
 })
 const userName = computed(() => authStore.user?.full_name || 'Kullanici')
 

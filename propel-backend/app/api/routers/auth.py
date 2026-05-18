@@ -29,6 +29,7 @@ def read_users_me(current_user: User = Depends(get_current_user), db: Session = 
         is_active=current_user.is_active,
         created_at=current_user.created_at,
         department_id=employee.department_id if employee else None,
+        department_name=employee.department.name if employee and employee.department else None,
     )
     return result
 
