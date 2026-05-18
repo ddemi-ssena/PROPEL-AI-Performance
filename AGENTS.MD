@@ -719,3 +719,15 @@ docker exec propel_backend python seed_data.py
 
 - Merge commit tamamlandiktan sonra gerekirse backend image yeniden build edilmeli; PR #25 `lightgbm`, `xgboost` ve `libgomp1` ekledigi icin eski container image yeterli olmayabilir.
 - Smoke test: admin KPI menusu, admin satis analizi, satis manager nav, satis calisani `/employee/sales`, 360 menulerinin KPI gostermemesi.
+
+## 2026-05-18 PR #26 Master Conflict Guncellemesi
+
+- Kullanici GitHub PR #26 (`ml-team-analytics` -> `master`) ekraninda hala 3 conflict gorundugunu paylasti.
+- Yerel kontrol: `ml-team-analytics` remote ile esitti, fakat PR #26 base branch'i olan `origin/master` branch'e henuz merge edilmemisti.
+- `origin/master` `ml-team-analytics` icine merge edildi; merge lokal olarak conflict vermeden tamamlandi.
+- Conflict marker kontrolu `AGENTS.MD`, `AppLayout.vue`, `router/index.ts` uzerinde temiz.
+- Dogrulama: `npm.cmd run type-check` basarili; backend sales/analytics dosyalari `python -m py_compile` basarili.
+
+## Sonraki Adim
+
+- Yeni master merge commit'i ve bu not commit'i `origin/ml-team-analytics` branch'ine pushlaninca GitHub PR #26 conflict uyarisi guncellenmeli/kalkmali.
