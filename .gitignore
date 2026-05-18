@@ -42,3 +42,5 @@ docker-compose.override.yml
 /propel-backend/ml/models/*.joblib
 /propel-backend/uploads/
 /propel-backend/app/analytics/artifacts_store/
+.claude/
+uploads/

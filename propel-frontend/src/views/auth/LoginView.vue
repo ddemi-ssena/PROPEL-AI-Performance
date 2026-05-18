@@ -264,16 +264,19 @@ function fillCredentials(user: string, pass: string) {
 
 async function handleLogin() {
   const success = await authStore.login(credentials.value)
-  
+
   if (success) {
     const role = authStore.user?.role
-    
+    const deptId = authStore.user?.department_id
+
     if (role === 'admin') {
       router.push('/admin')
     } else if (role === 'department_manager') {
       router.push('/manager')
     } else if (role === 'employee') {
-      router.push('/employee')
+      // dept_id=2 gerçek DB satış, dept_id=18 mock satış
+      const isSales = deptId === 2 || deptId === 18
+      router.push(isSales ? '/employee/sales' : '/employee')
     } else {
       router.push('/dashboard')
     }

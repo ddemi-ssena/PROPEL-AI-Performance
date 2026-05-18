@@ -9,6 +9,13 @@ from app.schemas.analytics import (
     DepartmentAnalyticsConfigResponse,
     DepartmentAnalyticsOverviewResponse,
     DepartmentPerformanceSummaryResponse,
+    SalesBulkPredictionResponse,
+    SalesDatasetEmployeeResponse,
+    SalesDatasetResponse,
+    SalesModelStateResponse,
+    SalesModelTrainRequest,
+    SalesModelTrainResponse,
+    SalesPredictionResponse,
     SoftwareBulkPredictionResponse,
     SoftwareDatasetEmployeeResponse,
     SoftwareDatasetResponse,
@@ -149,6 +156,94 @@ def get_performance_summary(
         current_user=current_user,
         department_id=department_id,
         team=team,
+    )
+
+
+@router.get("/departments/sales/datasets", response_model=list[SalesDatasetResponse])
+def list_sales_datasets(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.sales_ml_service import SalesMLService
+
+    return SalesMLService.list_datasets(db)
+
+
+@router.get("/departments/sales/datasets/{upload_id}/employees", response_model=list[SalesDatasetEmployeeResponse])
+def list_sales_dataset_employees(
+    upload_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.sales_ml_service import SalesMLService
+
+    return SalesMLService.list_dataset_employees(db, upload_id)
+
+
+@router.get("/departments/sales/datasets/{upload_id}/model-state", response_model=list[SalesModelStateResponse])
+def list_sales_model_states(
+    upload_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.sales_ml_service import SalesMLService
+
+    return SalesMLService.list_model_states(db, upload_id)
+
+
+@router.post("/departments/sales/models/train", response_model=SalesModelTrainResponse)
+def train_sales_model(
+    payload: SalesModelTrainRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.sales_ml_service import SalesMLService
+
+    return SalesMLService.train_from_upload(
+        db=db,
+        upload_id=payload.upload_id,
+        target_column=payload.target_column,
+        test_period_count=payload.test_period_count,
+    )
+
+
+@router.get("/departments/sales/predictions/latest", response_model=SalesPredictionResponse)
+def get_latest_sales_prediction(
+    upload_id: int,
+    employee_id: int,
+    target_column: str = "Performance_Drop_Target",
+    use_llm_narrative: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.sales_ml_service import SalesMLService
+
+    return SalesMLService.predict_latest_from_upload(
+        db=db,
+        upload_id=upload_id,
+        employee_id=employee_id,
+        target_column=target_column,
+        use_llm_narrative=use_llm_narrative,
+    )
+
+
+@router.get("/departments/sales/predictions/bulk", response_model=SalesBulkPredictionResponse)
+def get_bulk_sales_predictions(
+    upload_id: int,
+    target_column: str = "Performance_Drop_Target",
+    use_llm_narrative: bool = False,
+    llm_team: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.sales_ml_service import SalesMLService
+
+    return SalesMLService.predict_all_from_upload(
+        db=db,
+        upload_id=upload_id,
+        target_column=target_column,
+        use_llm_narrative=use_llm_narrative,
+        llm_team=llm_team,
     )
 
 

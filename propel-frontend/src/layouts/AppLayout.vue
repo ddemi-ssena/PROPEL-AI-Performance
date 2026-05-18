@@ -203,6 +203,11 @@ const authStore = useAuthStore()
 const isWeeklyPulseModalOpen = ref(false)
 
 const userRole = computed(() => authStore.user?.role || localStorage.getItem('role') || 'employee')
+// dept_id=2 gerçek DB, dept_id=18 mock fallback
+const isSalesDept = computed(() => {
+  const id = authStore.user?.department_id
+  return id === 2 || id === 18
+})
 const userName = computed(() => authStore.user?.full_name || 'Kullanici')
 
 const userInitials = computed(() =>
@@ -227,6 +232,7 @@ type NavLeaf = {
   to: string
   icon: NavIcon
   role?: string
+  dept?: 'sales' | 'software' | 'all'
   type?: undefined
   indent?: boolean
 }
@@ -244,47 +250,20 @@ type NavGroup = {
   type: 'group'
   icon: NavIcon
   role?: string
+  dept?: 'sales' | 'software' | 'all'
   children: NavGroupChild[]
 }
 
 type NavigationItem = NavLeaf | NavSection | NavGroup
 
 const allNavigation: NavigationItem[] = [
+  // ── Admin ──────────────────────────────────────────────────────────────────
   { name: 'Genel Bakis', to: '/admin', icon: HomeIcon, role: 'admin' },
   { name: 'Personel Yonetimi', to: '/admin/employees', icon: UsersIcon, role: 'admin' },
   { name: 'Veri Yonetimi', to: '/admin/data-management', icon: DocumentTextIcon, role: 'admin' },
   { name: 'Yapay Zeka Icgoruleri', to: '/admin/ai-insights', icon: ChartBarIcon, role: 'admin' },
   { name: 'Anket Sonuclari', to: '/admin/survey-results', icon: DocumentTextIcon, role: 'admin' },
-  { name: 'Departman Performansi', to: '/manager', icon: ChartBarIcon, role: 'department_manager' },
-  {
-    name: 'KPI & ML Analizi',
-    type: 'group',
-    icon: ChartBarIcon,
-    role: 'department_manager',
-    children: [
-      { name: 'Model Durumu', to: '/manager/kpi-ml-analysis?section=model', icon: ChartBarIcon },
-      { name: 'KPI Departman Analizi', to: '/manager/kpi-ml-analysis?section=department', icon: DocumentTextIcon },
-      { name: 'Takim Analizi', to: '/manager/kpi-ml-analysis?section=teams', icon: UsersIcon },
-      { name: 'KPI Calisan Analizi', to: '/manager/kpi-ml-analysis?section=watchlist', icon: UsersIcon },
-      { name: 'Teknik Detaylar', to: '/manager/kpi-ml-analysis?section=technical', icon: Cog6ToothIcon },
-    ],
-  },
-  { name: 'Ekibim', to: '/manager/team', icon: UsersIcon, role: 'department_manager' },
-  { name: 'Anket Sonuclari', to: '/manager/survey-results', icon: DocumentTextIcon, role: 'department_manager' },
-  {
-    name: '360 Derece Feedback',
-    type: 'group',
-    icon: ChatBubbleLeftRightIcon,
-    role: 'department_manager',
-    children: [
-      { name: 'Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon },
-      { name: '360 Derece Feedback Raporlari', type: 'section' },
-      { name: '360 Calisan Raporu', to: '/manager/feedback-reports/employees', icon: UsersIcon },
-      { name: '360 Departman Raporu', to: '/manager/feedback-reports/department', icon: DocumentTextIcon },
-    ],
-  },
-  { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'employee' },
-  { name: 'Nabiz Anketi', to: '/employee/pulse', icon: HeartIcon, role: 'employee' },
+  { name: 'Satis ML Analizi', to: '/admin/sales-analytics', icon: ChartBarIcon, role: 'admin' },
   {
     name: 'KPI & ML Analizi',
     type: 'group',
@@ -310,15 +289,79 @@ const allNavigation: NavigationItem[] = [
       { name: '360 Departman Raporu', to: '/admin/feedback-reports/department', icon: DocumentTextIcon },
     ],
   },
-  { name: 'Kisisel Gelisim', to: '/employee', icon: UserIcon, role: 'employee' },
+
+  // ── Yazilim Yoneticisi ─────────────────────────────────────────────────────
+  { name: 'Departman Performansi', to: '/manager', icon: ChartBarIcon, role: 'department_manager', dept: 'software' },
+  {
+    name: 'KPI & ML Analizi',
+    type: 'group',
+    icon: ChartBarIcon,
+    role: 'department_manager',
+    dept: 'software',
+    children: [
+      { name: 'Model Durumu', to: '/manager/kpi-ml-analysis?section=model', icon: ChartBarIcon },
+      { name: 'KPI Departman Analizi', to: '/manager/kpi-ml-analysis?section=department', icon: DocumentTextIcon },
+      { name: 'Takim Analizi', to: '/manager/kpi-ml-analysis?section=teams', icon: UsersIcon },
+      { name: 'KPI Calisan Analizi', to: '/manager/kpi-ml-analysis?section=watchlist', icon: UsersIcon },
+      { name: 'Teknik Detaylar', to: '/manager/kpi-ml-analysis?section=technical', icon: Cog6ToothIcon },
+    ],
+  },
+
+  // ── Satis Yoneticisi ────────────────────────────────────────────────────────
+  { name: 'Departman Performansi', to: '/manager', icon: ChartBarIcon, role: 'department_manager', dept: 'sales' },
+  {
+    name: 'Satis KPI & ML',
+    type: 'group',
+    icon: ChartBarIcon,
+    role: 'department_manager',
+    dept: 'sales',
+    children: [
+      { name: 'Performans Analizi', to: '/manager/sales-analytics', icon: ChartBarIcon },
+      { name: 'Takim Riski', to: '/manager/sales-analytics', icon: UsersIcon },
+    ],
+  },
+
+  // ── Ortak Yonetici ─────────────────────────────────────────────────────────
+  { name: 'Ekibim', to: '/manager/team', icon: UsersIcon, role: 'department_manager' },
+  { name: 'Anket Sonuclari', to: '/manager/survey-results', icon: DocumentTextIcon, role: 'department_manager' },
+  {
+    name: '360 Derece Feedback',
+    type: 'group',
+    icon: ChatBubbleLeftRightIcon,
+    role: 'department_manager',
+    children: [
+      { name: 'Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon },
+      { name: '360 Derece Feedback Raporlari', type: 'section' },
+      { name: '360 Calisan Raporu', to: '/manager/feedback-reports/employees', icon: UsersIcon },
+      { name: '360 Departman Raporu', to: '/manager/feedback-reports/department', icon: DocumentTextIcon },
+    ],
+  },
+
+  // ── Yazilim Calisan ────────────────────────────────────────────────────────
+  { name: 'Kisisel Gelisim', to: '/employee', icon: UserIcon, role: 'employee', dept: 'software' },
+  { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'employee', dept: 'software' },
+  { name: 'Nabiz Anketi', to: '/employee/pulse', icon: HeartIcon, role: 'employee', dept: 'software' },
+
+  // ── Satis Calisan ──────────────────────────────────────────────────────────
+  { name: 'Satis Performansim', to: '/employee/sales', icon: ChartBarIcon, role: 'employee', dept: 'sales' },
+  { name: '360 Derece Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon, role: 'employee', dept: 'sales' },
+  { name: 'Nabiz Anketi', to: '/employee/pulse', icon: HeartIcon, role: 'employee', dept: 'sales' },
+
+  // ── Ortak ──────────────────────────────────────────────────────────────────
   { name: 'Ayarlar', to: '/settings', icon: Cog6ToothIcon, role: 'all' },
 ]
 
 const navigation = computed(() =>
-  allNavigation.filter((item) => item.role === 'all' || item.role === userRole.value)
+  allNavigation.filter((item) => {
+    if (item.role !== 'all' && item.role !== userRole.value) return false
+    if (!('dept' in item) || !item.dept || item.dept === 'all') return true
+    if (item.dept === 'sales') return isSalesDept.value
+    if (item.dept === 'software') return !isSalesDept.value
+    return true
+  })
 )
 
-const openGroups = ref<string[]>(['360 Derece Feedback', 'KPI & ML Analizi'])
+const openGroups = ref<string[]>(['360 Derece Feedback', 'KPI & ML Analizi', 'Satis KPI & ML'])
 
 const isActiveRoute = (target: string) => {
   if (target.includes('?')) {

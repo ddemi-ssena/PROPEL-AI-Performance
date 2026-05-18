@@ -252,6 +252,81 @@ export interface TeamReportExportPayload {
   talking_points: string[]
 }
 
+// ── Sales Department Types ────────────────────────────────────────────────────
+
+export type SalesTargetColumn =
+  | 'Performance_Drop_Target'
+  | 'Burnout_Target'
+  | 'Resignation_Target'
+  | 'High_Risk_Target'
+
+export interface SalesModelTrainRequest {
+  upload_id: number
+  target_column: SalesTargetColumn
+  test_period_count?: number
+}
+
+export interface SalesModelStateResponse {
+  department: string
+  upload_id: number
+  target_column: string
+  target_label: string
+  is_trained: boolean
+  is_current_dataset: boolean
+  trained_at?: string | null
+  model_name?: string | null
+  train_count?: number | null
+  test_count?: number | null
+  labels: string[]
+  metrics: Record<string, any>
+  artifact_dir?: string | null
+}
+
+export interface SalesModelTrainResponse {
+  department: string
+  upload_id: number
+  target_column: string
+  model_name: string
+  train_count: number
+  test_count: number
+  labels: string[]
+  metrics: Record<string, any>
+  top_features: Array<Record<string, any>>
+  validation_summary: Record<string, any>
+  artifact_dir: string
+}
+
+export interface SalesPredictionResponse {
+  department: string
+  upload_id: number
+  employee_id: number
+  target_column: string
+  predicted_band: string
+  confidence: number
+  probabilities: Record<string, number>
+  top_features: Array<Record<string, any>>
+  risk_summary: string
+  top_drivers: Array<Record<string, any>>
+  recommended_actions: string[]
+  summary_payload: Record<string, any>
+  narrative?: Record<string, any> | null
+}
+
+export interface SalesBulkPredictionResponse {
+  department: string
+  upload_id: number
+  target_column: string
+  prediction_count: number
+  high_risk_count: number
+  medium_risk_count: number
+  low_risk_count: number
+  generated_at?: string
+  department_narrative?: Record<string, any> | null
+  team_narratives: Array<Record<string, any>>
+  team_analytics?: Array<Record<string, any>>
+  items: SalesPredictionResponse[]
+}
+
 export const analyticsApi = {
   async getDepartmentConfigs(): Promise<DepartmentAnalyticsConfigResponse[]> {
     const { data } = await apiClient.get<DepartmentAnalyticsConfigResponse[]>('/analytics/departments')
@@ -342,6 +417,61 @@ export const analyticsApi = {
       '/analytics/departments/software/team-report/export',
       payload,
       { responseType: 'blob' }
+    )
+    return data
+  },
+
+  // ── Sales Department ────────────────────────────────────────────────────────
+
+  async getSalesDatasets(): Promise<SoftwareDatasetResponse[]> {
+    const { data } = await apiClient.get<SoftwareDatasetResponse[]>('/analytics/departments/sales/datasets')
+    return data
+  },
+
+  async getSalesDatasetEmployees(uploadId: number): Promise<SoftwareDatasetEmployeeResponse[]> {
+    const { data } = await apiClient.get<SoftwareDatasetEmployeeResponse[]>(
+      `/analytics/departments/sales/datasets/${uploadId}/employees`
+    )
+    return data
+  },
+
+  async getSalesModelState(uploadId: number): Promise<SalesModelStateResponse[]> {
+    const { data } = await apiClient.get<SalesModelStateResponse[]>(
+      `/analytics/departments/sales/datasets/${uploadId}/model-state`
+    )
+    return data
+  },
+
+  async trainSalesModel(payload: SalesModelTrainRequest): Promise<SalesModelTrainResponse> {
+    const { data } = await apiClient.post<SalesModelTrainResponse>(
+      '/analytics/departments/sales/models/train',
+      { test_period_count: 12, ...payload }
+    )
+    return data
+  },
+
+  async getLatestSalesPrediction(params: {
+    upload_id: number
+    employee_id: number
+    target_column?: string
+    use_llm_narrative?: boolean
+  }): Promise<SalesPredictionResponse> {
+    const { data } = await apiClient.get<SalesPredictionResponse>(
+      '/analytics/departments/sales/predictions/latest',
+      { params }
+    )
+    return data
+  },
+
+  async getBulkSalesPredictions(params: {
+    upload_id: number
+    target_column?: string
+    use_llm_narrative?: boolean
+    llm_team?: string
+  }): Promise<SalesBulkPredictionResponse> {
+    const { data } = await apiClient.get<SalesBulkPredictionResponse>(
+      '/analytics/departments/sales/predictions/bulk',
+      { params }
     )
     return data
   },
