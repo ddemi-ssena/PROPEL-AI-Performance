@@ -54,6 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
         role: 'admin',
         is_active: true,
         department_id: 17,
+        department_name: 'Yazilim Gelistirme',
         created_at: new Date().toISOString()
       },
       'manager.yazilim@propel.com': {
@@ -63,6 +64,7 @@ export const useAuthStore = defineStore('auth', () => {
         role: 'department_manager',
         is_active: true,
         department_id: 17,
+        department_name: 'Yazilim Gelistirme',
         created_at: new Date().toISOString()
       },
       'manager.satis@propel.com': {
@@ -72,6 +74,7 @@ export const useAuthStore = defineStore('auth', () => {
         role: 'department_manager',
         is_active: true,
         department_id: 18,
+        department_name: 'Satis',
         created_at: new Date().toISOString()
       },
       'developer1@propel.com': {
@@ -81,6 +84,7 @@ export const useAuthStore = defineStore('auth', () => {
         role: 'employee',
         is_active: true,
         department_id: 17,
+        department_name: 'Yazilim Gelistirme',
         created_at: new Date().toISOString()
       },
       'sl-001@propel.com': {
@@ -90,6 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
         role: 'employee',
         is_active: true,
         department_id: 18,
+        department_name: 'Satis',
         created_at: new Date().toISOString()
       },
       'satis.employee@propel.com': {
@@ -99,6 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
         role: 'employee',
         is_active: true,
         department_id: 18,
+        department_name: 'Satis',
         created_at: new Date().toISOString()
       }
     }
@@ -129,6 +135,7 @@ export const useAuthStore = defineStore('auth', () => {
               role: 'admin',
               is_active: true,
               department_id: 17,
+              department_name: 'Yazilim Gelistirme',
               created_at: new Date().toISOString()
             },
             'manager.yazilim@propel.com': {
@@ -138,6 +145,7 @@ export const useAuthStore = defineStore('auth', () => {
               role: 'department_manager',
               is_active: true,
               department_id: 17,
+              department_name: 'Yazilim Gelistirme',
               created_at: new Date().toISOString()
             },
             'manager.satis@propel.com': {
@@ -147,6 +155,7 @@ export const useAuthStore = defineStore('auth', () => {
               role: 'department_manager',
               is_active: true,
               department_id: 18,
+              department_name: 'Satis',
               created_at: new Date().toISOString()
             },
             'developer1@propel.com': {
@@ -156,6 +165,7 @@ export const useAuthStore = defineStore('auth', () => {
               role: 'employee',
               is_active: true,
               department_id: 17,
+              department_name: 'Yazilim Gelistirme',
               created_at: new Date().toISOString()
             },
             'sl-001@propel.com': {
@@ -165,6 +175,7 @@ export const useAuthStore = defineStore('auth', () => {
               role: 'employee',
               is_active: true,
               department_id: 18,
+              department_name: 'Satis',
               created_at: new Date().toISOString()
             },
             'satis.employee@propel.com': {
@@ -174,6 +185,7 @@ export const useAuthStore = defineStore('auth', () => {
               role: 'employee',
               is_active: true,
               department_id: 18,
+              department_name: 'Satis',
               created_at: new Date().toISOString()
             }
           }

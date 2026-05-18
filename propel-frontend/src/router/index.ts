@@ -209,13 +209,15 @@ router.beforeEach((to, from, next) => {
     next('/login')
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
     const role = authStore.userRole
-    const deptId = authStore.user?.department_id
     if (role === 'admin') {
       next('/admin')
     } else if (role === 'department_manager') {
       next('/manager')
     } else if (role === 'employee') {
-      const isSales = deptId === 2 || deptId === 18
+      const departmentName = authStore.user?.department_name?.toLocaleLowerCase('tr-TR') || ''
+      const normalizedDepartmentName = departmentName.replace(/\u0131/g, 'i').replace(/\u015f/g, 's')
+      const email = authStore.user?.email?.toLocaleLowerCase('tr-TR') || ''
+      const isSales = normalizedDepartmentName.includes('satis') || email.includes('satis') || email.startsWith('sa-')
       next(isSales ? '/employee/sales' : '/employee')
     } else {
       next('/dashboard')
