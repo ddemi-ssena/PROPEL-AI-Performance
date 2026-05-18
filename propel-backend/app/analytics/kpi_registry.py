@@ -340,3 +340,391 @@ def get_software_kpi_by_feature_name(feature_name: str | None) -> KPIDefinition 
             break
 
     return SOFTWARE_KPI_BY_FEATURE_NAME.get(normalized)
+
+
+# ---------------------------------------------------------------------------
+# Sales KPI Registry
+# ---------------------------------------------------------------------------
+
+SALES_KPI_REGISTRY: tuple[KPIDefinition, ...] = (
+    # --- Uretkenlik & Hedef ---
+    KPIDefinition(
+        canonical_code="KPI-1 SHGO",
+        legacy_codes=(),
+        short_code="SHGO",
+        display_name="Satis Hedef Gerceklesme Orani",
+        category="Uretkenlik ve Hedef",
+        direction="higher_is_better",
+        unit="ratio",
+        formula="Weekly_Sales_Revenue / Weekly_Sales_Target",
+        thresholds=KPIThresholds(strong=1.0, stable=0.80, risk=0.80),
+        action_when_risky="Hedef altinda kalan haftalar icin satis taktigi ve pipeline kalitesi gozden gecirilmeli.",
+        source_columns=("sales_goal_attainment", "kpi-1_shgo", "Sales_Target_Achievement", "sales_target_achievement"),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-2 SAY",
+        legacy_codes=(),
+        short_code="SAY",
+        display_name="Satis Aktivite Yogunlugu",
+        category="Uretkenlik ve Hedef",
+        direction="higher_is_better",
+        unit="count",
+        formula="Total_Activity",
+        thresholds=KPIThresholds(strong=30.0, stable=15.0, risk=15.0),
+        action_when_risky="Aktivite dususu icin musteri gorusme plani ve outreach ritmi gozden gecirilmeli.",
+        source_columns=("Total_Activity",),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-3 NMKO",
+        legacy_codes=(),
+        short_code="NMKO",
+        display_name="Yeni Musteri Kazanim Orani",
+        category="Uretkenlik ve Hedef",
+        direction="higher_is_better",
+        unit="ratio",
+        formula="New_Customer_Count / Total_Customer_Count",
+        thresholds=KPIThresholds(strong=0.30, stable=0.15, risk=0.15),
+        action_when_risky="Yeni musteri kazanim kanalları ve prospecting aktiviteleri guclendirilmeli.",
+        source_columns=("new_customer_rate", "kpi-3_nmko", "New_Customer_Acquisition_Rate", "new_customer_acquisition_rate"),
+    ),
+    # --- Donusum ---
+    KPIDefinition(
+        canonical_code="KPI-4 LMDO",
+        legacy_codes=(),
+        short_code="LMDO",
+        display_name="Lead Musteriye Donusturme Orani",
+        category="Donusum",
+        direction="higher_is_better",
+        unit="ratio",
+        formula="Lead_to_Win_Conversion",
+        thresholds=KPIThresholds(strong=0.25, stable=0.10, risk=0.10),
+        action_when_risky="Nitelendirme kriterleri, demo kalitesi ve takip ritmi incelenmeli.",
+        source_columns=("Lead_to_Win_Conversion",),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-5 TKO",
+        legacy_codes=(),
+        short_code="TKO",
+        display_name="Tekliften Kazanima Donusum Orani",
+        category="Donusum",
+        direction="higher_is_better",
+        unit="ratio",
+        formula="Won_Deal_Count / (Won_Deal_Count + Lost_Deal_Count)",
+        thresholds=KPIThresholds(strong=0.50, stable=0.30, risk=0.30),
+        action_when_risky="Kaybedilen teklif analizi yapilmali; fiyat, kapsam ve rekabetci faktorler incelenmeli.",
+        source_columns=("win_rate", "kpi-5_tko", "Proposal_Win_Rate", "proposal_win_rate"),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-6 OSDS",
+        legacy_codes=(),
+        short_code="OSDS",
+        display_name="Ortalama Satis Dongusu Suresi",
+        category="Donusum",
+        direction="lower_is_better",
+        unit="days",
+        formula="Average_Sales_Cycle_Days",
+        thresholds=KPIThresholds(strong=30.0, stable=60.0, risk=60.0),
+        action_when_risky="Uzayan dongulerde karar engelleri ve onay surecleri analiz edilmeli.",
+        source_columns=("Average_Sales_Cycle_Days",),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-7 OSD",
+        legacy_codes=(),
+        short_code="OSD",
+        display_name="Ortalama Satis Degeri",
+        category="Donusum",
+        direction="higher_is_better",
+        unit="currency",
+        formula="Average_Sale_Value",
+        thresholds=KPIThresholds(strong=15000.0, stable=7500.0, risk=7500.0),
+        action_when_risky="Dusuk degerli firsatlarda upsell ve cross-sell stratejisi gelistirilmeli.",
+        source_columns=("Average_Sale_Value",),
+    ),
+    # --- Gelir Kalitesi ---
+    KPIDefinition(
+        canonical_code="KPI-8 GKP",
+        legacy_codes=(),
+        short_code="GKP",
+        display_name="Goreli Kazanim Performansi",
+        category="Gelir Kalitesi",
+        direction="higher_is_better",
+        unit="ratio",
+        formula="Weekly_Sales_Revenue / team_avg_revenue",
+        thresholds=KPIThresholds(strong=1.15, stable=0.85, risk=0.85),
+        action_when_risky="Takim ortalamasinin altinda kalan kisilerle satis taktigi ve hesap planlama gorusmesi yapilmali.",
+        source_columns=("Revenue_vs_Team", "KPI-8_GKP"),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-9 KKS",
+        legacy_codes=(),
+        short_code="KKS",
+        display_name="Kazanim Kalite Skoru",
+        category="Gelir Kalitesi",
+        direction="higher_is_better",
+        unit="count",
+        formula="Won_Deal_Count",
+        thresholds=KPIThresholds(strong=5.0, stable=2.0, risk=2.0),
+        action_when_risky="Kazanim sayisi dusukse pipeline kalitesi ve nitelendirme asamasi incelenmeli.",
+        source_columns=("Won_Deal_Count",),
+    ),
+    # --- Pipeline Sagligi ---
+    KPIDefinition(
+        canonical_code="KPI-10 PSO",
+        legacy_codes=(),
+        short_code="PSO",
+        display_name="Pipeline Saglik Orani",
+        category="Pipeline Sagligi",
+        direction="higher_is_better",
+        unit="ratio",
+        formula="Pipeline_Value / Weekly_Sales_Target",
+        thresholds=KPIThresholds(strong=3.0, stable=1.5, risk=1.5),
+        action_when_risky="Pipeline dolulugu icin prospecting ve fırsat acma aktiviteleri arttirilmali.",
+        source_columns=("pipeline_coverage", "kpi-10_pso", "Pipeline_Health_Ratio", "pipeline_health_ratio"),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-11 PYO",
+        legacy_codes=(),
+        short_code="PYO",
+        display_name="Pipeline Yasta Olma Orani",
+        category="Pipeline Sagligi",
+        direction="lower_is_better",
+        unit="ratio",
+        formula="Aged_Opportunity_Count / Open_Opportunity_Count",
+        thresholds=KPIThresholds(strong=0.20, stable=0.40, risk=0.40),
+        action_when_risky="Yasli firsatlar temizlenmeli; uzayan dongulerin kok nedeni analiz edilmeli.",
+        source_columns=("aged_pipeline_rate", "kpi-11_pyo", "Pipeline_Aging_Rate", "pipeline_aging_rate"),
+    ),
+    # --- Is Yuku ve Surdurulebilirlik ---
+    KPIDefinition(
+        canonical_code="KPI-12 SIYE",
+        legacy_codes=(),
+        short_code="SIYE",
+        display_name="Satis Is Yuku Endeksi",
+        category="Is Yuku ve Surdurulebilirlik",
+        direction="optimal_range",
+        unit="index",
+        thresholds=KPIThresholds(optimal_min=0.7, optimal_max=1.2),
+        formula="Sales_Workload_Index",
+        action_when_risky="Is yuku dengelemesi icin hesap dagilimi ve gorev onceliklendirmesi yapilmali.",
+        source_columns=("Sales_Workload_Index",),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-13 SIYS",
+        legacy_codes=(),
+        short_code="SIYS",
+        display_name="Surekli Is Yuku Stres Skoru",
+        category="Is Yuku ve Surdurulebilirlik",
+        direction="lower_is_better",
+        unit="score",
+        formula="rolling_4_hafta_ort(SIYE) > 1.2 → artan risk skoru",
+        thresholds=KPIThresholds(strong=0.0, stable=1.0, risk=2.0),
+        action_when_risky="Suren yuksek is yuku burnout riski olusturur; kaynak dengeleme planlanmali.",
+        source_columns=("overload_score", "kpi-13_siys"),
+    ),
+    # --- Musteri Odakliligi ---
+    KPIDefinition(
+        canonical_code="KPI-14 TDO",
+        legacy_codes=(),
+        short_code="TDO",
+        display_name="Takip Disiplini Orani",
+        category="Musteri Odakliligi",
+        direction="higher_is_better",
+        unit="ratio",
+        formula="Followup_OnTime_Rate",
+        thresholds=KPIThresholds(strong=0.90, stable=0.70, risk=0.70),
+        action_when_risky="Zamaninda takip disiplini icin CRM hatirlaticlari ve gorev planlama incelenmeli.",
+        source_columns=("Followup_OnTime_Rate",),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-15 CSAT",
+        legacy_codes=(),
+        short_code="CSAT",
+        display_name="Musteri Memnuniyeti",
+        category="Musteri Odakliligi",
+        direction="higher_is_better",
+        unit="score",
+        formula="Customer_Satisfaction",
+        thresholds=KPIThresholds(strong=4.5, stable=3.5, risk=3.5),
+        action_when_risky="Dusuk memnuniyet skorlarinda musteri gorusmesi ve sikayet koku analizi yapilmali.",
+        source_columns=("Customer_Satisfaction",),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-16 SO",
+        legacy_codes=(),
+        short_code="SO",
+        display_name="Sikayet Orani",
+        category="Musteri Odakliligi",
+        direction="lower_is_better",
+        unit="ratio",
+        formula="Complaint_Count / Won_Deal_Count",
+        thresholds=KPIThresholds(strong=0.05, stable=0.15, risk=0.15),
+        action_when_risky="Sikayet kaynaklari tespit edilmeli; urun uyum ve teslimat sureci gozden gecirilmeli.",
+        source_columns=("complaint_rate_derived", "complaint_rate", "kpi-16_so"),
+    ),
+    # --- CRM Disiplini ---
+    KPIDefinition(
+        canonical_code="KPI-17 CRMD",
+        legacy_codes=(),
+        short_code="CRMD",
+        display_name="CRM Disiplin Metrigi",
+        category="CRM Disiplini",
+        direction="higher_is_better",
+        unit="ratio",
+        formula="CRM_Usage_Rate",
+        thresholds=KPIThresholds(strong=0.90, stable=0.70, risk=0.70),
+        action_when_risky="CRM kullanim disiplini icin egitim ve sure sureci hatirlaticlari uygulanmali.",
+        source_columns=("CRM_Usage_Rate",),
+    ),
+    # --- Ekip Katki ---
+    KPIDefinition(
+        canonical_code="KPI-18 SEKS",
+        legacy_codes=(),
+        short_code="SEKS",
+        display_name="Satis Ekibi Katki Skoru",
+        category="Ekip Etkisi ve Is Birligi",
+        direction="higher_is_better",
+        unit="count",
+        formula="Mentorship_Count + Peer_Support_Count",
+        thresholds=KPIThresholds(strong=5.0, stable=2.0, risk=2.0),
+        action_when_risky="Ekip katki dusukse mentoring programi ve bilgi paylasim ritmi desteklenmeli.",
+        source_columns=("team_contribution", "kpi-18_seks", "Team_Contribution_Score", "team_contribution_score"),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-19 MS",
+        legacy_codes=(),
+        short_code="MS",
+        display_name="Motivasyon Skoru",
+        category="Duygu ve Gelisim",
+        direction="higher_is_better",
+        unit="score",
+        formula="Motivation_Score",
+        thresholds=KPIThresholds(strong=4.0, stable=3.0, risk=3.0),
+        action_when_risky="Motivasyon dususu icin 1:1 gorusme ve engel analizi yapilmali.",
+        source_columns=("Motivation_Score",),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-20 EKS",
+        legacy_codes=(),
+        short_code="EKS",
+        display_name="Ekip Destek Katki Skoru",
+        category="Ekip Etkisi ve Is Birligi",
+        direction="higher_is_better",
+        unit="count",
+        formula="Peer_Support_Count",
+        thresholds=KPIThresholds(strong=3.0, stable=1.0, risk=1.0),
+        action_when_risky="Akran destek eksikligi icin takim ici isbirligi aktiviteleri arttirilmali.",
+        source_columns=("Peer_Support_Count",),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-21 MTE",
+        legacy_codes=(),
+        short_code="MTE",
+        display_name="Motivasyon Trend Egimi",
+        category="Duygu ve Gelisim",
+        direction="higher_is_better",
+        unit="slope",
+        formula="Motivation_Score son 4 haftalik dogrusal egim",
+        thresholds=KPIThresholds(strong=0.1, stable=-0.1, risk=-0.1),
+        action_when_risky="Negatif motivasyon trendi icin kok neden ve takim iklimi analizi yapilmali.",
+        source_columns=("motivation_trend", "kpi-21_mte"),
+    ),
+    KPIDefinition(
+        canonical_code="KPI-22 GKS",
+        legacy_codes=(),
+        short_code="GKS",
+        display_name="Gelisim Katilim Skoru",
+        category="Duygu ve Gelisim",
+        direction="higher_is_better",
+        unit="ratio",
+        formula="Completed_Training_Count / Recommended_Training_Count",
+        thresholds=KPIThresholds(strong=1.0, stable=0.60, risk=0.60),
+        action_when_risky="Egitim katilim plani ve gelisim hedefleri netlestirilmeli.",
+        source_columns=("training_completion", "kpi-22_gks", "Development_Participation_Rate", "development_participation_rate"),
+    ),
+    # --- Bilesik KPI (target candidates, not model features) ---
+    KPIDefinition(
+        canonical_code="KPI-23 SPS",
+        legacy_codes=(),
+        short_code="SPS",
+        display_name="Satis Performans Skoru",
+        category="Bilesik KPI",
+        direction="higher_is_better",
+        unit="score",
+        formula="Hedef gerceklesme, donusum ve musteri odakliligi sinyallerini birlestiren skor",
+        action_when_risky="Alt KPI kirilimlari uzerinden satis performans dususu analiz edilmeli.",
+        source_columns=("KPI-23_SPS",),
+        is_model_feature=False,
+        is_target_candidate=True,
+    ),
+    KPIDefinition(
+        canonical_code="KPI-24 BRS",
+        legacy_codes=(),
+        short_code="BRS",
+        display_name="Burnout Risk Skoru",
+        category="Bilesik KPI",
+        direction="lower_is_better",
+        unit="score",
+        formula="Is yuku, motivasyon ve surekli stres sinyallerini birlestiren burnout risk skoru",
+        action_when_risky="Burnout riski icin is yuku, motivasyon ve destek sinyalleri birlikte incelenmeli.",
+        source_columns=("KPI-24_BRS",),
+        is_model_feature=False,
+        is_target_candidate=True,
+    ),
+    KPIDefinition(
+        canonical_code="KPI-25 PPE",
+        legacy_codes=(),
+        short_code="PPE",
+        display_name="Potansiyel Performans Endeksi",
+        category="Bilesik KPI",
+        direction="higher_is_better",
+        unit="score",
+        formula="Yuksek potansiyel sinyallerini birlestiren satis odakli endeks",
+        action_when_risky="Potansiyel dusukse gelisim, mentorluk ve hesap planlama destegi degerlendirilmeli.",
+        source_columns=("KPI-25_PPE",),
+        is_model_feature=False,
+        is_target_candidate=True,
+    ),
+)
+
+
+SALES_KPI_BY_CODE: dict[str, KPIDefinition] = {
+    code: definition
+    for definition in SALES_KPI_REGISTRY
+    for code in definition.all_codes
+}
+
+SALES_KPI_BY_SOURCE_COLUMN: dict[str, KPIDefinition] = {
+    column: definition
+    for definition in SALES_KPI_REGISTRY
+    for column in definition.source_columns
+}
+
+
+def get_sales_kpi_definition(metric_code: str | None) -> KPIDefinition | None:
+    if not metric_code:
+        return None
+    return SALES_KPI_BY_CODE.get(metric_code.strip())
+
+
+def sales_kpi_feature_name(definition: KPIDefinition) -> str:
+    code = definition.canonical_code.lower().replace("-", "_")
+    return re.sub(r"[^a-z0-9]+", "_", code).strip("_")
+
+
+SALES_KPI_BY_FEATURE_NAME: dict[str, KPIDefinition] = {
+    sales_kpi_feature_name(definition): definition
+    for definition in SALES_KPI_REGISTRY
+}
+
+
+def get_sales_kpi_by_feature_name(feature_name: str | None) -> KPIDefinition | None:
+    if not feature_name:
+        return None
+
+    normalized = feature_name
+    for suffix in ("_lag_1", "_rolling_4", "_trend_4"):
+        if normalized.endswith(suffix):
+            normalized = normalized[: -len(suffix)]
+            break
+
+    return SALES_KPI_BY_FEATURE_NAME.get(normalized)
