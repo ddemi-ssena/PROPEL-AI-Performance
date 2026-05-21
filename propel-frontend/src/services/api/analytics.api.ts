@@ -327,6 +327,33 @@ export interface SalesBulkPredictionResponse {
   items: SalesPredictionResponse[]
 }
 
+export interface SalesKPIMetric {
+  code: string
+  name: string
+  raw_value?: number | null
+  unit: string
+  direction: string
+  threshold_status?: string | null
+  trend_signal?: string | null
+  bar_pct: number
+}
+
+export interface SalesWeeklyTrendPoint {
+  label: string
+  score: number
+}
+
+export interface SalesEmployeePerformanceResponse {
+  employee_id: number
+  external_code?: string | null
+  latest_period?: string | null
+  kpis: Record<string, SalesKPIMetric>
+  weekly_trend: SalesWeeklyTrendPoint[]
+  prediction?: SalesPredictionResponse | null
+  has_upload: boolean
+  has_model: boolean
+}
+
 export const analyticsApi = {
   async getDepartmentConfigs(): Promise<DepartmentAnalyticsConfigResponse[]> {
     const { data } = await apiClient.get<DepartmentAnalyticsConfigResponse[]>('/analytics/departments')
@@ -472,6 +499,13 @@ export const analyticsApi = {
     const { data } = await apiClient.get<SalesBulkPredictionResponse>(
       '/analytics/departments/sales/predictions/bulk',
       { params }
+    )
+    return data
+  },
+
+  async getMyPerformance(): Promise<SalesEmployeePerformanceResponse> {
+    const { data } = await apiClient.get<SalesEmployeePerformanceResponse>(
+      '/analytics/departments/sales/my-performance'
     )
     return data
   },

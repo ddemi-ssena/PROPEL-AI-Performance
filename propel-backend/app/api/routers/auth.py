@@ -8,6 +8,7 @@ from app.core.security import verify_password, get_password_hash, create_access_
 from app.db.session import get_db
 from app.db.models.user import User, UserRole
 from app.db.models.employee import Employee
+from app.db.models.department import Department
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserResponse
 from app.api.dependencies import get_current_user  # Import added
@@ -20,7 +21,11 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login
 def read_users_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Mevcut kullanıcı bilgilerini getir"""
     employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
-    # Pydantic için geçici nesne oluştur (User modeline department_id yok)
+    dept_id = employee.department_id if employee else None
+    dept_name = None
+    if dept_id:
+        dept = db.query(Department).filter(Department.id == dept_id).first()
+        dept_name = dept.name if dept else None
     result = UserResponse(
         id=current_user.id,
         email=current_user.email,
@@ -28,8 +33,8 @@ def read_users_me(current_user: User = Depends(get_current_user), db: Session = 
         role=current_user.role,
         is_active=current_user.is_active,
         created_at=current_user.created_at,
-        department_id=employee.department_id if employee else None,
-        department_name=employee.department.name if employee and employee.department else None,
+        department_id=dept_id,
+        department_name=dept_name,
     )
     return result
 
