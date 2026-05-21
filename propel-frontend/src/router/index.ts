@@ -57,22 +57,16 @@ const router = createRouter({
           meta: { title: 'Anket Sonuclari' },
         },
         {
-          path: 'kpi-ml-analysis',
-          name: 'admin-kpi-ml-analysis',
-          component: () => import('@/views/manager/ManagerAnalyticsView.vue'),
-          meta: { title: 'KPI & ML Analizi' },
-        },
-        {
           path: 'feedback-reports/employees',
           name: 'admin-employee-analysis',
           component: () => import('@/views/manager/EmployeeAnalysisView.vue'),
-          meta: { title: '360 Calisan Raporu' },
+          meta: { title: 'Calisan Analizi' },
         },
         {
           path: 'feedback-reports/department',
           name: 'admin-department-analysis',
           component: () => import('@/views/manager/DepartmentAnalysisView.vue'),
-          meta: { title: '360 Departman Raporu' },
+          meta: { title: 'Departman Analizi' },
         },
         {
           path: 'sales-analytics',
@@ -97,13 +91,13 @@ const router = createRouter({
           path: 'feedback-reports/employees',
           name: 'manager-employee-analysis',
           component: () => import('@/views/manager/EmployeeAnalysisView.vue'),
-          meta: { title: '360 Calisan Raporu' },
+          meta: { title: 'Calisan Analizi' },
         },
         {
           path: 'feedback-reports/department',
           name: 'manager-department-analysis',
           component: () => import('@/views/manager/DepartmentAnalysisView.vue'),
-          meta: { title: '360 Departman Raporu' },
+          meta: { title: 'Departman Analizi' },
         },
         {
           path: 'kpi-ml-analysis',
@@ -209,15 +203,18 @@ router.beforeEach((to, from, next) => {
     next('/login')
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
     const role = authStore.userRole
+    const deptId = authStore.user?.department_id
     if (role === 'admin') {
       next('/admin')
     } else if (role === 'department_manager') {
-      next('/manager')
+      const deptName = authStore.user?.department_name?.toLowerCase() || ''
+      const deptId = authStore.user?.department_id
+      const email = authStore.user?.email?.toLowerCase() || ''
+      const isSalesMgr = deptName.includes('sat') || email.includes('satis') || deptId === 14 || deptId === 18 || deptId === 2
+      next(isSalesMgr ? '/manager/sales-analytics' : '/manager')
     } else if (role === 'employee') {
-      const departmentName = authStore.user?.department_name?.toLocaleLowerCase('tr-TR') || ''
-      const normalizedDepartmentName = departmentName.replace(/\u0131/g, 'i').replace(/\u015f/g, 's')
-      const email = authStore.user?.email?.toLocaleLowerCase('tr-TR') || ''
-      const isSales = normalizedDepartmentName.includes('satis') || email.includes('satis') || email.startsWith('sa-')
+      const deptName = authStore.user?.department_name?.toLowerCase() || ''
+      const isSales = deptName.includes('sat') || deptId === 2 || deptId === 18 || deptId === 14
       next(isSales ? '/employee/sales' : '/employee')
     } else {
       next('/dashboard')

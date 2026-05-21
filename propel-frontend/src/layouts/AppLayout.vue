@@ -203,11 +203,18 @@ const authStore = useAuthStore()
 const isWeeklyPulseModalOpen = ref(false)
 
 const userRole = computed(() => authStore.user?.role || localStorage.getItem('role') || 'employee')
+// dept_id=2 gerçek DB, dept_id=18 mock fallback
 const isSalesDept = computed(() => {
-  const departmentName = authStore.user?.department_name?.toLocaleLowerCase('tr-TR') || ''
-  const normalizedDepartmentName = departmentName.replace(/\u0131/g, 'i').replace(/\u015f/g, 's')
-  const email = authStore.user?.email?.toLocaleLowerCase('tr-TR') || ''
-  return normalizedDepartmentName.includes('satis') || email.includes('satis') || email.startsWith('sa-')
+  const name = authStore.user?.department_name?.toLowerCase() || ''
+  const id = authStore.user?.department_id
+  const email = authStore.user?.email?.toLowerCase() || ''
+  const onSalesRoute = route.path.includes('sales')
+  return (
+    name.includes('sat') ||
+    email.includes('satis') ||
+    id === 2 || id === 14 || id === 18 ||
+    onSalesRoute
+  )
 })
 const userName = computed(() => authStore.user?.full_name || 'Kullanici')
 
@@ -266,19 +273,6 @@ const allNavigation: NavigationItem[] = [
   { name: 'Anket Sonuclari', to: '/admin/survey-results', icon: DocumentTextIcon, role: 'admin' },
   { name: 'Satis ML Analizi', to: '/admin/sales-analytics', icon: ChartBarIcon, role: 'admin' },
   {
-    name: 'KPI & ML Analizi',
-    type: 'group',
-    icon: ChartBarIcon,
-    role: 'admin',
-    children: [
-      { name: 'Model Durumu', to: '/admin/kpi-ml-analysis?section=model', icon: ChartBarIcon },
-      { name: 'KPI Departman Analizi', to: '/admin/kpi-ml-analysis?section=department', icon: DocumentTextIcon },
-      { name: 'Takim Analizi', to: '/admin/kpi-ml-analysis?section=teams', icon: UsersIcon },
-      { name: 'KPI Calisan Analizi', to: '/admin/kpi-ml-analysis?section=watchlist', icon: UsersIcon },
-      { name: 'Teknik Detaylar', to: '/admin/kpi-ml-analysis?section=technical', icon: Cog6ToothIcon },
-    ],
-  },
-  {
     name: '360 Derece Feedback',
     type: 'group',
     icon: ChatBubbleLeftRightIcon,
@@ -286,8 +280,8 @@ const allNavigation: NavigationItem[] = [
     children: [
       { name: 'Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon },
       { name: '360 Derece Feedback Raporlari', type: 'section' },
-      { name: '360 Calisan Raporu', to: '/admin/feedback-reports/employees', icon: UsersIcon },
-      { name: '360 Departman Raporu', to: '/admin/feedback-reports/department', icon: DocumentTextIcon },
+      { name: 'Calisan Analizi', to: '/admin/feedback-reports/employees', icon: UsersIcon },
+      { name: 'Departman Analizi', to: '/admin/feedback-reports/department', icon: DocumentTextIcon },
     ],
   },
 
@@ -301,9 +295,9 @@ const allNavigation: NavigationItem[] = [
     dept: 'software',
     children: [
       { name: 'Model Durumu', to: '/manager/kpi-ml-analysis?section=model', icon: ChartBarIcon },
-      { name: 'KPI Departman Analizi', to: '/manager/kpi-ml-analysis?section=department', icon: DocumentTextIcon },
+      { name: 'Departman Analizi', to: '/manager/kpi-ml-analysis?section=department', icon: DocumentTextIcon },
       { name: 'Takim Analizi', to: '/manager/kpi-ml-analysis?section=teams', icon: UsersIcon },
-      { name: 'KPI Calisan Analizi', to: '/manager/kpi-ml-analysis?section=watchlist', icon: UsersIcon },
+      { name: 'Calisan Analizi', to: '/manager/kpi-ml-analysis?section=watchlist', icon: UsersIcon },
       { name: 'Teknik Detaylar', to: '/manager/kpi-ml-analysis?section=technical', icon: Cog6ToothIcon },
     ],
   },
@@ -333,8 +327,8 @@ const allNavigation: NavigationItem[] = [
     children: [
       { name: 'Feedback', to: '/feedback', icon: ChatBubbleLeftRightIcon },
       { name: '360 Derece Feedback Raporlari', type: 'section' },
-      { name: '360 Calisan Raporu', to: '/manager/feedback-reports/employees', icon: UsersIcon },
-      { name: '360 Departman Raporu', to: '/manager/feedback-reports/department', icon: DocumentTextIcon },
+      { name: 'Calisan Analizi', to: '/manager/feedback-reports/employees', icon: UsersIcon },
+      { name: 'Departman Analizi', to: '/manager/feedback-reports/department', icon: DocumentTextIcon },
     ],
   },
 

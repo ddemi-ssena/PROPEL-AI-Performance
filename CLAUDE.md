@@ -334,7 +334,15 @@ kutup-neww/
 
 **Dataset Kolon Uyumluluğu**: Excel/CSV'deki `Employee_ID`, `Week`, `Region`, `Role_Level` gibi Pascal/mixed case kolonlar otomatik normalize edilir. `year` kolonu olmayan dataset'lerde 2024 varsayılan.
 
-**Önemli Kısıt**: `Burnout_Target` çok seyrek (1560 satırda 1 pozitif örnek tipik) → eğitim başarısız olabilir; `Performance_Drop_Target`, `Resignation_Target`, `High_Risk_Target` çalışır.
+**Önemli Kısıt**: Yeni dataset (1612 satır, 31 çalışan) ile tüm 4 hedef başarıyla eğitiliyor:
+- Performance_Drop: %100 F1, 1240/372 train/test
+- Burnout: %99.4 F1
+- Resignation: %99.5 F1
+- High_Risk: %98.9 F1
+
+**Aktif Dataset**: `KUTUP_Sales_52Week_2024.xlsx` — 31 çalışan (SA-001..SA-031) × 52 hafta = 1612 satır.
+- SA-031: Hatice Yıldırım (Sales Department Manager, Genel bölge)
+- Tüm "Manager" pozisyon unvanları → "Sales Team Lead" olarak güncellendi (sadece Hatice Yıldırım "Manager")
 
 ---
 
@@ -557,21 +565,86 @@ docker exec propel_backend python seed_data.py
 - Admin → her iki departman + Satış ML Analizi linki
 - Satış çalışanı → Satış Performansım → `/employee/sales`
 
-**ML Target Durumu** (upload_id=1, 30 çalışan × 52 hafta):
-- `Performance_Drop_Target` ✅ eğitildi — 8 riskli, 22 güvenli
-- `Burnout_Target` ❌ eğitilemez — dataset'te tek sınıf (tüm satırlar = 0)
-- `Resignation_Target` ✅ eğitildi — 0 riskli, 30 güvenli
-- `High_Risk_Target` ✅ eğitildi — 8 riskli, 22 güvenli
+**ML Target Durumu** (upload_id=4, 31 çalışan × 52 hafta = 1612 satır):
+- `Performance_Drop_Target` ✅ F1=100%, 1240/372
+- `Burnout_Target` ✅ F1=99.4%, 1240/372
+- `Resignation_Target` ✅ F1=99.5%, 1240/372
+- `High_Risk_Target` ✅ F1=98.9%, 1240/372
 
-**Önemli Keşif**: `/api/v1/auth/me` endpoint'i `department_id` döndürmüyordu → frontend sidebar nav ve login yönlendirmesi çalışmıyordu. Backend fix ile çözüldü.
+**Riskli Çalışanlar** (Performans Düşüşü hedefine göre):
+Nihan Korkmaz, Baran Özdemir, Ozan Çetin, Tuncay Doğan, Aslı Erdoğan, Burcu Arslan, Serhat Bulut, Derya Kaplan
+
+**Önemli Keşif**: `/api/v1/auth/me` endpoint'i `department_id` döndürmüyordu → `department_name` de eklendi. Frontend sidebar artık email + department_name + route üzerinden satış tespiti yapıyor.
+
+---
+
+## Geliştirme Günlüğü (Devam)
+
+### 2026-05-21 Satış Çalışan Dashboard Backend Bağlantısı ★
+
+**Yeni Backend Endpoint**:
+- `GET /analytics/departments/sales/my-performance` — kimlik doğrulamalı çalışan için kişisel dashboard verisi
+  - 9 KPI metriği (SHGO, LMDO, TKO, OSDS, CSAT, CRMD, TDO, PSO, MS) — gerçek Excel verisi
+  - 8 haftalık bileşik performans trendi
+  - ML tahmini (Performance_Drop_Target) — `predicted_band`, `recommended_actions`, `top_drivers`
+  - `bar_pct` (0-1) — frontend progress bar için
+
+**Yeni Şemalar** (`schemas/analytics.py`):
+- `SalesKPIMetric` — code, name, raw_value, unit, direction, threshold_status, trend_signal, bar_pct
+- `SalesWeeklyTrendPoint` — label, score
+- `SalesEmployeePerformanceResponse` — tüm dashboard verisi
+
+**Auth `/me` Güncelleme** (`api/routers/auth.py`, `schemas/user.py`):
+- `department_name` alanı eklendi → sidebar ve router yönlendirmesi için
+
+**Frontend Güncellemeleri**:
+- `SalesEmployeeDashboard.vue` — tüm hardcoded veriler gerçek `getMyPerformance()` API'sine bağlandı
+- `survey.api.ts` — `createSurvey()` metodu eklendi (nabız anketi gerçek POST /surveys/)
+- `analytics.api.ts` — `getMyPerformance()`, `SalesEmployeePerformanceResponse`, `SalesKPIMetric`, `SalesWeeklyTrendPoint` eklendi
+- `AppLayout.vue` — `isSalesDept` email + department_name + route tabanlı tespit
+- `router/index.ts` — satış müdürü login sonrası `/manager/sales-analytics`'e yönlendirilir
+- `EmployeePulseView.vue` — "Personel Paneline Dön" butonu kaldırıldı
+
+**EMP_XXX Format Desteği**: `get_my_performance()` metodunda `SA-011` → `EMP_011` eşleştirmesi düzeltildi
+
+### 2026-05-21 Satış Dataset ve Seed Güncellemesi ★
+
+**Yeni Dataset**: `KUTUP_Sales_52Week_2024.xlsx`
+- 31 çalışan (SA-001..SA-031) × 52 hafta = 1612 satır
+- SA-031: Hatice Yıldırım (Sales Department Manager)
+- Tüm pozisyon unvanları: "Sales Manager" → "Sales Team Lead" (sadece SA-031 "Manager")
+- 28 kolon, 4 hedef değişken
+- Target dağılımları: PerfDrop=%34, Burnout=%3.3, Resignation=%5, HighRisk=%6.3
+- Generator script: `generate_sales_dataset.py`
+
+**Seed Data Güncellemeleri** (`seed_data.py`):
+- Tüm isimler Türkçe karakterlerle güncellendi (ı, ş, ğ, ç, ö, ü)
+- `manager.satis@propel.com` → `Hatice Yıldırım` (department_manager, SA-031, Genel bölgesi)
+- `satis.employee@propel.com` → `Zeynep Kaya` (SA-011)
+- SALES_EMPLOYEE_SPECS takım isimleri Excel Region sütunuyla birebir eşleşiyor
+- SA-011 loop'tan hariç tutuldu (ayrıca satis.employee olarak ekleniyor)
+
+**Test Kullanıcıları (Güncel)**:
+| Email | Şifre | Rol | Yönlendirme |
+|---|---|---|---|
+| admin@propel.com | admin123 | Admin | /admin |
+| manager.satis@propel.com | manager123 | Hatice Yıldırım — Satış Müdürü | /manager/sales-analytics |
+| manager.yazilim@propel.com | manager123 | Ahmet Yılmaz — Yazılım Müdürü | /manager |
+| satis.employee@propel.com | satis123 | Zeynep Kaya (SA-011) | /employee/sales |
+| sa-020@propel.com | employee123 | Ozan Çetin — Riskli profil | /employee/sales |
+| sa-001@propel.com | employee123 | Ali Yılmaz — Güvenli profil | /employee/sales |
 
 ---
 
 ## Sonraki Adımlar / Roadmap
 
 - [x] Satış departmanı frontend dashboard'u (Vue 3) — employee/manager/admin görünümleri
-- [ ] `Burnout_Target` için dataset'e pozitif örnek ekleme veya UI'dan gizleme
-- [ ] Satış çalışanı dashboard KPI kartlarını backend'e bağla (`/kpis/records?employee_id=X`)
+- [x] Satış çalışanı dashboard KPI kartlarını backend'e bağla
+- [x] Tüm 4 ML hedefi eğitilebilir hale getirildi
+- [x] Türkçe karakter düzeltmesi (tüm isimler)
+- [x] Hatice Yıldırım — tek satış müdürü (SA-031, dataset'e eklendi)
+- [ ] "Veri bekleniyor" durumu — satış müdürü KPI overview endpoint bağlantısı
+- [ ] Personel listesi performans skorları ML pipeline'ına bağlanacak
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri
 - [ ] LLM narrative endpoint'ini async/background job olarak ayır
