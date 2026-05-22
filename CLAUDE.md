@@ -636,6 +636,34 @@ Nihan Korkmaz, Baran Özdemir, Ozan Çetin, Tuncay Doğan, Aslı Erdoğan, Burcu
 
 ---
 
+### 2026-05-22 Satış Çalışanı Login Redirect Düzeltmesi ★
+
+**Sorun**: `satis.employee@propel.com` ile giriş yapıldığında `/employee/sales` (SalesEmployeeDashboard, emerald tema) yerine `/employee` (genel EmployeeDashboard, lacivert tema) açılıyordu. Sayfa yenilendikten sonra veya eski oturumda da aynı sorun tekrar ediyordu.
+
+**Kök Neden**: Pinia store'da `token` localStorage'dan restore ediliyordu (`ref(localStorage.getItem('token'))`) fakat `user` objesi `null` kalıyordu. Router guard `user = null` iken `isSales` kontrolü yapınca `false` döndürüyor ve `/employee`'ye yönlendiriyordu.
+
+**Düzeltilen Dosyalar**:
+
+`propel-frontend/src/stores/auth.ts`:
+- `login()` fonksiyonu: başarılı girişten sonra `userEmail` ve `deptId` localStorage'a kaydediliyor
+- `tryMockLogin()`: mock giriş için de aynı şekilde `userEmail` ve `deptId` kaydediliyor
+- `logout()`: `userEmail` ve `deptId` localStorage'dan temizleniyor
+
+`propel-frontend/src/router/index.ts`:
+- `isSalesUser()` yardımcı fonksiyonu eklendi: `user` objesi yokken `localStorage.getItem('userEmail')` ve `localStorage.getItem('deptId')` fallback olarak kullanılıyor; `department_id === 14/18` kontrolü eklendi
+- `router.beforeEach` guard `async` yapıldı: token varken `user = null` ise (sayfa yenileme / eski oturum) `/me` çekilip user restore ediliyor
+- `requiresGuest` guard: `authStore.userRole || localStorage.getItem('role')` ile role tespiti güçlendirildi  
+- `employee-dashboard` guard eklendi: satış çalışanı `/employee`'ye gelirse otomatik `/employee/sales`'e yönlendiriliyor
+
+**Önemli Teknik Not**: Windows'ta Docker Desktop volume sync gecikmesi nedeniyle HMR çalışmayabiliyor. Dosya değişikliklerinden sonra `docker cp` ile container'a manuel kopyalama gerekebilir:
+```bash
+docker cp propel-frontend/src/router/index.ts propel_frontend:/app/src/router/index.ts
+docker cp propel-frontend/src/stores/auth.ts propel_frontend:/app/src/stores/auth.ts
+docker restart propel_frontend
+```
+
+---
+
 ## Sonraki Adımlar / Roadmap
 
 - [x] Satış departmanı frontend dashboard'u (Vue 3) — employee/manager/admin görünümleri
@@ -643,6 +671,7 @@ Nihan Korkmaz, Baran Özdemir, Ozan Çetin, Tuncay Doğan, Aslı Erdoğan, Burcu
 - [x] Tüm 4 ML hedefi eğitilebilir hale getirildi
 - [x] Türkçe karakter düzeltmesi (tüm isimler)
 - [x] Hatice Yıldırım — tek satış müdürü (SA-031, dataset'e eklendi)
+- [x] Satış çalışanı login redirect düzeltmesi (router guard async + user restore)
 - [ ] "Veri bekleniyor" durumu — satış müdürü KPI overview endpoint bağlantısı
 - [ ] Personel listesi performans skorları ML pipeline'ına bağlanacak
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)

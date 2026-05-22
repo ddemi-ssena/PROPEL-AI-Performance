@@ -29,6 +29,12 @@ export const useAuthStore = defineStore('auth', () => {
       if (user.value?.role) {
         localStorage.setItem('role', user.value.role)
       }
+      if (user.value?.email) {
+        localStorage.setItem('userEmail', user.value.email)
+      }
+      if (user.value?.department_id != null) {
+        localStorage.setItem('deptId', String(user.value.department_id))
+      }
 
       return true
     } catch (err: any) {
@@ -116,6 +122,8 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = mockUser
       localStorage.setItem('token', token.value)
       localStorage.setItem('role', mockUser.role)
+      localStorage.setItem('userEmail', mockUser.email)
+      localStorage.setItem('deptId', String(mockUser.department_id))
       return true
     }
 
@@ -206,6 +214,8 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     localStorage.removeItem('token')
     localStorage.removeItem('role')
+    localStorage.removeItem('userEmail')
+    localStorage.removeItem('deptId')
   }
 
   return {
