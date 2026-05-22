@@ -196,28 +196,45 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
+function isSalesUser(authStore: ReturnType<typeof useAuthStore>): boolean {
+  const email = (authStore.user?.email || localStorage.getItem('userEmail') || '').toLowerCase()
+  const deptId = authStore.user?.department_id ?? Number(localStorage.getItem('deptId') || '0')
+  const deptName = (authStore.user?.department_name || '').toLowerCase()
+    .replace(/ı/g, 'i').replace(/ş/g, 's')
+  return deptName.includes('sat') || email.includes('satis') || email.startsWith('sa-')
+    || deptId === 2 || deptId === 14 || deptId === 18
+}
+
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
+
+  // Token var ama user bellekte yok (sayfa yenileme / eski oturum) → user'ı fetch et
+  if (authStore.isAuthenticated && !authStore.user) {
+    await authStore.fetchCurrentUser().catch(() => {})
+  }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    const role = authStore.userRole
-    const deptId = authStore.user?.department_id
+    const role = authStore.userRole || localStorage.getItem('role')
     if (role === 'admin') {
       next('/admin')
     } else if (role === 'department_manager') {
-      const deptName = authStore.user?.department_name?.toLowerCase() || ''
-      const deptId = authStore.user?.department_id
-      const email = authStore.user?.email?.toLowerCase() || ''
+      const email = (authStore.user?.email || localStorage.getItem('userEmail') || '').toLowerCase()
+      const deptId = authStore.user?.department_id ?? Number(localStorage.getItem('deptId') || '0')
+      const deptName = (authStore.user?.department_name || '').toLowerCase()
       const isSalesMgr = deptName.includes('sat') || email.includes('satis') || deptId === 14 || deptId === 18 || deptId === 2
       next(isSalesMgr ? '/manager/sales-analytics' : '/manager')
     } else if (role === 'employee') {
-      const deptName = authStore.user?.department_name?.toLowerCase() || ''
-      const isSales = deptName.includes('sat') || deptId === 2 || deptId === 18 || deptId === 14
-      next(isSales ? '/employee/sales' : '/employee')
+      next(isSalesUser(authStore) ? '/employee/sales' : '/employee')
     } else {
       next('/dashboard')
+    }
+  } else if (to.name === 'employee-dashboard' && authStore.isAuthenticated) {
+    if (isSalesUser(authStore)) {
+      next('/employee/sales')
+    } else {
+      next()
     }
   } else {
     next()
