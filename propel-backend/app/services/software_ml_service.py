@@ -12,15 +12,20 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.analytics.artifacts.software import SoftwareArtifactStore
+from app.analytics.explain.software import SoftwareExplanationBuilder
 from app.analytics.features.software import SoftwareFeatureBuilder
+from app.analytics.kpi_registry import KPIDefinition, SOFTWARE_KPI_BY_CODE, software_kpi_feature_name
 from app.analytics.prediction.software import SoftwarePredictionService
 from app.analytics.training.software import SoftwareBaselineTrainer
 from app.db.models.data_upload import DataUpload
 from app.db.models.employee import Employee
+from app.db.models.user import User
 from app.schemas.analytics import (
     SoftwareBulkPredictionResponse,
     SoftwareDatasetEmployeeResponse,
     SoftwareDatasetResponse,
+    SoftwareEmployeeKPIMetricResponse,
+    SoftwareEmployeePerformanceResponse,
     SoftwareModelStateResponse,
     SoftwareModelTrainResponse,
     SoftwarePredictionResponse,
@@ -29,11 +34,17 @@ from app.schemas.analytics import (
 
 UPLOAD_DIR = Path("uploads")
 SUPPORTED_TARGETS = {"performance_band", "attrition_risk_band"}
-SUPPORTED_MODELS = {"logistic_regression", "random_forest", "hist_gradient_boosting"}
+SUPPORTED_MODELS = {
+    "logistic_regression",
+    "random_forest",
+    "hist_gradient_boosting",
+    "stacking_lgbm_xgb_rf_lr",
+}
 TARGET_LABELS = {
     "performance_band": "Performans",
     "attrition_risk_band": "Ayrilma Riski",
 }
+EMPLOYEE_DASHBOARD_KPIS = tuple(f"KPI-{index}" for index in range(1, 21))
 logger = logging.getLogger(__name__)
 
 
@@ -248,6 +259,77 @@ class SoftwareMLService:
         return states
 
     @staticmethod
+    def get_my_performance(db: Session, current_user: User) -> SoftwareEmployeePerformanceResponse:
+        employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+        if not employee:
+            raise HTTPException(status_code=404, detail="Giris yapan kullanici icin calisan kaydi bulunamadi.")
+
+        upload = SoftwareMLService._latest_successful_upload(db)
+        rows = SoftwareMLService._load_rows(SoftwareMLService._upload_path(upload))
+        candidate_employee_ids = SoftwareMLService._candidate_employee_ids(db, employee.id)
+        employee_rows = [
+            row
+            for row in rows
+            if SoftwareMLService._normalize_employee_key(row.get("employee_id")) in candidate_employee_ids
+            or str(row.get("employee_id")) in candidate_employee_ids
+        ]
+        if not employee_rows:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "En son software dataset'i icinde bu calisana ait KPI satiri bulunamadi. "
+                    f"Denenen eslesmeler: {', '.join(sorted(candidate_employee_ids))}"
+                ),
+            )
+
+        dataset = SoftwareFeatureBuilder.build_from_rows(employee_rows)
+        if not dataset.feature_rows:
+            raise HTTPException(status_code=404, detail="Calisan KPI satirlari analiz edilebilir formatta degil.")
+
+        latest_index = max(
+            range(len(dataset.metadata_rows)),
+            key=lambda index: (
+                dataset.metadata_rows[index].get("year") or 0,
+                dataset.metadata_rows[index].get("week") or 0,
+            ),
+        )
+        latest_metadata = dataset.metadata_rows[latest_index]
+        latest_feature_row = dataset.feature_rows[latest_index]
+        latest_raw_row = SoftwareMLService._latest_raw_employee_row(employee_rows)
+        metrics = SoftwareMLService._employee_dashboard_metrics(latest_feature_row, latest_raw_row)
+
+        prediction: SoftwarePredictionResponse | None = None
+        try:
+            artifact = SoftwareArtifactStore().load("performance_band")
+            raw_prediction = SoftwarePredictionService.predict_latest(artifact, employee_rows)
+            prediction = SoftwareMLService._prediction_response(
+                upload_id=upload.id,
+                employee_id=employee.id,
+                prediction=raw_prediction,
+                employee_profile=SoftwareMLService._employee_profile(db, employee.id, employee_rows[-1]),
+                allow_llm_narrative=False,
+            )
+        except (FileNotFoundError, ValueError):
+            prediction = None
+
+        trend_points = SoftwareMLService._performance_trend(dataset)
+        return SoftwareEmployeePerformanceResponse(
+            department="software",
+            upload_id=upload.id,
+            file_name=upload.file_name,
+            employee_id=employee.id,
+            employee_name=employee.full_name,
+            team=employee.team or latest_metadata.get("team"),
+            role=employee.position or latest_metadata.get("role"),
+            period_label=f"{latest_metadata.get('year')}-W{int(latest_metadata.get('week') or 0):02d}",
+            latest_period=latest_metadata.get("period_date"),
+            metrics=metrics,
+            trend_labels=[item["label"] for item in trend_points],
+            trend_values=[item["value"] for item in trend_points],
+            prediction=prediction,
+        )
+
+    @staticmethod
     def _resolve_upload(db: Session, upload_id: int) -> DataUpload:
         upload = db.query(DataUpload).filter(DataUpload.id == upload_id).first()
         if not upload:
@@ -260,6 +342,170 @@ class SoftwareMLService:
             raise HTTPException(status_code=400, detail="Bu endpoint yalnizca software upload'lari icindir.")
 
         return upload
+
+    @staticmethod
+    def _latest_successful_upload(db: Session) -> DataUpload:
+        uploads = (
+            db.query(DataUpload)
+            .filter(
+                DataUpload.file_type == "Performans Metrikleri (KPI)",
+                DataUpload.status == "Success",
+            )
+            .order_by(DataUpload.upload_date.desc())
+            .limit(50)
+            .all()
+        )
+        for upload in uploads:
+            if (upload.raw_info or {}).get("department_key") == "software":
+                return upload
+        raise HTTPException(status_code=404, detail="Basarili software KPI dataset'i bulunamadi.")
+
+    @staticmethod
+    def _employee_dashboard_metrics(
+        feature_row: dict[str, Any],
+        raw_row: dict[str, Any] | None = None,
+    ) -> list[SoftwareEmployeeKPIMetricResponse]:
+        metrics: list[SoftwareEmployeeKPIMetricResponse] = []
+        definitions = [
+            definition
+            for prefix in EMPLOYEE_DASHBOARD_KPIS
+            for code, definition in SOFTWARE_KPI_BY_CODE.items()
+            if code.startswith(f"{prefix} ")
+        ]
+        seen_codes: set[str] = set()
+        for definition in definitions:
+            if definition.canonical_code in seen_codes:
+                continue
+            seen_codes.add(definition.canonical_code)
+            if not definition:
+                continue
+            feature_name = software_kpi_feature_name(definition)
+            raw_value = feature_row.get(feature_name)
+            if raw_value in (None, "") and raw_row:
+                for column_name in definition.source_columns:
+                    if column_name in raw_row and raw_row[column_name] not in (None, ""):
+                        raw_value = raw_row[column_name]
+                        break
+            numeric_value = SoftwareFeatureBuilder._parse_float(raw_value)
+            if numeric_value is None:
+                continue
+            if definition.unit == "ratio" and numeric_value > 1.5:
+                numeric_value = round(numeric_value / 100, 6)
+            status = SoftwareExplanationBuilder._threshold_status(definition, numeric_value)
+            metrics.append(
+                SoftwareEmployeeKPIMetricResponse(
+                    code=definition.short_code,
+                    label=definition.display_name,
+                    value=SoftwareMLService._format_kpi_value(definition, numeric_value),
+                    raw_value=round(numeric_value, 6),
+                    unit=definition.unit,
+                    status=SoftwareMLService._short_status(status),
+                    tone=SoftwareMLService._tone_from_status(status),
+                    bar_pct=SoftwareMLService._bar_pct(definition, numeric_value),
+                    hint=SoftwareMLService._threshold_hint(definition),
+                    category=definition.category,
+                )
+            )
+        return metrics
+
+    @staticmethod
+    def _latest_raw_employee_row(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+        if not rows:
+            return None
+        return max(
+            rows,
+            key=lambda row: (
+                SoftwareFeatureBuilder._parse_int(row.get("year")) or 0,
+                SoftwareFeatureBuilder._parse_int(row.get("week")) or 0,
+            ),
+        )
+
+    @staticmethod
+    def _performance_trend(dataset: Any) -> list[dict[str, Any]]:
+        trend: list[dict[str, Any]] = []
+        gto_feature = software_kpi_feature_name(SOFTWARE_KPI_BY_CODE["KPI-1 GTO"])
+        zto_feature = software_kpi_feature_name(SOFTWARE_KPI_BY_CODE["KPI-2 ZTO"])
+        kke_feature = software_kpi_feature_name(SOFTWARE_KPI_BY_CODE["KPI-4 KKKE"])
+        combined = sorted(
+            zip(dataset.feature_rows, dataset.metadata_rows),
+            key=lambda item: ((item[1].get("year") or 0), (item[1].get("week") or 0)),
+        )[-6:]
+        for feature_row, metadata in combined:
+            values = [
+                SoftwareFeatureBuilder._parse_float(feature_row.get(gto_feature)),
+                SoftwareFeatureBuilder._parse_float(feature_row.get(zto_feature)),
+                SoftwareFeatureBuilder._parse_float(feature_row.get(kke_feature)),
+            ]
+            present_values = [value for value in values if value is not None]
+            if not present_values:
+                continue
+            score = round(sum(present_values) / len(present_values) * 100, 1)
+            trend.append({"label": f"W{int(metadata.get('week') or 0):02d}", "value": score})
+        return trend
+
+    @staticmethod
+    def _format_kpi_value(definition: KPIDefinition, value: float) -> str:
+        if definition.unit == "ratio":
+            return f"%{round(value * 100)}"
+        if definition.unit == "bugs_per_kloc":
+            return f"{value:.2f}"
+        if definition.unit == "count":
+            return f"{value:.1f}".rstrip("0").rstrip(".")
+        if definition.unit in {"score", "index"}:
+            if value <= 1.5:
+                return f"%{round(value * 100)}"
+            return f"{value:.1f}".rstrip("0").rstrip(".")
+        return f"{value:.2f}".rstrip("0").rstrip(".")
+
+    @staticmethod
+    def _tone_from_status(status: str) -> str:
+        if "Guclu" in status or "Optimal aralikta" in status:
+            return "good"
+        if "Risk" in status or "altinda" in status or "ustunde" in status:
+            return "bad"
+        return "warn"
+
+    @staticmethod
+    def _short_status(status: str) -> str:
+        if "Guclu" in status or "Optimal aralikta" in status:
+            return "Iyi"
+        if "Risk" in status:
+            return "Dikkat"
+        return "Izle"
+
+    @staticmethod
+    def _bar_pct(definition: KPIDefinition, value: float) -> float:
+        thresholds = definition.thresholds
+        if definition.direction == "lower_is_better":
+            target = thresholds.risk or thresholds.stable or max(value, 1.0)
+            if target <= 0:
+                return 1.0
+            return max(0.04, min(value / target, 1.0))
+        if definition.direction == "optimal_range":
+            upper = thresholds.optimal_max or 1.0
+            if upper <= 0:
+                return 0.5
+            return max(0.04, min(value / upper, 1.0))
+        target = thresholds.strong or thresholds.stable or 1.0
+        if target <= 0:
+            return 0.0
+        return max(0.04, min(value / target, 1.0))
+
+    @staticmethod
+    def _threshold_hint(definition: KPIDefinition) -> str:
+        thresholds = definition.thresholds
+        if definition.direction == "lower_is_better" and thresholds.strong is not None:
+            return f"Hedef: {SoftwareMLService._format_kpi_value(definition, thresholds.strong)} alti"
+        if definition.direction == "optimal_range":
+            if thresholds.optimal_min is not None and thresholds.optimal_max is not None:
+                return (
+                    f"Hedef: {SoftwareMLService._format_kpi_value(definition, thresholds.optimal_min)} - "
+                    f"{SoftwareMLService._format_kpi_value(definition, thresholds.optimal_max)}"
+                )
+            return "Hedef: dengeli aralik"
+        if thresholds.strong is not None:
+            return f"Hedef: {SoftwareMLService._format_kpi_value(definition, thresholds.strong)} uzeri"
+        return "Hedef: takim standardi"
 
     @staticmethod
     def _upload_path(upload: DataUpload) -> Path:

@@ -159,7 +159,7 @@ class DepartmentPerformanceSummaryResponse(BaseModel):
 class SoftwareModelTrainRequest(AnalyticsBaseModel):
     upload_id: int
     target_column: str = "performance_band"
-    model_name: str = "random_forest"
+    model_name: str = "stacking_lgbm_xgb_rf_lr"
     test_period_count: int = 12
 
 
@@ -243,6 +243,35 @@ class SoftwareBulkPredictionResponse(BaseModel):
     team_narratives: list[dict] = []
     team_analytics: list[dict] = []
     items: list[SoftwarePredictionResponse]
+
+
+class SoftwareEmployeeKPIMetricResponse(BaseModel):
+    code: str
+    label: str
+    value: str
+    raw_value: Optional[float] = None
+    unit: str
+    status: str
+    tone: str
+    bar_pct: float
+    hint: str
+    category: str
+
+
+class SoftwareEmployeePerformanceResponse(BaseModel):
+    department: str
+    upload_id: int
+    file_name: str
+    employee_id: int
+    employee_name: Optional[str] = None
+    team: Optional[str] = None
+    role: Optional[str] = None
+    period_label: str
+    latest_period: Optional[date] = None
+    metrics: list[SoftwareEmployeeKPIMetricResponse]
+    trend_labels: list[str] = []
+    trend_values: list[float] = []
+    prediction: Optional[SoftwarePredictionResponse] = None
 
 
 # ---------------------------------------------------------------------------

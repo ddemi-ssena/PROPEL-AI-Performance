@@ -20,6 +20,7 @@ from app.schemas.analytics import (
     SoftwareBulkPredictionResponse,
     SoftwareDatasetEmployeeResponse,
     SoftwareDatasetResponse,
+    SoftwareEmployeePerformanceResponse,
     SoftwareModelStateResponse,
     SoftwareModelTrainRequest,
     SoftwareModelTrainResponse,
@@ -143,6 +144,16 @@ def get_bulk_software_predictions(
         use_llm_narrative=use_llm_narrative,
         llm_team=llm_team,
     )
+
+
+@router.get("/departments/software/my-performance", response_model=SoftwareEmployeePerformanceResponse)
+def get_my_software_performance(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.software_ml_service import SoftwareMLService
+
+    return SoftwareMLService.get_my_performance(db=db, current_user=current_user)
 
 
 @router.get("/performance/summary", response_model=DepartmentPerformanceSummaryResponse)

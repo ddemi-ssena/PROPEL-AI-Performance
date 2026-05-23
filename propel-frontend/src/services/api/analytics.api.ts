@@ -237,6 +237,35 @@ export interface SoftwareBulkPredictionResponse {
   items: SoftwarePredictionResponse[]
 }
 
+export interface SoftwareEmployeeKPIMetricResponse {
+  code: string
+  label: string
+  value: string
+  raw_value?: number | null
+  unit: string
+  status: string
+  tone: 'good' | 'warn' | 'bad' | string
+  bar_pct: number
+  hint: string
+  category: string
+}
+
+export interface SoftwareEmployeePerformanceResponse {
+  department: string
+  upload_id: number
+  file_name: string
+  employee_id: number
+  employee_name?: string | null
+  team?: string | null
+  role?: string | null
+  period_label: string
+  latest_period?: string | null
+  metrics: SoftwareEmployeeKPIMetricResponse[]
+  trend_labels: string[]
+  trend_values: number[]
+  prediction?: SoftwarePredictionResponse | null
+}
+
 export interface TeamReportExportPayload {
   team: string
   report_date: string
@@ -405,7 +434,7 @@ export const analyticsApi = {
     const { data } = await apiClient.post<SoftwareModelTrainResponse>(
       '/analytics/departments/software/models/train',
       {
-        model_name: 'random_forest',
+        model_name: 'stacking_lgbm_xgb_rf_lr',
         test_period_count: 12,
         ...payload,
       }
@@ -435,6 +464,13 @@ export const analyticsApi = {
     const { data } = await apiClient.get<SoftwareBulkPredictionResponse>(
       '/analytics/departments/software/predictions/bulk',
       { params }
+    )
+    return data
+  },
+
+  async getMySoftwarePerformance(): Promise<SoftwareEmployeePerformanceResponse> {
+    const { data } = await apiClient.get<SoftwareEmployeePerformanceResponse>(
+      '/analytics/departments/software/my-performance'
     )
     return data
   },
