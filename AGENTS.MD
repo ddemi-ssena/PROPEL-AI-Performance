@@ -447,6 +447,20 @@ docker exec propel_backend python seed_data.py
 - Backend container yeniden baslatilmali: `docker restart propel_backend`.
 - Ardindan yazilim calisaniyla `/employee` ekraninda `Yazilim Metrikleri` kartlari ve `/analytics/departments/software/my-performance` endpoint'i canli test edilmeli.
 
+## 2026-05-23 Yazilim Dataset-Calisan Eslesmesi Duzeltmesi
+
+- Kullanici v8 CSV dataset'indeki calisanlar ile uygulamadaki seed calisanlarin gercekten birebir eslesip eslesmedigini sordu.
+- Tespit: v8 CSV 30 kisi x 52 hafta = 1560 satir iceriyor; employee_id seti `1,4,5,6,7,9,10,13,14,16,17,18,20,25,26,27,28,31,32,33,34,35,38,40,42,45,46,47,48,49`.
+- Eski seed yazilim calisanlari `SE-001..SE-030` idi. Bu nedenle sayi 30 olsa da birebir kimlik uyumu yoktu; Canan `SE-001 -> employee_id=1` calisiyordu ama bazi seed calisanlarin CSV karsiligi yoktu.
+- `seed_data.py` icindeki `EMPLOYEE_SPECS` v8 dataset ID listesine gore guncellendi. Artik yazilim seed kodlari CSV employee_id setiyle birebir ayni: `SE-001, SE-004, ..., SE-049`.
+- Canli DB'deki mevcut 30 yazilim calisani da iki asamali unique-safe guncellemeyle ayni mapping'e tasindi; kullanici email'leri de kodlarla hizalandi (`developer1@propel.com` SE-001 olarak korundu, digerleri `se-004@propel.com` vb.).
+- Dogrulama: DB `external_employee_code` seti ile CSV `employee_id` seti birebir karsilastirildi; `missing_in_db=[]`, `missing_in_csv=[]`.
+- Canan Dagdelen testi: `/analytics/departments/software/my-performance` endpoint'i Canan icin `2025-W52`, `Backend`, `Mid Backend Engineer` ve v8 metriklerini dondurdu (`GTO %84`, `ZTO %72`, `GKE %125`, `KKKE %49`, `BY 0.37`).
+
+## Sonraki Adim
+
+- Frontendde `/employee` sayfasi yazilim calisaniyla kontrol edilmeli; artik gorulen kisi profili ve KPI metrikleri ayni dataset kimligine dayaniyor.
+
 ## 2026-05-14 360 Feedback Speech-to-Text
 
 - Kullanici 360 feedback cevaplarinin yalnizca klavye ile yazilmasinin vakit kaybi oldugunu, Web Speech API ile speech-to-text eklemek istedigini soyledi.
