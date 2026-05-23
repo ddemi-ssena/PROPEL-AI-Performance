@@ -57,22 +57,16 @@ const router = createRouter({
           meta: { title: 'Anket Sonuclari' },
         },
         {
-          path: 'kpi-ml-analysis',
-          name: 'admin-kpi-ml-analysis',
-          component: () => import('@/views/manager/ManagerAnalyticsView.vue'),
-          meta: { title: 'KPI & ML Analizi' },
-        },
-        {
           path: 'feedback-reports/employees',
           name: 'admin-employee-analysis',
           component: () => import('@/views/manager/EmployeeAnalysisView.vue'),
-          meta: { title: '360 Calisan Raporu' },
+          meta: { title: 'Calisan Analizi' },
         },
         {
           path: 'feedback-reports/department',
           name: 'admin-department-analysis',
           component: () => import('@/views/manager/DepartmentAnalysisView.vue'),
-          meta: { title: '360 Departman Raporu' },
+          meta: { title: 'Departman Analizi' },
         },
         {
           path: 'sales-analytics',
@@ -97,13 +91,13 @@ const router = createRouter({
           path: 'feedback-reports/employees',
           name: 'manager-employee-analysis',
           component: () => import('@/views/manager/EmployeeAnalysisView.vue'),
-          meta: { title: '360 Calisan Raporu' },
+          meta: { title: 'Calisan Analizi' },
         },
         {
           path: 'feedback-reports/department',
           name: 'manager-department-analysis',
           component: () => import('@/views/manager/DepartmentAnalysisView.vue'),
-          meta: { title: '360 Departman Raporu' },
+          meta: { title: 'Departman Analizi' },
         },
         {
           path: 'kpi-ml-analysis',
@@ -202,25 +196,45 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
+function isSalesUser(authStore: ReturnType<typeof useAuthStore>): boolean {
+  const email = (authStore.user?.email || localStorage.getItem('userEmail') || '').toLowerCase()
+  const deptId = authStore.user?.department_id ?? Number(localStorage.getItem('deptId') || '0')
+  const deptName = (authStore.user?.department_name || '').toLowerCase()
+    .replace(/ı/g, 'i').replace(/ş/g, 's')
+  return deptName.includes('sat') || email.includes('satis') || email.startsWith('sa-')
+    || deptId === 2 || deptId === 14 || deptId === 18
+}
+
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
+
+  // Token var ama user bellekte yok (sayfa yenileme / eski oturum) → user'ı fetch et
+  if (authStore.isAuthenticated && !authStore.user) {
+    await authStore.fetchCurrentUser().catch(() => {})
+  }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
   } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    const role = authStore.userRole
+    const role = authStore.userRole || localStorage.getItem('role')
     if (role === 'admin') {
       next('/admin')
     } else if (role === 'department_manager') {
-      next('/manager')
+      const email = (authStore.user?.email || localStorage.getItem('userEmail') || '').toLowerCase()
+      const deptId = authStore.user?.department_id ?? Number(localStorage.getItem('deptId') || '0')
+      const deptName = (authStore.user?.department_name || '').toLowerCase()
+      const isSalesMgr = deptName.includes('sat') || email.includes('satis') || deptId === 14 || deptId === 18 || deptId === 2
+      next(isSalesMgr ? '/manager/sales-analytics' : '/manager')
     } else if (role === 'employee') {
-      const departmentName = authStore.user?.department_name?.toLocaleLowerCase('tr-TR') || ''
-      const normalizedDepartmentName = departmentName.replace(/\u0131/g, 'i').replace(/\u015f/g, 's')
-      const email = authStore.user?.email?.toLocaleLowerCase('tr-TR') || ''
-      const isSales = normalizedDepartmentName.includes('satis') || email.includes('satis') || email.startsWith('sa-')
-      next(isSales ? '/employee/sales' : '/employee')
+      next(isSalesUser(authStore) ? '/employee/sales' : '/employee')
     } else {
       next('/dashboard')
+    }
+  } else if (to.name === 'employee-dashboard' && authStore.isAuthenticated) {
+    if (isSalesUser(authStore)) {
+      next('/employee/sales')
+    } else {
+      next()
     }
   } else {
     next()

@@ -364,3 +364,33 @@ class SalesBulkPredictionResponse(BaseModel):
     team_narratives: list[dict] = []
     team_analytics: list[dict] = []
     items: list[SalesPredictionResponse]
+
+
+# ---------------------------------------------------------------------------
+# Sales Employee Personal Dashboard
+# ---------------------------------------------------------------------------
+
+class SalesKPIMetric(BaseModel):
+    code: str
+    name: str
+    raw_value: Optional[float] = None
+    unit: str = "ratio"
+    direction: str = "higher_is_better"
+    threshold_status: Optional[str] = None
+    trend_signal: Optional[str] = None
+
+
+class SalesWeeklyTrendPoint(BaseModel):
+    label: str
+    score: float
+
+
+class SalesEmployeePerformanceResponse(BaseModel):
+    employee_id: int
+    external_code: Optional[str] = None
+    latest_period: Optional[str] = None
+    kpis: dict[str, SalesKPIMetric] = {}
+    weekly_trend: list[SalesWeeklyTrendPoint] = []
+    prediction: Optional[SalesPredictionResponse] = None
+    has_upload: bool = False
+    has_model: bool = False

@@ -45,12 +45,6 @@
           >
             Ankete Cevap Ver
           </button>
-          <router-link
-            to="/employee"
-            class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            Personel Paneline Don
-          </router-link>
         </div>
       </div>
 
@@ -82,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { HeartIcon } from '@heroicons/vue/24/outline'
 import WeeklyPulseModal from '@/components/dashboard/WeeklyPulseModal.vue'
@@ -91,6 +85,13 @@ import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
 const isWeeklyPulseModalOpen = ref(false)
+
+const SALES_DEPT_IDS = [2, 18]
+const dashboardRoute = computed(() =>
+  SALES_DEPT_IDS.includes(authStore.user?.department_id ?? -1)
+    ? '/employee/sales'
+    : '/employee'
+)
 
 const handlePulseSubmit = async (data: any) => {
   try {

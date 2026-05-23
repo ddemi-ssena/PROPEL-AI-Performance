@@ -12,6 +12,7 @@ from app.schemas.analytics import (
     SalesBulkPredictionResponse,
     SalesDatasetEmployeeResponse,
     SalesDatasetResponse,
+    SalesEmployeePerformanceResponse,
     SalesModelStateResponse,
     SalesModelTrainRequest,
     SalesModelTrainResponse,
@@ -256,6 +257,16 @@ def get_bulk_sales_predictions(
         use_llm_narrative=use_llm_narrative,
         llm_team=llm_team,
     )
+
+
+@router.get("/departments/sales/my-performance", response_model=SalesEmployeePerformanceResponse)
+def get_my_sales_performance(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.sales_ml_service import SalesMLService
+
+    return SalesMLService.get_my_performance(db=db, current_user=current_user)
 
 
 @router.post("/departments/software/team-report/export")

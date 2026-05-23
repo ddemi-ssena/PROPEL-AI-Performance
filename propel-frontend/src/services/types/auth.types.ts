@@ -22,6 +22,6 @@ export interface User {
   role: 'admin' | 'department_manager' | 'employee'
   is_active: boolean
   department_id?: number
-  department_name?: string | null
+  department_name?: string
   created_at: string
 }

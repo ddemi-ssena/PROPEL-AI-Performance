@@ -12,18 +12,24 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.analytics.artifacts.sales import SalesArtifactStore
+from app.analytics.explain.sales import SalesExplanationBuilder
 from app.analytics.features.sales import SalesFeatureBuilder
+from app.analytics.kpi_registry import SALES_KPI_BY_FEATURE_NAME, sales_kpi_feature_name, SALES_KPI_REGISTRY
 from app.analytics.prediction.sales import SalesPredictionService
 from app.analytics.training.sales import SalesStackingTrainer
 from app.db.models.data_upload import DataUpload
 from app.db.models.employee import Employee
+from app.db.models.user import User
 from app.schemas.analytics import (
     SalesBulkPredictionResponse,
     SalesDatasetEmployeeResponse,
     SalesDatasetResponse,
+    SalesEmployeePerformanceResponse,
+    SalesKPIMetric,
     SalesModelStateResponse,
     SalesModelTrainResponse,
     SalesPredictionResponse,
+    SalesWeeklyTrendPoint,
 )
 
 
@@ -681,3 +687,168 @@ class SalesMLService:
             )
 
         return sorted(analytics, key=lambda item: item["risk_score"], reverse=True)
+
+    # ------------------------------------------------------------------
+    # Satış çalışanı kişisel performans dashboard verisi
+    # ------------------------------------------------------------------
+
+    # Dashboard'da gösterilecek 9 KPI: (short_code, feature_name, unit_type)
+    # unit_type: "ratio" → 0-1, "days" → sayı, "score_5" → 0-5, "score_10" → 0-10
+    _DASHBOARD_KPIS: list[tuple[str, str, str]] = [
+        ("SHGO", "kpi_1_shgo", "ratio"),
+        ("LMDO", "kpi_4_lmdo", "ratio"),
+        ("TKO", "kpi_5_tko", "ratio"),
+        ("OSDS", "kpi_6_osds", "days"),
+        ("CSAT", "kpi_15_csat", "score_5"),
+        ("CRMD", "kpi_17_crmd", "ratio"),
+        ("TDO", "kpi_14_tdo", "ratio"),
+        ("PSO", "kpi_10_pso", "ratio"),
+        ("MS", "kpi_19_ms", "score_5"),
+    ]
+
+    @staticmethod
+    def _composite_weekly_score(feature_row: dict[str, Any]) -> float:
+        scores: list[float] = []
+        for code, fname, unit_type in SalesMLService._DASHBOARD_KPIS:
+            v = feature_row.get(fname)
+            if v is None:
+                continue
+            v = float(v)
+            if unit_type == "ratio":
+                scores.append(min(v * 100, 100.0))
+            elif unit_type == "days":
+                # lower_is_better: 0 days → 100, 90+ days → 0
+                scores.append(max(0.0, 100.0 - v / 90.0 * 100.0))
+            elif unit_type in ("score_5", "score_10"):
+                scale = 5.0 if unit_type == "score_5" else 10.0
+                scores.append(min(v / scale * 100.0, 100.0))
+        return round(sum(scores) / len(scores), 1) if scores else 50.0
+
+    @staticmethod
+    def _kpi_metrics_from_feature_row(feature_row: dict[str, Any]) -> dict[str, SalesKPIMetric]:
+        kpis: dict[str, SalesKPIMetric] = {}
+        for code, fname, unit_type in SalesMLService._DASHBOARD_KPIS:
+            definition = SALES_KPI_BY_FEATURE_NAME.get(fname)
+            raw_value = feature_row.get(fname)
+            if raw_value is not None:
+                raw_value = float(raw_value)
+
+            threshold_status: str | None = None
+            trend_signal: str | None = None
+            if definition and raw_value is not None:
+                threshold_status = SalesExplanationBuilder._threshold_status(definition, raw_value)
+                trend_raw = feature_row.get(f"{fname}_trend_4")
+                trend_signal = SalesExplanationBuilder._trend_signal(definition, trend_raw)
+
+            kpis[code] = SalesKPIMetric(
+                code=code,
+                name=definition.display_name if definition else code,
+                raw_value=raw_value,
+                unit=unit_type,
+                direction=definition.direction if definition else "higher_is_better",
+                threshold_status=threshold_status,
+                trend_signal=trend_signal,
+            )
+        return kpis
+
+    @staticmethod
+    def get_my_performance(db: Session, current_user: User) -> SalesEmployeePerformanceResponse:
+        employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+        if not employee:
+            raise HTTPException(status_code=404, detail="Çalışan kaydınız bulunamadı.")
+
+        # En son satış upload'ını bul
+        uploads = (
+            db.query(DataUpload)
+            .filter(DataUpload.file_type == "Performans Metrikleri (KPI)", DataUpload.status == "Success")
+            .order_by(DataUpload.upload_date.desc())
+            .limit(20)
+            .all()
+        )
+        sales_uploads = [u for u in uploads if (u.raw_info or {}).get("department_key") == "sales"]
+        if not sales_uploads:
+            return SalesEmployeePerformanceResponse(
+                employee_id=employee.id,
+                external_code=employee.external_employee_code,
+                has_upload=False,
+            )
+
+        upload = sales_uploads[0]
+        rows = SalesMLService._load_rows(SalesMLService._upload_path(upload))
+
+        # Bu çalışana ait satırları filtrele
+        candidate_ids = SalesMLService._candidate_employee_ids(db, employee.id)
+        from app.analytics.features.sales import _parse_employee_id_raw
+        employee_rows = [
+            row for row in rows
+            if SalesMLService._normalize_employee_key(_row_employee_id(row)) in candidate_ids
+            or str(_row_employee_id(row)) in candidate_ids
+        ]
+        if not employee_rows:
+            return SalesEmployeePerformanceResponse(
+                employee_id=employee.id,
+                external_code=employee.external_employee_code,
+                has_upload=True,
+            )
+
+        dataset = SalesFeatureBuilder.build_from_rows(employee_rows)
+        if not dataset.feature_rows:
+            return SalesEmployeePerformanceResponse(
+                employee_id=employee.id,
+                external_code=employee.external_employee_code,
+                has_upload=True,
+            )
+
+        # En son haftayı bul
+        latest_index = max(
+            range(len(dataset.metadata_rows)),
+            key=lambda i: (dataset.metadata_rows[i]["year"], dataset.metadata_rows[i]["week"]),
+        )
+        latest_feature_row = dataset.feature_rows[latest_index]
+        latest_meta = dataset.metadata_rows[latest_index]
+        latest_period = f"{latest_meta['year']}-W{latest_meta['week']:02d}"
+
+        # KPI metrikleri
+        kpis = SalesMLService._kpi_metrics_from_feature_row(latest_feature_row)
+
+        # Haftalık trend (son 8 hafta)
+        sorted_pairs = sorted(
+            zip(dataset.feature_rows, dataset.metadata_rows),
+            key=lambda p: (p[1]["year"], p[1]["week"]),
+        )
+        trend_window = list(sorted_pairs)[-8:]
+        weekly_trend = [
+            SalesWeeklyTrendPoint(
+                label=f"H{i + 1}",
+                score=SalesMLService._composite_weekly_score(fr),
+            )
+            for i, (fr, _meta) in enumerate(trend_window)
+        ]
+
+        # ML tahmini (Performance_Drop_Target)
+        prediction: SalesPredictionResponse | None = None
+        has_model = False
+        try:
+            artifact = SalesArtifactStore().load("Performance_Drop_Target")
+            pred = SalesPredictionService.predict_latest(artifact, employee_rows)
+            prediction = SalesMLService._prediction_response(
+                upload_id=upload.id,
+                employee_id=employee.id,
+                prediction=pred,
+                employee_profile=SalesMLService._employee_profile(db, employee.id, employee_rows[-1]),
+                allow_llm_narrative=False,
+            )
+            has_model = True
+        except (FileNotFoundError, ValueError):
+            pass
+
+        return SalesEmployeePerformanceResponse(
+            employee_id=employee.id,
+            external_code=employee.external_employee_code,
+            latest_period=latest_period,
+            kpis=kpis,
+            weekly_trend=weekly_trend,
+            prediction=prediction,
+            has_upload=True,
+            has_model=has_model,
+        )

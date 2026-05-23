@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 import random
@@ -20,8 +20,8 @@ from app.services.rag_service import RAGService
 
 db = SessionLocal()
 RNG = random.Random(42)
-SOFTWARE_DEPARTMENT_NAME = "Yazılım Geliştirme"
-SALES_DEPARTMENT_NAME = "Satış"
+SOFTWARE_DEPARTMENT_NAME = "YazÄ±lÄ±m GeliÅŸtirme"
+SALES_DEPARTMENT_NAME = "SatÄ±ÅŸ"
 
 
 EMPLOYEE_SPECS = [
@@ -58,41 +58,39 @@ EMPLOYEE_SPECS = [
     {"code": "SE-049", "name": "Naz Yalin", "team": "Backend", "position": "Senior Backend Engineer", "experience_years": 7.1},
 ]
 
-
 SALES_EMPLOYEE_SPECS = [
-    # SA-001..SA-010: ilk 10 çalışan (mevcut kullanıcılarla eşleşmiş)
-    {"code": "SA-001", "name": "Ali Yilmaz",     "team": "Marmara Bolge",            "position": "Senior Sales Representative", "experience_years": 7.5},
-    {"code": "SA-002", "name": "Ayse Demir",      "team": "Ege Bolge",                "position": "Junior Sales Representative", "experience_years": 4.2},
-    {"code": "SA-003", "name": "Mehmet Kaya",     "team": "Karadeniz Bolge",          "position": "Sales Manager",               "experience_years": 9.1},
-    {"code": "SA-004", "name": "Fatma Celik",     "team": "Marmara Bolge",            "position": "Mid Sales Representative",    "experience_years": 5.8},
-    {"code": "SA-005", "name": "Mustafa Koc",     "team": "Karadeniz Bolge",          "position": "Sales Manager",               "experience_years": 3.4},
-    {"code": "SA-006", "name": "Zeynep Sahin",    "team": "Dogu Anadolu Bolge",       "position": "Sales Manager",               "experience_years": 1.2},
-    {"code": "SA-007", "name": "Ahmet Ozturk",    "team": "Ic Anadolu Bolge",         "position": "Senior Sales Representative", "experience_years": 6.5},
-    {"code": "SA-008", "name": "Elif Aydin",      "team": "Marmara Bolge",            "position": "Mid Sales Representative",    "experience_years": 3.8},
-    {"code": "SA-009", "name": "Caner Yildiz",    "team": "Akdeniz Bolge",            "position": "Mid Sales Representative",    "experience_years": 1.5},
-    {"code": "SA-010", "name": "Burcu Arslan",    "team": "Akdeniz Bolge",            "position": "Junior Sales Representative", "experience_years": 3.1},
-    # SA-011: satis.employee@propel.com
-    {"code": "SA-011", "name": "Zeynep Kaya",     "team": "Akdeniz Bolge",            "position": "Senior Sales Executive",      "experience_years": 4.5},
-    # SA-012..SA-030: dataset'teki kalan 19 çalışan
-    {"code": "SA-012", "name": "Kerem Arslan",    "team": "Guneydogu Anadolu Bolge",  "position": "Sales Team Lead",             "experience_years": 6.2},
-    {"code": "SA-013", "name": "Selin Yilmaz",    "team": "Ic Anadolu Bolge",         "position": "Sales Manager",               "experience_years": 8.4},
-    {"code": "SA-014", "name": "Tuncay Dogan",    "team": "Dogu Anadolu Bolge",       "position": "Senior Sales Representative", "experience_years": 5.1},
-    {"code": "SA-015", "name": "Nihan Korkmaz",   "team": "Dogu Anadolu Bolge",       "position": "Junior Sales Representative", "experience_years": 1.3},
-    {"code": "SA-016", "name": "Baran Ozdemir",   "team": "Guneydogu Anadolu Bolge",  "position": "Junior Sales Representative", "experience_years": 1.8},
-    {"code": "SA-017", "name": "Derya Kaplan",    "team": "Guneydogu Anadolu Bolge",  "position": "Sales Team Lead",             "experience_years": 7.0},
-    {"code": "SA-018", "name": "Serhat Bulut",    "team": "Dogu Anadolu Bolge",       "position": "Senior Sales Representative", "experience_years": 6.8},
-    {"code": "SA-019", "name": "Merve Polat",     "team": "Akdeniz Bolge",            "position": "Senior Sales Representative", "experience_years": 5.5},
-    {"code": "SA-020", "name": "Ozan Cetin",      "team": "Dogu Anadolu Bolge",       "position": "Junior Sales Representative", "experience_years": 2.0},
-    {"code": "SA-021", "name": "Gamze Kurt",      "team": "Ege Bolge",                "position": "Mid Sales Representative",    "experience_years": 3.7},
-    {"code": "SA-022", "name": "Hakan Acar",      "team": "Ic Anadolu Bolge",         "position": "Sales Manager",               "experience_years": 9.2},
-    {"code": "SA-023", "name": "Rana Simsek",     "team": "Akdeniz Bolge",            "position": "Junior Sales Representative", "experience_years": 1.1},
-    {"code": "SA-024", "name": "Emre Yildiz",     "team": "Marmara Bolge",            "position": "Senior Sales Representative", "experience_years": 4.9},
-    {"code": "SA-025", "name": "Pinar Gul",       "team": "Marmara Bolge",            "position": "Sales Manager",               "experience_years": 7.6},
-    {"code": "SA-026", "name": "Tolga Kara",      "team": "Akdeniz Bolge",            "position": "Sales Team Lead",             "experience_years": 5.3},
-    {"code": "SA-027", "name": "Asli Erdogan",    "team": "Dogu Anadolu Bolge",       "position": "Mid Sales Representative",    "experience_years": 2.8},
-    {"code": "SA-028", "name": "Volkan Sahin",    "team": "Ege Bolge",                "position": "Sales Manager",               "experience_years": 8.0},
-    {"code": "SA-029", "name": "Irem Ozkan",      "team": "Dogu Anadolu Bolge",       "position": "Sales Team Lead",             "experience_years": 6.5},
-    {"code": "SA-030", "name": "Burak Caliskan",  "team": "Ic Anadolu Bolge",         "position": "Mid Sales Representative",    "experience_years": 3.2},
+    # TakÄ±m isimleri Excel'deki Region sÃ¼tunuyla birebir eÅŸleÅŸiyor
+    {"code": "SA-001", "name": "Ali YÄ±lmaz",      "team": "Marmara",           "position": "Senior Sales Representative", "experience_years": 7.5},
+    {"code": "SA-002", "name": "AyÅŸe Demir",      "team": "Ege",               "position": "Junior Sales Representative", "experience_years": 1.2},
+    {"code": "SA-003", "name": "Mehmet Kaya",      "team": "Karadeniz",         "position": "Sales Team Lead",             "experience_years": 9.1},
+    {"code": "SA-004", "name": "Fatma Ã‡elik",      "team": "Marmara",           "position": "Mid Sales Representative",    "experience_years": 2.6},
+    {"code": "SA-005", "name": "Mustafa KoÃ§",      "team": "Karadeniz",         "position": "Sales Team Lead",             "experience_years": 8.3},
+    {"code": "SA-006", "name": "Zeynep Åahin",     "team": "Dogu Anadolu",      "position": "Sales Team Lead",             "experience_years": 8.8},
+    {"code": "SA-007", "name": "Ahmet Ã–ztÃ¼rk",     "team": "Ic Anadolu",        "position": "Senior Sales Representative", "experience_years": 4.2},
+    {"code": "SA-008", "name": "Elif AydÄ±n",       "team": "Marmara",           "position": "Mid Sales Representative",    "experience_years": 2.4},
+    {"code": "SA-009", "name": "Caner YÄ±ldÄ±z",     "team": "Akdeniz",           "position": "Mid Sales Representative",    "experience_years": 2.7},
+    {"code": "SA-010", "name": "Burcu Arslan",      "team": "Akdeniz",           "position": "Junior Sales Representative", "experience_years": 1.1},
+    # SA-011: satis.employee@propel.com â€” Zeynep Kaya
+    {"code": "SA-011", "name": "Zeynep Kaya",      "team": "Akdeniz",           "position": "Senior Sales Executive",      "experience_years": 4.3},
+    {"code": "SA-012", "name": "Kerem Arslan",      "team": "Guneydogu Anadolu", "position": "Sales Team Lead",             "experience_years": 5.7},
+    {"code": "SA-013", "name": "Selin YÄ±lmaz",     "team": "Ic Anadolu",        "position": "Sales Team Lead",             "experience_years": 8.6},
+    {"code": "SA-014", "name": "Tuncay DoÄŸan",     "team": "Dogu Anadolu",      "position": "Senior Sales Representative", "experience_years": 3.8},
+    {"code": "SA-015", "name": "Nihan Korkmaz",     "team": "Dogu Anadolu",      "position": "Junior Sales Representative", "experience_years": 1.0},
+    {"code": "SA-016", "name": "Baran Ã–zdemir",    "team": "Guneydogu Anadolu", "position": "Junior Sales Representative", "experience_years": 1.3},
+    {"code": "SA-017", "name": "Derya Kaplan",      "team": "Guneydogu Anadolu", "position": "Sales Team Lead",             "experience_years": 5.3},
+    {"code": "SA-018", "name": "Serhat Bulut",      "team": "Dogu Anadolu",      "position": "Senior Sales Representative", "experience_years": 3.7},
+    {"code": "SA-019", "name": "Merve Polat",       "team": "Akdeniz",           "position": "Senior Sales Representative", "experience_years": 4.1},
+    {"code": "SA-020", "name": "Ozan Ã‡etin",       "team": "Dogu Anadolu",      "position": "Junior Sales Representative", "experience_years": 1.2},
+    {"code": "SA-021", "name": "Gamze Kurt",        "team": "Ege",               "position": "Mid Sales Representative",    "experience_years": 2.8},
+    {"code": "SA-022", "name": "Hakan Acar",        "team": "Ic Anadolu",        "position": "Sales Team Lead",             "experience_years": 9.2},
+    {"code": "SA-023", "name": "Rana ÅimÅŸek",      "team": "Akdeniz",           "position": "Junior Sales Representative", "experience_years": 1.0},
+    {"code": "SA-024", "name": "Emre YÄ±ldÄ±z",      "team": "Marmara",           "position": "Senior Sales Representative", "experience_years": 3.9},
+    {"code": "SA-025", "name": "PÄ±nar GÃ¼l",        "team": "Marmara",           "position": "Sales Team Lead",             "experience_years": 8.8},
+    {"code": "SA-026", "name": "Tolga Kara",        "team": "Akdeniz",           "position": "Sales Team Lead",             "experience_years": 5.5},
+    {"code": "SA-027", "name": "AslÄ± ErdoÄŸan",     "team": "Dogu Anadolu",      "position": "Mid Sales Representative",    "experience_years": 2.4},
+    {"code": "SA-028", "name": "Volkan Åahin",     "team": "Ege",               "position": "Sales Team Lead",             "experience_years": 8.2},
+    {"code": "SA-029", "name": "Ä°rem Ã–zkan",       "team": "Dogu Anadolu",      "position": "Sales Team Lead",             "experience_years": 5.8},
+    {"code": "SA-030", "name": "Burak Ã‡alÄ±ÅŸkan",   "team": "Ic Anadolu",        "position": "Mid Sales Representative",    "experience_years": 2.9},
 ]
 
 
@@ -200,28 +198,28 @@ def create_users() -> list[User]:
         User(
             email="admin@propel.com",
             hashed_password=get_password_hash("admin123"),
-            full_name="Admin Kullanici",
+            full_name="Admin KullanÄ±cÄ±",
             role=UserRole.admin,
             is_active=True,
         ),
         User(
             email="manager.yazilim@propel.com",
             hashed_password=get_password_hash("manager123"),
-            full_name="Ahmet Yilmaz",
+            full_name="Ahmet YÄ±lmaz",
             role=UserRole.department_manager,
             is_active=True,
         ),
         User(
             email="manager.satis@propel.com",
             hashed_password=get_password_hash("manager123"),
-            full_name="Mehmet Satis",
+            full_name="Hatice YÄ±ldÄ±rÄ±m",
             role=UserRole.department_manager,
             is_active=True,
         ),
         User(
             email="satis.employee@propel.com",
             hashed_password=get_password_hash("satis123"),
-            full_name="Satis Personeli",
+            full_name="Zeynep Kaya",
             role=UserRole.employee,
             is_active=True,
         ),
@@ -242,7 +240,7 @@ def create_users() -> list[User]:
 
     for spec in SALES_EMPLOYEE_SPECS:
         if spec["code"] == "SA-011":
-            continue
+            continue  # SA-011 â†’ satis.employee@propel.com olarak ayrÄ±ca eklendi
         login_email = f"{spec['code'].lower()}@propel.com"
         login_password = "employee123"
         users.append(
@@ -302,24 +300,24 @@ def create_employees(users: list[User], departments: list[Department]) -> list[E
         Employee(
             user_id=user_map["manager.satis@propel.com"].id,
             department_id=sales_department.id,
-            external_employee_code="MGR-SL",
-            team="Yonetim",
+            external_employee_code="SA-031",
+            team="Genel",
             position="Sales Department Manager",
-            experience_years=10.0,
-            hire_date=date(2020, 1, 1),
+            experience_years=12.0,
+            hire_date=date(2019, 6, 1),
         )
     )
 
-    # Yeni satis calisani
+    # SA-011: satis.employee@propel.com â€” Zeynep Kaya
     employees.append(
         Employee(
             user_id=user_map["satis.employee@propel.com"].id,
             department_id=sales_department.id,
             external_employee_code="SA-011",
-            team="Kurumsal Satis",
+            team="Akdeniz",
             position="Senior Sales Executive",
-            experience_years=4.5,
-            hire_date=date(2022, 1, 1),
+            experience_years=4.3,
+            hire_date=date(2021, 3, 15),
         )
     )
 
@@ -339,7 +337,7 @@ def create_employees(users: list[User], departments: list[Department]) -> list[E
 
     for index, spec in enumerate(SALES_EMPLOYEE_SPECS, start=1):
         if spec["code"] == "SA-011":
-            continue
+            continue  # SA-011 â†’ satis.employee@propel.com olarak ayrÄ±ca eklendi
         email = f"{spec['code'].lower()}@propel.com"
         employees.append(
             Employee(
