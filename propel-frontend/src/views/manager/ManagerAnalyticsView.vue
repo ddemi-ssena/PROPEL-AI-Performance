@@ -59,7 +59,7 @@
       <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">ML Model</p>
-          <h3 class="mt-1 text-lg font-bold text-slate-900">Software risk tahmini</h3>
+          <h3 class="mt-1 text-lg font-bold text-slate-900">Software risk tahmini - LightGBM + XGB + RF -> LR</h3>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 w-full xl:max-w-6xl">
@@ -83,6 +83,16 @@
           >
             <option value="performance_band">Performans</option>
             <option value="attrition_risk_band">Ayrilma Riski</option>
+          </select>
+
+          <select
+            v-model="mlModelName"
+            class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-sm"
+          >
+            <option value="stacking_lgbm_xgb_rf_lr">Stacking Ensemble</option>
+            <option value="random_forest">Random Forest</option>
+            <option value="hist_gradient_boosting">Hist Gradient Boosting</option>
+            <option value="logistic_regression">Logistic Regression</option>
           </select>
 
           <button
@@ -211,17 +221,19 @@
           <div
             v-for="state in modelStates"
             :key="state.target_column"
-            class="rounded-xl border border-slate-200 bg-white p-4"
+            class="rounded-xl border p-4"
+            :class="softwareModelStateCardClass(state)"
           >
-            <div class="flex items-center justify-between gap-3">
-              <p class="text-sm font-bold text-slate-900">{{ state.target_label }}</p>
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-sm font-bold text-slate-900 leading-5">{{ state.target_label }}</p>
+                <p v-if="state.model_name" class="mt-1 text-[11px] font-semibold text-slate-500">
+                  {{ state.model_name }}
+                </p>
+              </div>
               <span
-                class="rounded-full px-2.5 py-1 text-xs font-semibold"
-                :class="state.is_trained
-                  ? state.is_current_dataset
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-amber-50 text-amber-700 border border-amber-200'
-                  : 'bg-rose-50 text-rose-700 border border-rose-200'"
+                class="rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
+                :class="softwareModelStateBadgeClass(state)"
               >
                 {{ modelStateLabel(state) }}
               </span>
@@ -229,6 +241,16 @@
             <p class="mt-2 text-xs leading-5 text-slate-500">
               {{ state.is_trained ? `Son egitim: ${formatDateTime(state.trained_at)}` : 'Bu target icin model henuz egitilmedi.' }}
             </p>
+            <div v-if="state.is_trained" class="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div class="rounded-lg bg-white/70 px-2 py-1.5">
+                <p class="text-slate-400">Weighted F1</p>
+                <p class="font-bold text-slate-800">{{ formatPercent(state.metrics?.weighted_f1) }}</p>
+              </div>
+              <div class="rounded-lg bg-white/70 px-2 py-1.5">
+                <p class="text-slate-400">Train / Test</p>
+                <p class="font-bold text-slate-800">{{ state.train_count || '-' }} / {{ state.test_count || '-' }}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2212,6 +2234,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const mlUploadId = ref<number | null>(null)
 const mlTargetColumn = ref('performance_band')
+const mlModelName = ref('stacking_lgbm_xgb_rf_lr')
 const mlEmployeeId = ref<number | null>(null)
 const mlLoading = ref<'train' | 'predict' | 'bulk' | 'narrative' | null>(null)
 const mlError = ref<string | null>(null)
@@ -3971,6 +3994,18 @@ function modelStateLabel(state?: SoftwareModelStateResponse | null) {
   return 'Model var'
 }
 
+function softwareModelStateCardClass(state: SoftwareModelStateResponse) {
+  if (!state.is_trained) return 'border-rose-100 bg-rose-50/60'
+  if (!state.is_current_dataset) return 'border-amber-100 bg-amber-50/60'
+  return 'border-emerald-100 bg-emerald-50/60'
+}
+
+function softwareModelStateBadgeClass(state: SoftwareModelStateResponse) {
+  if (!state.is_trained) return 'bg-rose-100 text-rose-700'
+  if (!state.is_current_dataset) return 'bg-amber-100 text-amber-700'
+  return 'bg-emerald-100 text-emerald-700'
+}
+
 function syncAnalyticsSectionFromRoute(value: unknown) {
   const section = String(value || '')
   if (analyticsSectionKeys.includes(section as AnalyticsSectionKey)) {
@@ -4048,6 +4083,7 @@ async function trainModel() {
     trainingResult.value = await analyticsApi.trainSoftwareModel({
       upload_id: mlUploadId.value,
       target_column: mlTargetColumn.value,
+      model_name: mlModelName.value,
     })
     modelStates.value = await analyticsApi.getSoftwareModelState(mlUploadId.value)
     activeAnalyticsSection.value = 'model'

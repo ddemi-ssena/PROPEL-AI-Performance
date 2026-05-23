@@ -74,7 +74,7 @@
             <div class="h-72">
                 <LineChart 
                     :labels="['Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim']" 
-                    :data="[75, 82, 80, 88, 85, 92]" 
+                    :data="softwarePerformance?.trend_values?.length ? softwarePerformance.trend_values : [75, 82, 80, 88, 85, 92]" 
                     label="Kişisel Skor"
                     color="#4f46e5" 
                 />
@@ -118,6 +118,62 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Software KPI Detail Cards -->
+    <div class="mb-8">
+      <div class="flex items-center justify-between gap-4 mb-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">KPI Detayı</p>
+          <h3 class="mt-1 text-xl font-bold text-slate-900">Yazılım Metrikleri</h3>
+        </div>
+        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+          {{ softwarePerformance?.period_label || 'Veri bekleniyor' }}
+        </span>
+      </div>
+
+      <div v-if="softwarePerformanceLoading" class="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+        Yazılım KPI metrikleri yükleniyor...
+      </div>
+
+      <div v-else-if="softwarePerformanceError" class="rounded-2xl border border-amber-100 bg-amber-50 p-6 text-sm text-amber-800">
+        {{ softwarePerformanceError }}
+      </div>
+
+      <div v-else-if="softwarePerformance?.metrics?.length" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div
+          v-for="metric in softwarePerformance.metrics"
+          :key="metric.code"
+          class="rounded-2xl border bg-white p-5 shadow-sm hover:shadow-md transition-shadow"
+          :class="metric.tone === 'good' ? 'border-emerald-100' : metric.tone === 'warn' ? 'border-amber-100' : 'border-rose-100'"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ metric.code }}</p>
+              <p class="mt-1 text-sm font-semibold text-slate-700">{{ metric.label }}</p>
+            </div>
+            <span
+              class="rounded-full px-2.5 py-1 text-xs font-semibold"
+              :class="metric.tone === 'good' ? 'bg-emerald-50 text-emerald-700' : metric.tone === 'warn' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'"
+            >
+              {{ metric.status }}
+            </span>
+          </div>
+          <p class="mt-4 text-2xl font-bold text-slate-900">{{ metric.value }}</p>
+          <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              class="h-full rounded-full transition-all duration-500"
+              :class="metric.tone === 'good' ? 'bg-emerald-500' : metric.tone === 'warn' ? 'bg-amber-500' : 'bg-rose-500'"
+              :style="{ width: `${Math.round(Math.max(0.04, Math.min(metric.bar_pct, 1)) * 100)}%` }"
+            ></div>
+          </div>
+          <p class="mt-2 text-xs text-slate-500">{{ metric.hint }}</p>
+        </div>
+      </div>
+
+      <div v-else class="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+        Bu çalışan için yazılım KPI metriği bulunamadı.
+      </div>
     </div>
 
     <!-- Creative Features Row: Pulse & Peer Praise -->
@@ -263,10 +319,14 @@ import { useAuthStore } from '@/stores/auth'
 import BadgeMedal from '@/components/common/BadgeMedal.vue'
 import { feedbackApi, type BadgeResponse, type BadgeType } from '@/services/api/feedback.api'
 import { employeeApi } from '@/services/api/employee.api'
+import { analyticsApi, type SoftwareEmployeePerformanceResponse } from '@/services/api/analytics.api'
 const userStore = useAuthStore()
 const badges = ref<BadgeResponse[]>([])
 const employee = ref<any>(null)
 const isWeeklyPulseModalOpen = ref(false)
+const softwarePerformance = ref<SoftwareEmployeePerformanceResponse | null>(null)
+const softwarePerformanceLoading = ref(false)
+const softwarePerformanceError = ref('')
 
 const isSalesDepartment = computed(() => {
     const pos = (employee.value?.position || '').toLowerCase()
@@ -304,7 +364,20 @@ onMounted(async () => {
   } catch (error) {
     console.error('Çalışan verileri yüklenemedi:', error)
   }
+  await loadSoftwarePerformance()
 })
+
+async function loadSoftwarePerformance() {
+  softwarePerformanceLoading.value = true
+  softwarePerformanceError.value = ''
+  try {
+    softwarePerformance.value = await analyticsApi.getMySoftwarePerformance()
+  } catch (error: any) {
+    softwarePerformanceError.value = error.response?.data?.detail || 'Yazılım KPI dataseti henüz hazır değil.'
+  } finally {
+    softwarePerformanceLoading.value = false
+  }
+}
 
 const handlePulseSubmit = async (data: any) => {
   try {

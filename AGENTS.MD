@@ -429,6 +429,24 @@ docker exec propel_backend python seed_data.py
 - 360 Feedback ekraninda farkli rol/departman kombinasyonlariyla soru cekilip DB'deki yeni `is_ai_generated=True` kayitlar incelenmeli.
 - Gerekirse mevcut eski `feedback_questions` kayitlari arsivlenip/temizlenerek yeni prompt'un urettigi nitelikli sorularin daha tutarli gorunmesi saglanabilir.
 
+## 2026-05-23 Yazilim Calisan KPI Metrik Kartlari
+
+- Kullanici satis calisan dashboard'undaki `KPI Detayi / Satis Metrikleri` kartlarinin yazilim departmaninda nerede oldugunu sordu.
+- Tespit: satis ekrani `/employee/sales` route'u ve `SalesEmployeeDashboard.vue` icinde; yazilim calisan karsiligi `/employee` ve `EmployeeDashboard.vue` idi, fakat yazilim KPI detay kartlari yoktu.
+- Backend'e `GET /api/v1/analytics/departments/software/my-performance` endpoint'i eklendi.
+- Endpoint giris yapan kullanicinin `Employee` kaydini bulur, en son basarili `department_key=software` KPI upload'unu secer, dataset satirlarini calisanla eslestirir ve son haftanin KPI kartlarini dondurur.
+- KPI kartlari artik rastgele/secili metinlerden degil `SOFTWARE_KPI_REGISTRY` ve dataset kaynak kolonlarindan uretilir; `KPI-1`..`KPI-20` resmi yazilim KPI listesi desteklenir.
+- Model feature olmayan ama dataset'te bulunan hedef aday KPI'lar (`KPI-18 GPS`, `KPI-19 ARS`, `KPI-20 PPE`) da raw dataset satirindan okunacak sekilde eklendi.
+- Frontend `analyticsApi.getMySoftwarePerformance()` eklendi ve `EmployeeDashboard.vue` icinde `Yazilim Metrikleri` kart bolumu olusturuldu.
+- Kartlar kod, ad, formatli deger, durum, renk tonu, bar yuzdesi, hedef ipucu ve kategori bilgilerini backend response'undan alir.
+- Dogrulama: lokal `python -m py_compile app\\api\\routers\\analytics.py app\\schemas\\analytics.py app\\services\\software_ml_service.py`, `npm.cmd run type-check`, `npm.cmd run build-only` basarili.
+- Docker container icinde py_compile/restart/API smoke test denenmek istendi fakat Docker erisimi icin izin verilmedigi icin calistirilamadi.
+
+## Sonraki Adim
+
+- Backend container yeniden baslatilmali: `docker restart propel_backend`.
+- Ardindan yazilim calisaniyla `/employee` ekraninda `Yazilim Metrikleri` kartlari ve `/analytics/departments/software/my-performance` endpoint'i canli test edilmeli.
+
 ## 2026-05-14 360 Feedback Speech-to-Text
 
 - Kullanici 360 feedback cevaplarinin yalnizca klavye ile yazilmasinin vakit kaybi oldugunu, Web Speech API ile speech-to-text eklemek istedigini soyledi.
@@ -757,3 +775,86 @@ docker exec propel_backend python seed_data.py
 
 - PR #26 branch'i pushlandiktan sonra GitHub conflict/checks ekrani tekrar kontrol edilmeli.
 - Backend test suite icin `pytest` dependency ve temel `app/tests/` smoke testleri eklenmeli; su an pytest runner image'da yok.
+
+## 2026-05-22 Origin Master PR #28 Analizi
+
+- Kullanici yeni commit geldigini, merge/pull sonrasi neler eklendigini analiz etmemi istedi.
+- `git fetch --all --prune` sonrasi `origin/master` `ee4a364` -> `6a9ed1a` ilerledi; yeni merge PR #28, asil feature commit `392554c`.
+- Commit basligi: `feat: sales employee dashboard backend baglantisi, dataset ve seed guncellemeleri`.
+- Eklenenler:
+  - `GET /analytics/departments/sales/my-performance` endpoint'i.
+  - `SalesEmployeePerformanceResponse`, `SalesKPIMetric`, `SalesWeeklyTrendPoint` semalari.
+  - `SalesEmployeeDashboard.vue` hardcoded verilerden `analyticsApi.getMyPerformance()` verisine geciyor.
+  - `surveyApi.createSurvey()` eklendi; sales dashboard icindeki pulse formu gercek `/surveys/` POST'una baglaniyor.
+  - `generate_sales_dataset.py` eklendi; 31 satis calisani x 52 hafta dataset uretiyor.
+  - `seed_data.py` satis takim isimlerini Excel region isimleriyle eslestiriyor; satis manager `SA-031`/Hatice Yildirim olarak guncelleniyor.
+- Riskler/regression notlari:
+  - `AppLayout.vue` ve `router/index.ts` bizim onceki 360/KPI menu netlestirmemizi kismen geri aliyor: admin `KPI & ML Analizi` route/menu kaldirilmis gorunuyor, 360 menuleri tekrar `Calisan Analizi` / `Departman Analizi` gibi belirsiz adlara donuyor.
+  - Satis tespiti yeniden hardcoded `dept_id=2/14/18` fallback'lerine yaslaniyor; `department_name` kullanimi var ama onceki normalize `satış -> satis` mantigi kadar temiz degil.
+  - Frontend `SalesKPIMetric` tipi `bar_pct` bekliyor, fakat backend semasi ve servis cevabi `bar_pct` uretmiyor. Bu KPI progress bar'larinin 0% gorunmesine yol acabilir.
+  - `EmployeePulseView.vue` icinde hesaplanan `dashboardRoute` kullanilmiyor; geri butonu kaldirildigi icin etkisiz/olmus kod.
+  - `SalesEmployeeDashboard.vue` icinde employee verisi `employeeApi.getEmployees()` ile tum listeyi cekerek bulunuyor; kendi employee endpoint'i yoksa calisir ama gereksiz genis veri cekiyor.
+- Merge-tree analizinde teknik conflict gorunmedi; fakat merge edilirse davranissal regression'lar elle korunarak cozulmeli.
+
+## Sonraki Adim
+
+- PR #28 merge edilecekse faydali sales dashboard/backend endpoint degisiklikleri alinmali, fakat admin KPI route/menu, 360 menu adlari ve normalize satis departmani tespiti korunmali.
+- `bar_pct` ya backend response'una eklenmeli ya frontend tipi/hesabi backend semasiyla uyumlu hale getirilmeli.
+
+## 2026-05-23 Satis Ensemble Sayfa Analizi
+
+- Kullanici `/admin/sales-analytics` ekranindaki LightGBM + XGBoost + RandomForest -> LogisticRegression ensemble yapisinin gercekten backend'de kullanilip kullanilmadigini sordu.
+- Frontend ekran metni `SalesAnalyticsView.vue` icinde; `Model Egit` butonu `analyticsApi.trainSalesModel()` ile `POST /analytics/departments/sales/models/train` endpoint'ine gidiyor.
+- Backend router `analytics.py` bu istegi `SalesMLService.train_from_upload()` fonksiyonuna yonlendiriyor.
+- `SalesMLService.train_from_upload()` `SalesStackingTrainer.train()` cagiriyor.
+- Gercek ensemble `app/analytics/training/sales.py` icinde: `StackingClassifier` base estimators olarak LightGBM (`lgbm`), XGBoost (`xgb`) ve RandomForest (`rf`) kullaniyor; final estimator LogisticRegression. `cv=3`.
+- Satis trainer sinif dagilimi yetersizse (`min_class_count < 6`) stacking yerine `random_forest_fallback` kullaniyor. Ekranda model adi `stacking_lgbm_xgb_rf_lr` ise gercek ensemble egitilmis demektir.
+- Yazilim departmani su anda ayni yapida degil. `app/analytics/training/software.py` `SoftwareBaselineTrainer` ile tek model secerek calisiyor: `logistic_regression`, `random_forest` veya `hist_gradient_boosting`.
+- Yazilim tarafinda da satis benzeri ensemble icin yeni `SoftwareStackingTrainer` veya mevcut trainer'a `stacking_lgbm_xgb_rf_lr` model secenegi eklenmeli; `SoftwareMLService.train_from_upload()`, schema/model option, frontend model secimi ve artifact metadata uyumlu hale getirilmeli.
+
+## Sonraki Adim
+
+- Yazilim departmanina satis ile paralel stacking ensemble uygulanacaksa once `app/analytics/training/software.py` icinde pipeline eklenmeli, sonra service/schema/frontend akisi guncellenmeli ve mevcut random_forest fallback korunmali.
+
+## 2026-05-23 Yazilim Stacking Ensemble Uygulamasi
+
+- Kullanici satis sayfasindaki LightGBM + XGBoost + RandomForest -> LogisticRegression ensemble yapisinin yazilim departmanina da uygulanmasini istedi.
+- `app/analytics/training/software.py` guncellendi:
+  - `stacking_lgbm_xgb_rf_lr` model secenegi eklendi.
+  - Base learner'lar: LightGBM, XGBoost ve RandomForest.
+  - Meta learner: LogisticRegression.
+  - XGBoost string/multiclass label'larda sorun cikarmasin diye `LabelEncodedClassifier` adapter'i eklendi.
+  - Sinif basina ornek sayisi 6'dan azsa ensemble yerine RandomForest ile egitilip metadata `random_forest_fallback` donuyor.
+  - Stacking icin base learner feature importance ortalamasi `top_features` olarak uretiliyor.
+- `SoftwareMLService.SUPPORTED_MODELS` icine `stacking_lgbm_xgb_rf_lr` eklendi.
+- `SoftwareModelTrainRequest` varsayilan modeli `stacking_lgbm_xgb_rf_lr` oldu.
+- Frontend `ManagerAnalyticsView.vue` yazilim ML panelinde model secimi eklendi: Stacking Ensemble, Random Forest, Hist Gradient Boosting, Logistic Regression.
+- Frontend `analyticsApi.trainSoftwareModel()` varsayilan modeli artik `stacking_lgbm_xgb_rf_lr` gonderiyor.
+- Dogrulama:
+  - Lokal `py_compile` basarili.
+  - Container icinde sentetik yazilim datasiyla `SoftwareBaselineTrainer.train(..., "stacking_lgbm_xgb_rf_lr")` gercek `StackingClassifier` uretip tahmin servisinde probability dondu.
+  - Container icinde sinif dagilimi yetersiz sentetik data `random_forest_fallback` dondu.
+  - `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - Container icinde `py_compile` basarili.
+  - Ilk denemede image icinde `pytest` kurulu olmadigi icin test runner calismadi; `requirements-dev.txt` ile container icine `pytest==8.3.4` kuruldu.
+  - Software analytics odakli testler basarili: `python -m pytest app/tests/test_software_artifact_prediction.py app/tests/test_software_analytics_endpoints.py app/tests/test_software_ml_rows.py -q` -> 6 passed.
+  - Tum backend test suite basarili: `python -m pytest app/tests -q` -> 17 passed, 23 Pydantic deprecation warning.
+  - Backend container `docker restart propel_backend` ile yeniden baslatildi; `/docs` 200 dondu.
+- Gercek v8 dataset testi:
+  - `uploads/4_kutup_dataset_final_realistic_v8_fixed.csv` dosyasi vardi fakat `data_uploads` tablosu seed/reset sonrasi bostu.
+  - Admin upload API ile dosya tekrar kaydedildi: upload id `5`, 1560 satir, `department_key=software`.
+  - `UploadService` icinde CSV fallback path'i icin eksik `import csv` eklendi.
+  - `performance_band` stacking egitimi basarili: model `stacking_lgbm_xgb_rf_lr`, train/test `1200/360`, weighted F1 `0.806142`.
+  - `attrition_risk_band` stacking egitimi basarili: model `stacking_lgbm_xgb_rf_lr`, train/test `1200/360`, weighted F1 `0.844117`.
+  - Model state iki target icin `is_trained=True`, `is_current_dataset=True`, model `stacking_lgbm_xgb_rf_lr`.
+  - Tekil tahmin smoke testi basarili: employee `1`, `performance_band=Stabil`, confidence `0.495503`, model `stacking_lgbm_xgb_rf_lr`, probability map dondu.
+- Yazilim model durumu UI guncellemesi:
+  - Kullanici satis ekranindaki target bazli hazir/model kartlarinin yazilim tarafinda olmadigini ve model durumu ekranina eklemenin mantikli olup olmadigini sordu.
+  - `ManagerAnalyticsView.vue` model durumu bolumunde her software target icin renkli kart eklendi.
+  - Kartlar artik target label, model adi, durum rozeti (`Hazir`, `Model var`, `Model yok`), son egitim, Weighted F1 ve Train/Test bilgisini gosteriyor.
+  - `softwareModelStateCardClass` ve `softwareModelStateBadgeClass` helper'lari eklendi.
+  - Dogrulama: `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+
+## Sonraki Adim
+
+- UI'da `/admin/kpi-ml-analysis?section=model` veya manager KPI & ML ekraninda upload id `5` secilerek model state ve tahmin sonucunun gorundugu manuel olarak kontrol edilebilir.
