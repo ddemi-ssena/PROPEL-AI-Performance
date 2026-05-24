@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AnalyticsBaseModel(BaseModel):
@@ -272,6 +272,118 @@ class SoftwareEmployeePerformanceResponse(BaseModel):
     trend_labels: list[str] = []
     trend_values: list[float] = []
     prediction: Optional[SoftwarePredictionResponse] = None
+
+
+class SoftwareDepartmentInsightsResponse(BaseModel):
+    status: str
+    department: str
+    upload_id: Optional[int] = None
+    period: str
+    insights: str
+    generated_at: datetime
+    source: str
+    model: Optional[str] = None
+    fallback_used: bool = False
+    health_score: Optional[float] = None
+    sections: dict = {}
+    actions: list[dict] = []
+
+
+class DepartmentDashboardDepartmentResponse(BaseModel):
+    id: int
+    name: str
+    member_count: int
+    team_count: int
+    teams: list[str] = Field(default_factory=list)
+
+
+class DepartmentDashboardCoverageResponse(BaseModel):
+    kpi_employee_count: int = 0
+    kpi_percentage: float = 0.0
+    pulse_response_count: int = 0
+    pulse_employee_count: int = 0
+    pulse_percentage: float = 0.0
+    feedback_response_count: int = 0
+    feedback_employee_count: int = 0
+    feedback_percentage: float = 0.0
+    confidence_score: float = 0.0
+    last_kpi_update: Optional[datetime] = None
+    last_pulse_update: Optional[date] = None
+    last_feedback_update: Optional[datetime] = None
+
+
+class DepartmentDashboardScoresResponse(BaseModel):
+    department_health: float
+    execution_score: float
+    people_health_score: float
+    risk_score: float
+    confidence_score: float
+    weights: dict[str, float]
+
+
+class DepartmentDashboardSourceResponse(BaseModel):
+    label: str
+    score: float
+    status: str
+    metrics: dict = Field(default_factory=dict)
+    details: dict = Field(default_factory=dict)
+
+
+class DepartmentDashboardInsightResponse(BaseModel):
+    type: str
+    severity: str
+    title: str
+    description: str
+    recommendation: str
+    action: str
+    team: Optional[str] = None
+
+
+class DepartmentDashboardTeamResponse(BaseModel):
+    team: str
+    member_count: int
+    scores: dict[str, float]
+    metrics: dict = Field(default_factory=dict)
+    status: str
+    trend: str
+
+
+class DepartmentDashboardActionResponse(BaseModel):
+    title: str
+    description: str
+    priority: str
+    due_date: str
+    owner: str
+    source: str
+
+
+class DepartmentDashboardActionsResponse(BaseModel):
+    urgent: list[DepartmentDashboardActionResponse] = Field(default_factory=list)
+    this_week: list[DepartmentDashboardActionResponse] = Field(default_factory=list)
+    monitoring: list[DepartmentDashboardActionResponse] = Field(default_factory=list)
+
+
+class DepartmentDashboardAISummaryResponse(BaseModel):
+    summary: str
+    strengths: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    source: str = "deterministic"
+
+
+class SoftwareDepartmentDashboardResponse(BaseModel):
+    status: str
+    department: DepartmentDashboardDepartmentResponse
+    period: str
+    generated_at: datetime
+    upload_id: Optional[int] = None
+    coverage: DepartmentDashboardCoverageResponse
+    scores: DepartmentDashboardScoresResponse
+    sources: dict[str, DepartmentDashboardSourceResponse]
+    hybrid_insights: list[DepartmentDashboardInsightResponse] = Field(default_factory=list)
+    team_breakdown: list[DepartmentDashboardTeamResponse] = Field(default_factory=list)
+    actions: DepartmentDashboardActionsResponse
+    ai_summary: DepartmentDashboardAISummaryResponse
 
 
 # ---------------------------------------------------------------------------

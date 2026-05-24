@@ -4,7 +4,7 @@ import csv
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -18,12 +18,26 @@ from app.analytics.kpi_registry import KPIDefinition, SOFTWARE_KPI_BY_CODE, soft
 from app.analytics.prediction.software import SoftwarePredictionService
 from app.analytics.training.software import SoftwareBaselineTrainer
 from app.db.models.data_upload import DataUpload
+from app.db.models.department import Department
 from app.db.models.employee import Employee
-from app.db.models.user import User
+from app.db.models.nlp import FeedbackNLPAnalysis, NLPSourceType, RiskLevel
+from app.db.models.survey_response import SurveyResponse
+from app.db.models.user import User, UserRole
 from app.schemas.analytics import (
+    DepartmentDashboardAISummaryResponse,
+    DepartmentDashboardActionResponse,
+    DepartmentDashboardActionsResponse,
+    DepartmentDashboardCoverageResponse,
+    DepartmentDashboardDepartmentResponse,
+    DepartmentDashboardInsightResponse,
+    DepartmentDashboardScoresResponse,
+    DepartmentDashboardSourceResponse,
+    DepartmentDashboardTeamResponse,
     SoftwareBulkPredictionResponse,
+    SoftwareDepartmentDashboardResponse,
     SoftwareDatasetEmployeeResponse,
     SoftwareDatasetResponse,
+    SoftwareDepartmentInsightsResponse,
     SoftwareEmployeeKPIMetricResponse,
     SoftwareEmployeePerformanceResponse,
     SoftwareModelStateResponse,
@@ -810,6 +824,696 @@ class SoftwareMLService:
             team_analytics=team_analytics,
             items=items,
         )
+
+    @staticmethod
+    def generate_department_dashboard(
+        db: Session,
+        *,
+        current_user: User,
+        upload_id: int | None = None,
+        period: str = "week",
+        target_column: str = "performance_band",
+        use_llm: bool = False,
+    ) -> SoftwareDepartmentDashboardResponse:
+        if period not in {"week", "month", "quarter", "year"}:
+            raise HTTPException(status_code=400, detail="period week, month, quarter veya year olmali.")
+
+        department = SoftwareMLService._dashboard_department(db, current_user)
+        employees = db.query(Employee).filter(Employee.department_id == department.id).all()
+        teams = sorted({employee.team for employee in employees if employee.team})
+        period_start = SoftwareMLService._dashboard_period_start(period)
+
+        upload = SoftwareMLService._resolve_upload(db, upload_id) if upload_id else SoftwareMLService._latest_successful_upload(db)
+        bulk = SoftwareMLService.predict_all_from_upload(
+            db=db,
+            upload_id=upload.id,
+            target_column=target_column,
+            use_llm_narrative=use_llm,
+        )
+
+        kpi_source = SoftwareMLService._dashboard_kpi_source(bulk)
+        pulse_source = SoftwareMLService._dashboard_pulse_source(db, department.id, period_start)
+        feedback_source = SoftwareMLService._dashboard_feedback_source(db, department.id, period_start)
+
+        coverage = SoftwareMLService._dashboard_coverage(
+            total_employees=len(employees),
+            upload=upload,
+            kpi_source=kpi_source,
+            pulse_source=pulse_source,
+            feedback_source=feedback_source,
+        )
+        scores = SoftwareMLService._dashboard_scores(
+            kpi_score=kpi_source["score"],
+            pulse_score=pulse_source["score"],
+            feedback_score=feedback_source["score"],
+            kpi_risk=kpi_source["risk_score"],
+            pulse_risk=pulse_source["risk_score"],
+            feedback_risk=feedback_source["risk_score"],
+            confidence_score=coverage.confidence_score,
+        )
+        insights = SoftwareMLService._dashboard_insights(
+            kpi_source=kpi_source,
+            pulse_source=pulse_source,
+            feedback_source=feedback_source,
+            scores=scores,
+        )
+        team_breakdown = SoftwareMLService._dashboard_team_breakdown(
+            employees=employees,
+            teams=teams,
+            kpi_source=kpi_source,
+            pulse_source=pulse_source,
+            feedback_source=feedback_source,
+        )
+        actions = SoftwareMLService._dashboard_actions(insights, team_breakdown, scores)
+        ai_summary = SoftwareMLService._dashboard_ai_summary(insights, actions, scores)
+
+        return SoftwareDepartmentDashboardResponse(
+            status="success",
+            department=DepartmentDashboardDepartmentResponse(
+                id=department.id,
+                name=department.name,
+                member_count=len(employees),
+                team_count=len(teams),
+                teams=teams,
+            ),
+            period=period,
+            generated_at=datetime.now(timezone.utc),
+            upload_id=upload.id,
+            coverage=coverage,
+            scores=scores,
+            sources={
+                "kpiMl": DepartmentDashboardSourceResponse(
+                    label="Performans Ciktilari (KPI/ML)",
+                    score=kpi_source["score"],
+                    status=SoftwareMLService._dashboard_status(kpi_source["score"]),
+                    metrics=kpi_source["metrics"],
+                    details=kpi_source["details"],
+                ),
+                "weeklyPulse": DepartmentDashboardSourceResponse(
+                    label="Insan Sagligi Sinyalleri (Haftalik Nabiz)",
+                    score=pulse_source["score"],
+                    status=SoftwareMLService._dashboard_status(pulse_source["score"]),
+                    metrics=pulse_source["metrics"],
+                    details=pulse_source["details"],
+                ),
+                "feedback360": DepartmentDashboardSourceResponse(
+                    label="Davranis ve Iliski Kalitesi (360 Feedback)",
+                    score=feedback_source["score"],
+                    status=SoftwareMLService._dashboard_status(feedback_source["score"]),
+                    metrics=feedback_source["metrics"],
+                    details=feedback_source["details"],
+                ),
+            },
+            hybrid_insights=insights,
+            team_breakdown=team_breakdown,
+            actions=actions,
+            ai_summary=ai_summary,
+        )
+
+    @staticmethod
+    def _dashboard_department(db: Session, current_user: User) -> Department:
+        current_employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+        if current_user.role == UserRole.department_manager and current_employee and current_employee.department:
+            return current_employee.department
+        if current_user.role == UserRole.employee:
+            raise HTTPException(status_code=403, detail="Departman dashboard'u manager veya admin erisimi gerektirir.")
+
+        if current_employee and current_employee.department:
+            return current_employee.department
+
+        department = (
+            db.query(Department)
+            .filter(Department.name.ilike("%Yaz%"))
+            .order_by(Department.id.asc())
+            .first()
+        )
+        if not department:
+            department = db.query(Department).order_by(Department.id.asc()).first()
+        if not department:
+            raise HTTPException(status_code=404, detail="Departman kaydi bulunamadi.")
+        return department
+
+    @staticmethod
+    def _dashboard_period_start(period: str) -> date:
+        today = datetime.now(timezone.utc).date()
+        if period == "year":
+            return today.replace(month=1, day=1)
+        if period == "quarter":
+            quarter_month = ((today.month - 1) // 3) * 3 + 1
+            return today.replace(month=quarter_month, day=1)
+        if period == "month":
+            return today.replace(day=1)
+        return today - timedelta(days=7)
+
+    @staticmethod
+    def _dashboard_status(score: float) -> str:
+        if score >= 85:
+            return "success"
+        if score >= 70:
+            return "warning"
+        return "danger"
+
+    @staticmethod
+    def _dashboard_avg(values: list[float | None]) -> float | None:
+        numeric_values = [float(value) for value in values if value is not None]
+        if not numeric_values:
+            return None
+        return round(sum(numeric_values) / len(numeric_values), 2)
+
+    @staticmethod
+    def _dashboard_clamp(value: float, minimum: float = 0.0, maximum: float = 100.0) -> float:
+        return round(max(minimum, min(maximum, value)), 1)
+
+    @staticmethod
+    def _dashboard_scale_score(value: float | None) -> float | None:
+        if value is None:
+            return None
+        value = float(value)
+        if value <= 1.5:
+            return SoftwareMLService._dashboard_clamp(value * 100)
+        if value <= 5:
+            return SoftwareMLService._dashboard_clamp(value * 20)
+        return SoftwareMLService._dashboard_clamp(value)
+
+    @staticmethod
+    def _dashboard_risk_level_score(level: Any) -> float:
+        raw = getattr(level, "value", level)
+        return {"high": 85.0, "medium": 55.0, "low": 15.0}.get(str(raw or "").lower(), 35.0)
+
+    @staticmethod
+    def _dashboard_trend(values: list[float]) -> str:
+        if len(values) < 2:
+            return "stabil"
+        delta = values[-1] - values[0]
+        if delta > 3:
+            return "yukselis"
+        if delta < -3:
+            return "dusus"
+        return "stabil"
+
+    @staticmethod
+    def _dashboard_kpi_source(bulk: SoftwareBulkPredictionResponse) -> dict[str, Any]:
+        total = max(bulk.prediction_count, 1)
+        risk_score = SoftwareMLService._dashboard_clamp(
+            ((bulk.high_risk_count * 100) + (bulk.medium_risk_count * 55) + (bulk.low_risk_count * 15)) / total
+        )
+        score = SoftwareMLService._dashboard_clamp(100 - risk_score)
+
+        trend_values = [
+            value
+            for team in bulk.team_analytics
+            for value in (team.get("trend_values") or [])
+            if isinstance(value, (int, float))
+        ]
+        team_scores = {
+            str(team.get("team")): {
+                "score": SoftwareMLService._dashboard_clamp(100 - float(team.get("risk_score") or 0)),
+                "risk": SoftwareMLService._dashboard_clamp(float(team.get("risk_score") or 0)),
+                "trend": SoftwareMLService._dashboard_trend([float(v) for v in (team.get("trend_values") or []) if isinstance(v, (int, float))]),
+            }
+            for team in bulk.team_analytics
+            if team.get("team")
+        }
+
+        return {
+            "score": score,
+            "risk_score": risk_score,
+            "employee_count": bulk.prediction_count,
+            "last_update": bulk.generated_at,
+            "team_scores": team_scores,
+            "metrics": {
+                "averagePerformance": score,
+                "targetAlignment": round((bulk.low_risk_count / total) * 100, 1),
+                "trend": SoftwareMLService._dashboard_trend([float(value) for value in trend_values]),
+                "mlRiskScore": risk_score,
+                "highRiskCount": bulk.high_risk_count,
+                "mediumRiskCount": bulk.medium_risk_count,
+                "lowRiskCount": bulk.low_risk_count,
+            },
+            "details": {
+                "predictionCount": bulk.prediction_count,
+                "targetColumn": bulk.target_column,
+                "teamAnalytics": bulk.team_analytics,
+                "narrative": bulk.department_narrative,
+            },
+        }
+
+    @staticmethod
+    def _dashboard_pulse_source(db: Session, department_id: int, period_start: date) -> dict[str, Any]:
+        rows = (
+            db.query(SurveyResponse)
+            .join(Employee)
+            .filter(
+                Employee.department_id == department_id,
+                SurveyResponse.survey_type == "weekly_pulse",
+                SurveyResponse.period_date >= period_start,
+            )
+            .all()
+        )
+        employee_ids = {row.employee_id for row in rows}
+        motivation = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.score for row in rows]))
+        mte = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.mte_score for row in rows]))
+        ars = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.ars_score for row in rows]))
+        score = motivation if motivation is not None else 50.0
+        risk_score = ars if ars is not None else (100 - score)
+
+        team_rows: dict[str, list[SurveyResponse]] = {}
+        for row in rows:
+            team = row.employee.team if row.employee else None
+            if team:
+                team_rows.setdefault(team, []).append(row)
+        team_scores = {}
+        for team, items in team_rows.items():
+            team_score = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.score for item in items])) or 50.0
+            team_ars = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.ars_score for item in items]))
+            team_scores[team] = {
+                "score": team_score,
+                "risk": team_ars if team_ars is not None else 100 - team_score,
+                "trend": "stabil",
+            }
+
+        return {
+            "score": round(score, 1),
+            "risk_score": round(risk_score, 1),
+            "response_count": len(rows),
+            "employee_count": len(employee_ids),
+            "last_update": max((row.period_date for row in rows), default=None),
+            "team_scores": team_scores,
+            "metrics": {
+                "motivationAverage": motivation,
+                "motivationTrend": mte,
+                "stressLevel": risk_score,
+                "engagementScore": score,
+                "attritionRisk": ars,
+                "overallMood": SoftwareMLService._dashboard_status(score),
+            },
+            "details": {
+                "dataAvailable": bool(rows),
+                "responseCount": len(rows),
+                "employeeCount": len(employee_ids),
+            },
+        }
+
+    @staticmethod
+    def _dashboard_feedback_source(db: Session, department_id: int, period_start: date) -> dict[str, Any]:
+        rows = (
+            db.query(FeedbackNLPAnalysis)
+            .join(Employee, FeedbackNLPAnalysis.employee_id == Employee.id)
+            .filter(
+                Employee.department_id == department_id,
+                FeedbackNLPAnalysis.department_id == department_id,
+                FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
+                FeedbackNLPAnalysis.created_at >= datetime.combine(period_start, datetime.min.time()),
+            )
+            .all()
+        )
+        employee_ids = {row.employee_id for row in rows}
+        motivation = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.motivation_score for row in rows]))
+        safety = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.psychological_safety_score for row in rows]))
+        collaboration = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.collaboration_score for row in rows]))
+        leadership = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.leadership_support_score for row in rows]))
+        score = SoftwareMLService._dashboard_avg([motivation, safety, collaboration, leadership])
+        score = score if score is not None else 50.0
+        risk_values = [
+            SoftwareMLService._dashboard_risk_level_score(row.burnout_risk)
+            for row in rows
+            if row.burnout_risk is not None
+        ] + [
+            SoftwareMLService._dashboard_risk_level_score(row.flight_risk)
+            for row in rows
+            if row.flight_risk is not None
+        ]
+        risk_score = SoftwareMLService._dashboard_avg(risk_values)
+        risk_score = risk_score if risk_score is not None else 100 - score
+
+        high_burnout = sum(1 for row in rows if row.burnout_risk == RiskLevel.high)
+        high_flight = sum(1 for row in rows if row.flight_risk == RiskLevel.high)
+        team_rows: dict[str, list[FeedbackNLPAnalysis]] = {}
+        for row in rows:
+            team = row.employee.team if row.employee else None
+            if team:
+                team_rows.setdefault(team, []).append(row)
+        team_scores = {}
+        for team, items in team_rows.items():
+            team_score = SoftwareMLService._dashboard_avg([
+                SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.motivation_score for item in items])),
+                SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.psychological_safety_score for item in items])),
+                SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.collaboration_score for item in items])),
+            ]) or 50.0
+            team_scores[team] = {
+                "score": team_score,
+                "risk": 100 - team_score,
+                "trend": "stabil",
+            }
+
+        return {
+            "score": round(score, 1),
+            "risk_score": round(risk_score, 1),
+            "response_count": len(rows),
+            "employee_count": len(employee_ids),
+            "last_update": max((row.created_at for row in rows), default=None),
+            "team_scores": team_scores,
+            "metrics": {
+                "motivationScore": motivation,
+                "trustScore": safety,
+                "collaborationScore": collaboration,
+                "leadershipSupportScore": leadership,
+                "burnoutRisk": round((high_burnout / max(len(rows), 1)) * 100, 1) if rows else None,
+                "flightRisk": round((high_flight / max(len(rows), 1)) * 100, 1) if rows else None,
+                "supportNeedFlag": bool(high_burnout or high_flight),
+            },
+            "details": {
+                "dataAvailable": bool(rows),
+                "responseCount": len(rows),
+                "employeeCount": len(employee_ids),
+                "highBurnoutCount": high_burnout,
+                "highFlightRiskCount": high_flight,
+            },
+        }
+
+    @staticmethod
+    def _dashboard_coverage(
+        *,
+        total_employees: int,
+        upload: DataUpload,
+        kpi_source: dict[str, Any],
+        pulse_source: dict[str, Any],
+        feedback_source: dict[str, Any],
+    ) -> DepartmentDashboardCoverageResponse:
+        denominator = max(total_employees, 1)
+        kpi_pct = round((kpi_source["employee_count"] / denominator) * 100, 1)
+        pulse_pct = round((pulse_source["employee_count"] / denominator) * 100, 1)
+        feedback_pct = round((feedback_source["employee_count"] / denominator) * 100, 1)
+        confidence = round((kpi_pct * 0.5) + (pulse_pct * 0.25) + (feedback_pct * 0.25), 1)
+        return DepartmentDashboardCoverageResponse(
+            kpi_employee_count=kpi_source["employee_count"],
+            kpi_percentage=kpi_pct,
+            pulse_response_count=pulse_source["response_count"],
+            pulse_employee_count=pulse_source["employee_count"],
+            pulse_percentage=pulse_pct,
+            feedback_response_count=feedback_source["response_count"],
+            feedback_employee_count=feedback_source["employee_count"],
+            feedback_percentage=feedback_pct,
+            confidence_score=confidence,
+            last_kpi_update=upload.upload_date,
+            last_pulse_update=pulse_source["last_update"],
+            last_feedback_update=feedback_source["last_update"],
+        )
+
+    @staticmethod
+    def _dashboard_scores(
+        *,
+        kpi_score: float,
+        pulse_score: float,
+        feedback_score: float,
+        kpi_risk: float,
+        pulse_risk: float,
+        feedback_risk: float,
+        confidence_score: float,
+    ) -> DepartmentDashboardScoresResponse:
+        department_health = (kpi_score * 0.5) + (pulse_score * 0.25) + (feedback_score * 0.25)
+        people_health = (pulse_score + feedback_score) / 2
+        risk_score = (kpi_risk + pulse_risk + feedback_risk) / 3
+        return DepartmentDashboardScoresResponse(
+            department_health=SoftwareMLService._dashboard_clamp(department_health),
+            execution_score=SoftwareMLService._dashboard_clamp(kpi_score),
+            people_health_score=SoftwareMLService._dashboard_clamp(people_health),
+            risk_score=SoftwareMLService._dashboard_clamp(risk_score),
+            confidence_score=SoftwareMLService._dashboard_clamp(confidence_score),
+            weights={"kpiMl": 50, "weeklyPulse": 25, "feedback360": 25},
+        )
+
+    @staticmethod
+    def _dashboard_insights(
+        *,
+        kpi_source: dict[str, Any],
+        pulse_source: dict[str, Any],
+        feedback_source: dict[str, Any],
+        scores: DepartmentDashboardScoresResponse,
+    ) -> list[DepartmentDashboardInsightResponse]:
+        insights: list[DepartmentDashboardInsightResponse] = []
+        kpi = kpi_source["score"]
+        pulse = pulse_source["score"]
+        feedback = feedback_source["score"]
+
+        if kpi >= 80 and pulse < 65:
+            insights.append(DepartmentDashboardInsightResponse(
+                type="performance_vs_health",
+                severity="warning",
+                title="Performans iyi, nabiz zayif",
+                description=f"KPI/ML skoru {kpi:.0f}/100 ama haftalik nabiz {pulse:.0f}/100. Ekip cikti uretirken yorgunluk sinyali veriyor olabilir.",
+                recommendation="Kapasite, odak ve is yuku dengesi bu hafta takim liderleriyle gozden gecirilmeli.",
+                action="this_week",
+            ))
+        if feedback < 65 and kpi >= 70:
+            insights.append(DepartmentDashboardInsightResponse(
+                type="trust_vs_execution",
+                severity="warning",
+                title="Cikti var, iliski kalitesi zayif",
+                description=f"360 skoru {feedback:.0f}/100 seviyesinde, KPI/ML skoru {kpi:.0f}/100. Is akisi yuruyor ama guven/is birligi sinyalleri takip edilmeli.",
+                recommendation="Takim ici iletisim, code review ritmi ve destek ihtiyaci icin fasilite edilmis 1-on-1 planlanmali.",
+                action="this_week",
+            ))
+        if scores.risk_score >= 60:
+            insights.append(DepartmentDashboardInsightResponse(
+                type="risk_overlap",
+                severity="critical",
+                title="Birlesik risk seviyesi yuksek",
+                description=f"Birlesik risk skoru {scores.risk_score:.0f}/100. KPI, nabiz ve 360 kaynaklarindan gelen riskler birlikte izlenmeli.",
+                recommendation="Manager, HR ve teknik liderler ile 48 saat icinde risk degerlendirme toplantisi yapilmali.",
+                action="urgent",
+            ))
+        if scores.confidence_score < 60:
+            insights.append(DepartmentDashboardInsightResponse(
+                type="coverage_gap",
+                severity="info",
+                title="Veri kapsama orani dusuk",
+                description=f"Dashboard guven skoru {scores.confidence_score:.0f}/100. Bazi kaynaklarda yeterli yanit yok.",
+                recommendation="Nabiz ve 360 katilimi artirilarak hibrit skorun guvenilirligi yukseltilmeli.",
+                action="monitoring",
+            ))
+        if not insights:
+            insights.append(DepartmentDashboardInsightResponse(
+                type="balanced_signal",
+                severity="success",
+                title="Kaynaklar dengeli gorunuyor",
+                description="KPI/ML, haftalik nabiz ve 360 sinyalleri arasinda kritik bir cakisma gorunmuyor.",
+                recommendation="Mevcut ritim korunup dusuk kapsama veya takim bazli sapmalar haftalik izlenmeli.",
+                action="monitoring",
+            ))
+        return insights
+
+    @staticmethod
+    def _dashboard_team_breakdown(
+        *,
+        employees: list[Employee],
+        teams: list[str],
+        kpi_source: dict[str, Any],
+        pulse_source: dict[str, Any],
+        feedback_source: dict[str, Any],
+    ) -> list[DepartmentDashboardTeamResponse]:
+        counts = {team: sum(1 for employee in employees if employee.team == team) for team in teams}
+        rows: list[DepartmentDashboardTeamResponse] = []
+        for team in teams:
+            kpi = (kpi_source["team_scores"].get(team) or {}).get("score", kpi_source["score"])
+            pulse = (pulse_source["team_scores"].get(team) or {}).get("score", pulse_source["score"])
+            feedback = (feedback_source["team_scores"].get(team) or {}).get("score", feedback_source["score"])
+            health = (kpi * 0.5) + (pulse * 0.25) + (feedback * 0.25)
+            risk = (
+                (kpi_source["team_scores"].get(team) or {}).get("risk", kpi_source["risk_score"])
+                + (pulse_source["team_scores"].get(team) or {}).get("risk", pulse_source["risk_score"])
+                + (feedback_source["team_scores"].get(team) or {}).get("risk", feedback_source["risk_score"])
+            ) / 3
+            rows.append(DepartmentDashboardTeamResponse(
+                team=team,
+                member_count=counts.get(team, 0),
+                scores={
+                    "health": SoftwareMLService._dashboard_clamp(health),
+                    "kpi": SoftwareMLService._dashboard_clamp(kpi),
+                    "pulse": SoftwareMLService._dashboard_clamp(pulse),
+                    "feedback": SoftwareMLService._dashboard_clamp(feedback),
+                    "risk": SoftwareMLService._dashboard_clamp(risk),
+                },
+                metrics={
+                    "performance": kpi,
+                    "motivation": pulse,
+                    "trustScore": feedback,
+                },
+                status=SoftwareMLService._dashboard_status(health),
+                trend=(kpi_source["team_scores"].get(team) or {}).get("trend", "stabil"),
+            ))
+        return sorted(rows, key=lambda item: item.scores.get("health", 0))
+
+    @staticmethod
+    def _dashboard_actions(
+        insights: list[DepartmentDashboardInsightResponse],
+        team_breakdown: list[DepartmentDashboardTeamResponse],
+        scores: DepartmentDashboardScoresResponse,
+    ) -> DepartmentDashboardActionsResponse:
+        urgent: list[DepartmentDashboardActionResponse] = []
+        this_week: list[DepartmentDashboardActionResponse] = []
+        monitoring: list[DepartmentDashboardActionResponse] = []
+
+        for insight in insights:
+            action = DepartmentDashboardActionResponse(
+                title=insight.recommendation,
+                description=insight.description,
+                priority="P0" if insight.severity == "critical" else ("P1" if insight.severity == "warning" else "P2"),
+                due_date="48 saat" if insight.severity == "critical" else ("Bu hafta" if insight.severity == "warning" else "Haftalik"),
+                owner="Manager + HR" if insight.severity == "critical" else "Manager",
+                source=insight.type,
+            )
+            if insight.severity == "critical":
+                urgent.append(action)
+            elif insight.severity == "warning":
+                this_week.append(action)
+            else:
+                monitoring.append(action)
+
+        for team in team_breakdown[:3]:
+            if team.scores.get("health", 100) < 70:
+                monitoring.append(DepartmentDashboardActionResponse(
+                    title=f"{team.team} takim sagligini izle",
+                    description=f"{team.team} hibrit saglik skoru {team.scores.get('health')}/100.",
+                    priority="P2",
+                    due_date="Haftalik",
+                    owner="Team Lead",
+                    source="team_breakdown",
+                ))
+
+        if scores.confidence_score < 60:
+            monitoring.append(DepartmentDashboardActionResponse(
+                title="Veri kapsamasini artir",
+                description="Nabiz ve 360 katilimi dusuk oldugunda hibrit yorumlarin guveni azalir.",
+                priority="P2",
+                due_date="Bu hafta",
+                owner="Manager",
+                source="coverage",
+            ))
+
+        return DepartmentDashboardActionsResponse(
+            urgent=urgent,
+            this_week=this_week,
+            monitoring=monitoring,
+        )
+
+    @staticmethod
+    def _dashboard_ai_summary(
+        insights: list[DepartmentDashboardInsightResponse],
+        actions: DepartmentDashboardActionsResponse,
+        scores: DepartmentDashboardScoresResponse,
+    ) -> DepartmentDashboardAISummaryResponse:
+        risk_titles = [item.title for item in insights if item.severity in {"critical", "warning"}]
+        recommendations = [item.title for item in actions.urgent + actions.this_week][:5]
+        strengths = []
+        if scores.execution_score >= 80:
+            strengths.append("KPI/ML performans sinyali guclu.")
+        if scores.people_health_score >= 75:
+            strengths.append("Insan sagligi kaynaklari dengeli gorunuyor.")
+        if not strengths:
+            strengths.append("Hibrit veriler takip edilebilir bir baslangic resmi sunuyor.")
+        summary = (
+            f"Departman saglik skoru {scores.department_health}/100. "
+            f"Performans {scores.execution_score}/100, insan sagligi {scores.people_health_score}/100, "
+            f"birlesik risk {scores.risk_score}/100 ve veri guveni {scores.confidence_score}/100."
+        )
+        return DepartmentDashboardAISummaryResponse(
+            summary=summary,
+            strengths=strengths,
+            risks=risk_titles,
+            recommendations=recommendations,
+            source="deterministic",
+        )
+
+    @staticmethod
+    def generate_department_insights(
+        db: Session,
+        *,
+        upload_id: int | None = None,
+        period: str = "week",
+        target_column: str = "performance_band",
+        use_llm: bool = True,
+    ) -> SoftwareDepartmentInsightsResponse:
+        upload = SoftwareMLService._resolve_upload(db, upload_id) if upload_id else SoftwareMLService._latest_successful_upload(db)
+        bulk = SoftwareMLService.predict_all_from_upload(
+            db=db,
+            upload_id=upload.id,
+            target_column=target_column,
+            use_llm_narrative=use_llm,
+        )
+        narrative = bulk.department_narrative or {}
+        manager_summary = narrative.get("manager_summary") or "Departman icin AI ozeti henuz olusmadi."
+        risk_interpretation = narrative.get("risk_interpretation") or ""
+        action_plan = narrative.get("action_plan") or []
+        talking_points = narrative.get("leadership_talking_points") or []
+        confidence_note = narrative.get("confidence_note") or ""
+        health_score = SoftwareMLService._department_health_score(bulk)
+
+        team_notes = []
+        for team in (bulk.team_analytics or [])[:4]:
+            team_name = team.get("team") or "Takim"
+            latest_score = team.get("latest_score")
+            trend_delta = team.get("trend_delta")
+            team_notes.append(f"{team_name}: son skor {latest_score if latest_score is not None else '-'}, trend {trend_delta if trend_delta is not None else '-'}.")
+
+        action_lines = [
+            f"- {item.get('title') or item.get('reason')}"
+            for item in action_plan
+            if item.get("title") or item.get("reason")
+        ]
+        talking_lines = [f"- {item}" for item in talking_points]
+        team_lines = [f"- {item}" for item in team_notes]
+
+        insights = "\n".join(
+            part for part in [
+                "1. OZET",
+                manager_summary,
+                "",
+                "2. GUCLU YONLER",
+                "\n".join(team_lines) if team_lines else "Takim bazli olumlu sinyaller backend verisi geldikce netlesecek.",
+                "",
+                "3. GELISTIRME ALANLARI",
+                risk_interpretation or "Risk alanlari model tahminleri ve KPI driver tekrarlarina gore izleniyor.",
+                "",
+                "4. DEPARTMAN SAGLIGI",
+                f"Genel saglik puani: {health_score}/100. Yuksek risk: {bulk.high_risk_count}, orta risk: {bulk.medium_risk_count}, dusuk risk: {bulk.low_risk_count}.",
+                "",
+                "5. ONERILER",
+                "\n".join(action_lines) if action_lines else "Bu hafta icin otomatik aksiyon onerisi olusmadi.",
+                "",
+                "6. SONRAKI HAFTA BEKLENTISI",
+                "\n".join(talking_lines) if talking_lines else "Takim liderleriyle kapasite, odak ve risk sinyalleri haftalik olarak takip edilmeli.",
+                "",
+                confidence_note,
+            ] if part is not None
+        )
+
+        return SoftwareDepartmentInsightsResponse(
+            status="success",
+            department="software",
+            upload_id=upload.id,
+            period=period,
+            insights=insights,
+            generated_at=datetime.now(timezone.utc),
+            source=str(narrative.get("source") or "deterministic"),
+            model=narrative.get("model"),
+            fallback_used=bool(narrative.get("fallback_used", False)),
+            health_score=health_score,
+            sections={
+                "summary": manager_summary,
+                "strengths": team_notes,
+                "improvement_areas": [risk_interpretation] if risk_interpretation else [],
+                "next_week": talking_points,
+            },
+            actions=action_plan,
+        )
+
+    @staticmethod
+    def _department_health_score(bulk: SoftwareBulkPredictionResponse) -> float:
+        total = max(bulk.prediction_count, 1)
+        penalty = (bulk.high_risk_count * 18) + (bulk.medium_risk_count * 8)
+        score = 100 - (penalty / total)
+        return round(max(0, min(100, score)), 1)
 
     @staticmethod
     def _top_driver_counts(items: list[SoftwarePredictionResponse], limit: int = 5) -> list[tuple[str, int]]:
