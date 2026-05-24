@@ -872,3 +872,325 @@ docker exec propel_backend python seed_data.py
 ## Sonraki Adim
 
 - UI'da `/admin/kpi-ml-analysis?section=model` veya manager KPI & ML ekraninda upload id `5` secilerek model state ve tahmin sonucunun gorundugu manuel olarak kontrol edilebilir.
+
+## 2026-05-24 Yazilim Departman Performansi Sayfa Analizi
+
+- Kullanici yazilim departmani `Departman Performansi` sayfasinda hardcoded alanlar ve iyilestirme firsatlarini incelememi istedi.
+- Incelenen ana sayfa `/manager` route'undaki `ManagerDashboard.vue`; ust baslik `Departman Performansi` olsa da sayfa buyuk oranda 360 feedback raporlari icin gecis/ozet paneli gibi tasarlanmis.
+- Sayfa veri kaynaklari:
+  - `feedbackApi.getDepartment360SummaryReport()` -> `/feedbacks/reports/department`
+  - `feedbackApi.getFeedbackCandidates()` -> secilebilir calisan sayisi
+  - `kpiApi.getAllVisibleRecords()` -> eski KPI kayit ozeti
+- Hardcoded/fallback alanlar tespit edildi: hero metinleri, hizli yol aciklamalari, ayrim mantigi kartlari, metric label eslesmeleri (`Departman Motivasyonu`, `Yuksek Flight Risk`), KPI unit suffix map'i ve veri yok fallback metinleri.
+- Kritik bulgu: `Departman Performansi` olarak gorunen KPI ozeti yazilim ML/v8 datasetinden veya `/analytics/departments/software/predictions/bulk` sonucundan degil, genel `/kpis/records` kayitlarindan hesaplanıyor. Bu nedenle yazilim ML performansi, risk dagilimi, model confidence ve takim trendleriyle dogrudan bagli degil.
+- `DepartmentAnalysisView.vue` tamamen 360/NLP odakli; burada da grafikte bos veri icin `Hafta 1..4`, `Dusuk/Orta/Yuksek`, `Veri yok` fallback'leri var. Backend `NLPService.build_department_nlp_charts` da haftalari 1..4 sabit uretip veri yoksa 0 degeri donduruyor.
+- Encoding sorunu hala gorunuyor: bazi Vue dosyalarinda `DepartmanÄ±`, `HaftalÄ±k`, `GÃ¼ven` gibi mojibake metinler var.
+
+## Sonraki Adim
+
+- `/manager` sayfasi gercek yazilim departman performansi olacaksa 360 feedback hero/gecis paneli ayrilmali; KPI/ML odakli ozetler `analyticsApi.getSoftwareDatasets`, `getSoftwareModelStates`, `getBulkSoftwarePredictions` ve `team_analytics` verilerine baglanmali.
+- 360 rapor gecisleri ayri ve daha kucuk bir bolum olarak kalabilir; fakat sayfa dili `Departman Performansi` ile `360 Feedback Raporlari` arasinda net ayrilmali.
+- KPI ozetindeki eski `/kpis/records` tabanli kartlar ya kaldirilmali ya da "manuel KPI kayitlari" olarak etiketlenmeli; yazilim v8 dataset metrikleri icin ayri backend ozet endpoint'i dusunulebilir.
+
+## 2026-05-24 Departman Performansi Dashboard Layout Adim 1
+
+- Kullanici once gorunumu degistirip sonra hardcoded/fallback alanlari backend'e baglama planini onayladi.
+- `ManagerDashboard.vue` 3 katmanli dashboard iskeletine tasindi:
+  - Header: departman adi, donem filtresi, Export ve Refresh aksiyonlari.
+  - Ust metrik kartlari: gorunen KPI, hedef uyumu, risk sinyali, ekip kapsami.
+  - Orta katman: departman genel durum gauge'i ve performans-vs-hedef gauge'i.
+  - Trend katmani: son donem KPI egilimi icin LineChart.
+  - Alt katman: risk gostergeleri, takim metrikleri, hizli aksiyon listesi.
+  - En altta acilip kapanabilir AI departman ozeti paneli.
+- Bu adimda yeni backend kontrati eklenmedi; mevcut `feedbackApi.getDepartment360SummaryReport`, `getFeedbackCandidates` ve `kpiApi.getAllVisibleRecords` verileri yeni layout'a yerlestirildi.
+- Dogrulama:
+  - Kod degisikliginden once `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklikten sonra `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - `docker compose restart frontend` basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Dashboard metriklerini gercek yazilim ML/dataset backend kontratina baglamak icin yeni veya mevcut analytics endpointleri netlestirilmeli.
+- Export ve donem filtresi su an gorsel aksiyon olarak duruyor; sonraki adimda backend parametreleri ve export davranisi baglanmali.
+- 360/NLP kaynakli alanlar ile yazilim KPI/ML performans alanlari veri modelinde net ayrilmali.
+
+## 2026-05-24 Departman Performansi KPI Kartlari Adim 2
+
+- Kullanici KPI kartlarini profesyonellestirmemi istedi: icon+baslik, buyuk ana deger, `/100` kesir formati, trend oku/yuzde, durum etiketi ve target/vs ort alt bilgileri.
+- `ManagerDashboard.vue` ust KPI kartlari yeniden tasarlandi.
+- Kartlar artik 4 metrik gosteriyor:
+  - Ortalama Performans
+  - Hedef Uyumu
+  - Risk Kontrolu
+  - Veri Kapsami
+- Durum renklendirmesi eklendi: `85+ Basarili` yesil, `70-85 Dikkat` sari, `<70 Risk` kirmizi.
+- Trend gosterimi eklendi: pozitif `↑`, negatif `↓`, sabit `→`; trend yuzdesi mevcut KPI trend serisinden turetiliyor.
+- Bu adimda backend kontrati eklenmedi; kart verileri mevcut `kpiRecords`, `teamMembers` ve `departmentReport` state'lerinden turetiliyor.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - `docker compose restart frontend` basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- KPI kartlarindaki `target`, `benchmark`, trend ve skor hesaplari backend'den gelen resmi departman performans kontratina baglanmali.
+- Kart metrikleri yazilim v8 dataset/ML bulk prediction sonucu ile uyumlu hale getirilmeli; mevcut eski `/kpis/records` turetimi gecici kabul edilmeli.
+
+## 2026-05-24 Departman Performansi Gauge Chart Adim 3
+
+- Kullanici hedef karsilastirmasi icin gauge chart tasarimi istedi.
+- React/Recharts ornegi Vue 3 yapisina uyarlandi; ek paket eklenmedi.
+- `ManagerDashboard.vue` icinde `GaugeComparisonCard` component'i olusturuldu.
+- Iki panelde eski conic full-circle gauge yerine yarim daire hedef karsilastirma gauge'i kullaniliyor:
+  - `Ortalama Performans`
+  - `Performans vs Hedef`
+- Gauge ozellikleri:
+  - Kirmizi/sari/yesil zonlar: `<60 Risk`, `60-80 Dikkat`, `80-100 Iyi`.
+  - Dinamik ibre acisi: mevcut deger yuzdesine gore hesaplanir.
+  - Mevcut deger, hedef deger, ilerleme yuzdesi, minimum ve maksimum gosterilir.
+  - Durum rozeti yuzdeye gore `Hedefi Gecti`, `Dikkat`, `Risk`.
+- Bu adimda backend kontrati eklenmedi; gauge degerleri mevcut frontend state'inden turetiliyor.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - `docker compose restart frontend` basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Gauge `current`, `target`, `min`, `max`, `status` ve zone esikleri backend kontratindan gelmeli.
+- Hedef karsilastirma yazilim ML/v8 datasetindeki resmi KPI hedefleriyle baglanmali.
+
+## 2026-05-24 Departman Performansi KPI Componentlestirme
+
+- Kullanici React/MUI grid ve React `KPICard` ornegini paylasti.
+- Mevcut Vue/Tailwind dashboard yapisi korunarak React orneginin component mantigi uyarlandi.
+- Yeni `propel-frontend/src/components/dashboard/KPICard.vue` component'i eklendi.
+- `ManagerDashboard.vue` ust KPI kartlari artik inline markup yerine `KPICard` component'i ile render ediliyor.
+- `KPICard` ozellikleri:
+  - Icon + baslik + subtitle.
+  - Buyuk ana deger ve `value / max` kesir formati.
+  - Trend oku ve trend metni.
+  - Status badge.
+  - Target ve `vs Ort` alt bilgileri.
+  - Success/warning/danger yuzey renklendirmesi.
+- React/MUI veya lucide dependency eklenmedi; mevcut Vue + Heroicons + Tailwind ile devam edildi.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - `docker compose restart frontend` basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Grid katmanlari icin benzer sekilde `GaugeComparisonCard`, `RiskIndicators`, `TeamMetrics`, `QuickActions` ve `AIInsightsPanel` component'lerine ayirma dusunulebilir.
+- KPI card props'lari backend'den gelecek resmi departman dashboard response'una gore sade ve stabil bir tipe baglanmali.
+
+## 2026-05-24 Departman Performansi Pipeline Tracking Adim 4
+
+- Kullanici sales funnel/pipeline tracking tasarimini paylasti.
+- React/lucide ornegi Vue/Tailwind yapisina uyarlandi; yeni dependency eklenmedi.
+- Yeni `propel-frontend/src/components/dashboard/PipelineTracking.vue` component'i eklendi.
+- `ManagerDashboard.vue` icine `Performans Pipeline Tracking` bolumu eklendi.
+- Pipeline asamalari su an mevcut frontend state'inden turetiliyor:
+  - Ekip Kapsami
+  - KPI Kaydi
+  - Performans Normal
+  - Hedef Uyumlu
+  - Risk Kontrolu
+  - Aksiyon Hazir
+- Her asamada deger, yuzde progress bar, renk, donusum orani ve legend gosteriliyor.
+- Eski risk/takim/aksiyon satiri yeniden duzenlendi:
+  - Pipeline solda genis kolon.
+  - Risk gostergeleri ve hizli aksiyon sag kolonda.
+  - Takim metrikleri ve akis ozeti altta.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - `docker compose restart frontend` basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Pipeline stage listesi backend'den gelmeli; frontend yalnizca gelen stage adlarini, degerleri, yuzdeleri, donusum oranlarini ve renk/status bilgisini render etmeli.
+- Yazilim departmani icin sales funnel yerine performans pipeline isimleri kalacaksa backend kontratinda bu alanlar netlestirilmeli; satis departmani icin ayrica gercek Lead/Deal funnel stage'leri kullanilabilir.
+
+## 2026-05-24 Departman Performansi Funnel Analizi Adim 5
+
+- Kullanici lead conversion funnel chart tasarimini paylasti.
+- React/Recharts ornegi Vue/Tailwind yapisina uyarlandi; yeni chart dependency eklenmedi.
+- Yeni `propel-frontend/src/components/dashboard/FunnelChart.vue` component'i eklendi.
+- `ManagerDashboard.vue` icine `Lead Conversion Funnel` bolumu eklendi.
+- Funnel component ozellikleri:
+  - Stage bazli yatay barlar.
+  - Deger, conversion yuzdesi, drop-off yuzdesi.
+  - Asamalar arasi donusum satiri.
+  - Detayli tablo: Stage, Value, Conv. Rate, Drop-off.
+- Funnel verisi su an mevcut pipeline stage'lerinden turetiliyor ve gecici olarak lead/deal isimlerine map ediliyor:
+  - Leads Created
+  - Leads Contacted
+  - Deal Qualified
+  - Deal Converted
+- Sag tarafa funnel ozeti eklendi: toplam donusum, en yuksek kayip asamasi ve son asama conversion yorumu.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - `docker compose restart frontend` basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Funnel `rows` verisi backend'den gelmeli; yazilim departmani icin lead/deal terimleri yerine performans pipeline asamalari kullanilacaksa isimlendirme backend kontratinda netlestirilmeli.
+- Satis departmani dashboard'unda ayni component gercek CRM/satis funnel verileriyle yeniden kullanilabilir.
+
+## 2026-05-24 Departman Performansi Trend Line Chart Adim 6
+
+- Kullanici 6 aylik multi-line trend chart tasarimini paylasti.
+- React/Recharts ornegi mevcut Chart.js/vue-chartjs stack'ine uyarlandi; yeni dependency eklenmedi.
+- Yeni `propel-frontend/src/components/dashboard/DepartmentTrendChart.vue` component'i eklendi.
+- `ManagerDashboard.vue` icindeki eski tek serili `LineChart` trend alani kaldirildi.
+- Yeni chart serileri:
+  - Performans (mavi, kalin cizgi, alan dolgusu)
+  - Kapasite (yesil)
+  - Risk Skoru (kirmizi)
+  - Hedef (85, sari kesikli cizgi)
+- Chart ozellikleri:
+  - 0-100 Y ekseni.
+  - 6 aylik X ekseni.
+  - Bottom legend.
+  - Tooltip formatter ve `Ay: ...` label'i.
+  - Responsive 400px chart alani.
+- Bu adimda backend kontrati eklenmedi; trend verisi mevcut `kpiRecords`, `coverageScore` ve `riskScore` state'lerinden turetiliyor.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - `docker compose restart frontend` basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Trend chart `performance`, `capacity`, `risk` ve hedef cizgisi backend'den gelen resmi 6 aylik seriyle beslenmeli.
+- Frontend fallback ay etiketleri ve turetilmis kapasite/risk hesaplari backend kontrati geldikten sonra kaldirilmali.
+
+## 2026-05-24 Departman Performansi Risk ve Quick Actions Adim 7
+
+- Kullanici risk gostergeleri ve hizli aksiyonlar tasarimini paylasti.
+- Yeni `propel-frontend/src/components/dashboard/RiskIndicators.vue` component'i eklendi.
+  - Kritik Riskler, Uyarilar ve Olumlu Isaretler olarak 3 kategori gosterir.
+  - Kategori ikonlari ve kirmizi/sari/yesil nokta sistemi var.
+- Yeni `propel-frontend/src/components/dashboard/QuickActions.vue` component'i eklendi.
+  - Checkbox'li aksiyon listesi.
+  - Tamamlanan aksiyonlarda line-through ve soluk metin.
+  - `HIGH` / `MEDIUM` priority badge'leri.
+- `ManagerDashboard.vue` icindeki inline risk ve aksiyon kartlari bu component'lerle degistirildi.
+- Risk gruplari ve aksiyonlar su an mevcut `departmentReport`, `riskItems`, `quickActions`, `targetAlignmentRate`, `kpiTrendPercent`, `riskScore` state'lerinden turetiliyor.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - `docker compose restart frontend` basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Risk kategorileri ve aksiyon priority/status bilgileri backend'den resmi olarak gelmeli.
+- Quick action checkbox state'i kalici olacaksa backend'e veya local storage'a baglanmali; su an component state'i sayfa yenilenince sifirlanir.
+
+## 2026-05-24 Departman Performansi AI Departman Ozeti Adim 8
+
+- Kullanici LLM destekli AI departman analizi backend endpoint'i ve frontend panel tasarimini paylasti.
+- Projeye yeni OpenAI dependency eklenmedi; mevcut `AIService` Gemini/Ollama altyapisi ve `SoftwareNarrativeService` kullanildi.
+- Backend:
+  - `SoftwareDepartmentInsightsResponse` semasi eklendi.
+  - `GET /api/v1/analytics/departments/software/insights` endpoint'i eklendi.
+  - Endpoint opsiyonel `upload_id`, `period`, `target_column`, `use_llm` parametrelerini aliyor.
+  - `SoftwareMLService.generate_department_insights` eklendi.
+  - Upload verilmezse en son basarili software upload seciliyor.
+  - Bulk prediction + department narrative uzerinden 6 bolumlu insight metni uretiliyor: ozet, guclu yonler, gelistirme alanlari, departman sagligi, oneriler, sonraki hafta beklentisi.
+  - `use_llm=true` ile mevcut Gemini/Ollama narrative deneniyor; provider yoksa deterministik fallback donuyor.
+- Frontend:
+  - `SoftwareDepartmentInsightsResponse` tipi ve `analyticsApi.getSoftwareDepartmentInsights()` eklendi.
+  - Yeni `AIInsightsPanel.vue` component'i eklendi.
+  - Eski statik AI ozet paneli kaldirildi; `ManagerDashboard.vue` artik `AIInsightsPanel` kullanıyor.
+  - Panel gradient tasarimli, loading skeleton, expand/collapse, yenile, PDF indir ve ekibe gonder aksiyonlari iceriyor.
+  - Yenile butonu gercek endpoint'i tekrar cagiriyor; PDF/ekibe gonder su an gorsel aksiyon olarak duruyor.
+- Dogrulama:
+  - `py_compile` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `npm.cmd run build-only` basarili.
+  - Backend kodu degistigi icin `docker restart propel_backend` calistirildi.
+  - Frontend `docker compose restart frontend` ile yeniden baslatildi.
+  - `http://localhost:8001/docs` HTTP 200 dondu.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+  - Auth ile `/api/v1/analytics/departments/software/insights?use_llm=false&period=week` smoke testi basarili; upload `5`, source `deterministic`, fallback `true`, health_score `88.1` dondu.
+
+## Sonraki Adim
+
+- AI panelindeki PDF indir ve ekibe gonder butonlari gercek export/notification endpoint'lerine baglanmali.
+- LLM acik modda Gemini/Ollama provider ayarlariyla manuel test yapilmali; provider yoksa fallback beklenen davranis.
+- Insight response'u ileride dashboard'un tum hardcoded metriklerini besleyecek resmi `department_dashboard` kontratina dahil edilebilir.
+
+## 2026-05-24 Departman Performansi Header ve Filtreler Adim 9
+
+- Kullanici dashboard header tasarimini paylasti.
+- Yeni `propel-frontend/src/components/dashboard/DashboardHeader.vue` component'i eklendi.
+- `ManagerDashboard.vue` ust header section'i bu component ile degistirildi.
+- Header ozellikleri:
+  - Panel etiketi ve departman adi.
+  - `Calisan | Takim | Saglik Skoru` ozet satiri.
+  - 4 bilgi karti: Genel Saglik Skoru, Ort. Performans, Risk Duzeyi, Trend.
+  - Donem filtresi: Bu Hafta, Bu Ay, Bu Ceyrek, Bu Yil.
+  - Karsilastirma filtresi: Onceki Donem, Departman Ort., Hedef.
+  - Refresh, PDF ve Email aksiyonlari.
+- Header metrikleri mevcut frontend state'inden turetiliyor:
+  - `departmentHealthScore`
+  - `kpiAverageScore`
+  - `dashboardRiskLevel`
+  - `dashboardTrendLabel`
+  - `teamMemberCount`, `teamMetricCards.length`
+- PDF ve Email butonlari su an placeholder event olarak console bilgisi verir; backend baglantisi sonraki adima birakildi.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - `docker compose restart frontend` basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Donem ve karsilastirma filtreleri backend query parametrelerine baglanmali.
+- Header saglik skoru, risk duzeyi ve trend bilgileri resmi backend dashboard kontratindan gelmeli.
+- PDF ve Email aksiyonlari export/notification endpoint'lerine baglanmali.
+
+## 2026-05-24 Departman Performansi Hibrit Dashboard Backend Adim 1
+
+- Kullanici Departman Performansi sayfasinin KPI/ML, 360 Derece Feedback ve Haftalik Nabiz Anketlerini tek hibrit dashboard olarak gostermesini istedi.
+- Ilk fazda cache tablosu eklenmedi; veri modeli taslasmadan once canli aggregator endpoint tercih edildi.
+- Backend `SoftwareDepartmentDashboardResponse` ve alt Pydantic semalari eklendi:
+  - `department`, `coverage`, `scores`, `sources`, `hybrid_insights`, `team_breakdown`, `actions`, `ai_summary`.
+- Yeni endpoint eklendi: `GET /api/v1/analytics/departments/software/dashboard`.
+- Endpoint parametreleri: `upload_id`, `period=week|month|quarter|year`, `target_column`, `use_llm`.
+- `SoftwareMLService.generate_department_dashboard` eklendi.
+- Aggregator su kaynaklari birlestiriyor:
+  - KPI/ML: en son software upload + bulk prediction + team analytics.
+  - Haftalik Nabiz: `survey_responses` icindeki `weekly_pulse` kayitlari.
+  - 360 Feedback: `feedback_nlp_analyses` icindeki haftalik NLP sinyalleri.
+- Hibrit skorlar hesaplandi:
+  - `department_health = KPI/ML %50 + Nabiz %25 + 360 %25`
+  - `execution_score`, `people_health_score`, `risk_score`, `confidence_score`.
+- Coverage metrikleri eklendi: KPI, pulse ve 360 icin kisi/yanit sayisi, yuzde ve son guncelleme bilgileri.
+- Hibrit icgoruler ve aksiyon listeleri deterministik ilk kurallarla uretiliyor.
+- Frontend API tarafina `SoftwareDepartmentDashboardResponse` tipleri ve `analyticsApi.getSoftwareDepartmentDashboard()` eklendi.
+- Canli smoke test basarili:
+  - `/api/v1/analytics/departments/software/dashboard?period=week&use_llm=false`
+  - upload `5`, status `success`, confidence `72.6`, KPI coverage `96.8`, pulse coverage `96.8`, 360 coverage `0.0`.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Backend container `docker restart propel_backend` ile yeniden baslatildi.
+
+## Sonraki Adim
+
+- `ManagerDashboard.vue` parca parca endpointlerden veri birlestirmek yerine yeni `getSoftwareDepartmentDashboard()` response'una baglanmali.
+- 360 coverage su an canli haftalik NLP kaydi yoksa `0` geliyor; veri yoklugu UI'da source badge/confidence ile net gosterilmeli.
+- Cache tablosu (`department_dashboards`) ve AI LLM sentezi, response kontrati frontendde oturduktan sonra ikinci fazda eklenmeli.

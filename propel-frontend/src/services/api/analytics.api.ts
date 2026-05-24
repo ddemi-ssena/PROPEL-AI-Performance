@@ -266,6 +266,118 @@ export interface SoftwareEmployeePerformanceResponse {
   prediction?: SoftwarePredictionResponse | null
 }
 
+export interface SoftwareDepartmentInsightsResponse {
+  status: string
+  department: string
+  upload_id?: number | null
+  period: string
+  insights: string
+  generated_at: string
+  source: string
+  model?: string | null
+  fallback_used: boolean
+  health_score?: number | null
+  sections: Record<string, any>
+  actions: Array<Record<string, any>>
+}
+
+export interface DepartmentDashboardDepartmentResponse {
+  id: number
+  name: string
+  member_count: number
+  team_count: number
+  teams: string[]
+}
+
+export interface DepartmentDashboardCoverageResponse {
+  kpi_employee_count: number
+  kpi_percentage: number
+  pulse_response_count: number
+  pulse_employee_count: number
+  pulse_percentage: number
+  feedback_response_count: number
+  feedback_employee_count: number
+  feedback_percentage: number
+  confidence_score: number
+  last_kpi_update?: string | null
+  last_pulse_update?: string | null
+  last_feedback_update?: string | null
+}
+
+export interface DepartmentDashboardScoresResponse {
+  department_health: number
+  execution_score: number
+  people_health_score: number
+  risk_score: number
+  confidence_score: number
+  weights: Record<string, number>
+}
+
+export interface DepartmentDashboardSourceResponse {
+  label: string
+  score: number
+  status: string
+  metrics: Record<string, any>
+  details: Record<string, any>
+}
+
+export interface DepartmentDashboardInsightResponse {
+  type: string
+  severity: string
+  title: string
+  description: string
+  recommendation: string
+  action: string
+  team?: string | null
+}
+
+export interface DepartmentDashboardTeamResponse {
+  team: string
+  member_count: number
+  scores: Record<string, number>
+  metrics: Record<string, any>
+  status: string
+  trend: string
+}
+
+export interface DepartmentDashboardActionResponse {
+  title: string
+  description: string
+  priority: string
+  due_date: string
+  owner: string
+  source: string
+}
+
+export interface DepartmentDashboardActionsResponse {
+  urgent: DepartmentDashboardActionResponse[]
+  this_week: DepartmentDashboardActionResponse[]
+  monitoring: DepartmentDashboardActionResponse[]
+}
+
+export interface DepartmentDashboardAISummaryResponse {
+  summary: string
+  strengths: string[]
+  risks: string[]
+  recommendations: string[]
+  source: string
+}
+
+export interface SoftwareDepartmentDashboardResponse {
+  status: string
+  department: DepartmentDashboardDepartmentResponse
+  period: string
+  generated_at: string
+  upload_id?: number | null
+  coverage: DepartmentDashboardCoverageResponse
+  scores: DepartmentDashboardScoresResponse
+  sources: Record<string, DepartmentDashboardSourceResponse>
+  hybrid_insights: DepartmentDashboardInsightResponse[]
+  team_breakdown: DepartmentDashboardTeamResponse[]
+  actions: DepartmentDashboardActionsResponse
+  ai_summary: DepartmentDashboardAISummaryResponse
+}
+
 export interface TeamReportExportPayload {
   team: string
   report_date: string
@@ -471,6 +583,32 @@ export const analyticsApi = {
   async getMySoftwarePerformance(): Promise<SoftwareEmployeePerformanceResponse> {
     const { data } = await apiClient.get<SoftwareEmployeePerformanceResponse>(
       '/analytics/departments/software/my-performance'
+    )
+    return data
+  },
+
+  async getSoftwareDepartmentInsights(params?: {
+    upload_id?: number
+    period?: string
+    target_column?: string
+    use_llm?: boolean
+  }): Promise<SoftwareDepartmentInsightsResponse> {
+    const { data } = await apiClient.get<SoftwareDepartmentInsightsResponse>(
+      '/analytics/departments/software/insights',
+      { params: params || {} }
+    )
+    return data
+  },
+
+  async getSoftwareDepartmentDashboard(params?: {
+    upload_id?: number
+    period?: 'week' | 'month' | 'quarter' | 'year' | string
+    target_column?: string
+    use_llm?: boolean
+  }): Promise<SoftwareDepartmentDashboardResponse> {
+    const { data } = await apiClient.get<SoftwareDepartmentDashboardResponse>(
+      '/analytics/departments/software/dashboard',
+      { params: params || {} }
     )
     return data
   },

@@ -20,6 +20,8 @@ from app.schemas.analytics import (
     SoftwareBulkPredictionResponse,
     SoftwareDatasetEmployeeResponse,
     SoftwareDatasetResponse,
+    SoftwareDepartmentDashboardResponse,
+    SoftwareDepartmentInsightsResponse,
     SoftwareEmployeePerformanceResponse,
     SoftwareModelStateResponse,
     SoftwareModelTrainRequest,
@@ -154,6 +156,47 @@ def get_my_software_performance(
     from app.services.software_ml_service import SoftwareMLService
 
     return SoftwareMLService.get_my_performance(db=db, current_user=current_user)
+
+
+@router.get("/departments/software/insights", response_model=SoftwareDepartmentInsightsResponse)
+def get_software_department_insights(
+    upload_id: int | None = None,
+    period: str = "week",
+    target_column: str = "performance_band",
+    use_llm: bool = True,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.software_ml_service import SoftwareMLService
+
+    return SoftwareMLService.generate_department_insights(
+        db=db,
+        upload_id=upload_id,
+        period=period,
+        target_column=target_column,
+        use_llm=use_llm,
+    )
+
+
+@router.get("/departments/software/dashboard", response_model=SoftwareDepartmentDashboardResponse)
+def get_software_department_dashboard(
+    upload_id: int | None = None,
+    period: str = "week",
+    target_column: str = "performance_band",
+    use_llm: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.software_ml_service import SoftwareMLService
+
+    return SoftwareMLService.generate_department_dashboard(
+        db=db,
+        current_user=current_user,
+        upload_id=upload_id,
+        period=period,
+        target_column=target_column,
+        use_llm=use_llm,
+    )
 
 
 @router.get("/performance/summary", response_model=DepartmentPerformanceSummaryResponse)
