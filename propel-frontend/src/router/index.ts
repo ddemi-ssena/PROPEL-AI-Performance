@@ -201,8 +201,8 @@ function isSalesUser(authStore: ReturnType<typeof useAuthStore>): boolean {
   const deptId = authStore.user?.department_id ?? Number(localStorage.getItem('deptId') || '0')
   const deptName = (authStore.user?.department_name || '').toLowerCase()
     .replace(/ı/g, 'i').replace(/ş/g, 's')
-  return deptName.includes('sat') || email.includes('satis') || email.startsWith('sa-')
-    || deptId === 2 || deptId === 14 || deptId === 18
+  return deptName.includes('sat') || email.includes('satis') || email.startsWith('sa-') || email.startsWith('sl-')
+    || deptId === 2 || deptId === 14 || deptId === 18 || deptId === 20
 }
 
 router.beforeEach(async (to, _from, next) => {
@@ -223,7 +223,7 @@ router.beforeEach(async (to, _from, next) => {
       const email = (authStore.user?.email || localStorage.getItem('userEmail') || '').toLowerCase()
       const deptId = authStore.user?.department_id ?? Number(localStorage.getItem('deptId') || '0')
       const deptName = (authStore.user?.department_name || '').toLowerCase()
-      const isSalesMgr = deptName.includes('sat') || email.includes('satis') || deptId === 14 || deptId === 18 || deptId === 2
+      const isSalesMgr = deptName.includes('sat') || email.includes('satis') || email.startsWith('sl-') || deptId === 14 || deptId === 18 || deptId === 2 || deptId === 20
       next(isSalesMgr ? '/manager/sales-analytics' : '/manager')
     } else if (role === 'employee') {
       next(isSalesUser(authStore) ? '/employee/sales' : '/employee')
