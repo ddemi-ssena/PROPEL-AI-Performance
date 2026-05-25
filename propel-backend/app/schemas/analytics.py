@@ -337,6 +337,13 @@ class DepartmentDashboardInsightResponse(BaseModel):
     recommendation: str
     action: str
     team: Optional[str] = None
+    evidence: list[str] = Field(default_factory=list)
+    manager_interpretation: Optional[str] = None
+    impact: Optional[str] = None
+    follow_up_metrics: list[str] = Field(default_factory=list)
+    source: str = "deterministic"
+    model: Optional[str] = None
+    fallback_used: bool = False
 
 
 class DepartmentDashboardTeamResponse(BaseModel):
@@ -369,6 +376,8 @@ class DepartmentDashboardAISummaryResponse(BaseModel):
     risks: list[str] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
     source: str = "deterministic"
+    model: Optional[str] = None
+    fallback_used: bool = False
 
 
 class SoftwareDepartmentDashboardResponse(BaseModel):

@@ -4,9 +4,12 @@
       <div>
         <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{{ eyebrow }}</p>
         <h3 class="text-lg font-bold text-slate-900">{{ title }}</h3>
+        <p v-if="description" class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+          {{ description }}
+        </p>
       </div>
       <span class="w-fit rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-        Lead Conversion
+        {{ badgeText }}
       </span>
     </div>
 
@@ -16,8 +19,11 @@
           <div>
             <p class="truncate text-sm font-bold text-slate-800">{{ row.stage }}</p>
             <p class="mt-0.5 text-xs text-slate-500">
-              %{{ row.conversion }} donusum
-              <span v-if="index === 0">(Baslangic)</span>
+              %{{ row.conversion }} kapsama
+              <span v-if="index === 0">(Toplam baz)</span>
+            </p>
+            <p v-if="row.description" class="mt-1 text-xs leading-5 text-slate-500">
+              {{ row.description }}
             </p>
           </div>
           <p class="text-2xl font-bold text-slate-900">{{ row.value }}</p>
@@ -37,7 +43,7 @@
 
         <div v-if="index < processedRows.length - 1" class="my-2 flex items-center justify-center gap-2">
           <ChevronDownIcon class="h-4 w-4 text-slate-400" />
-          <span class="text-xs font-medium text-slate-500">Donusum: %{{ row.nextConversion }}</span>
+          <span class="text-xs font-medium text-slate-500">Sonraki adima gecen: %{{ row.nextConversion }}</span>
         </div>
       </div>
     </div>
@@ -46,10 +52,10 @@
       <table class="w-full min-w-[520px] text-sm">
         <thead class="bg-slate-50 text-xs uppercase tracking-[0.12em] text-slate-500">
           <tr>
-            <th class="px-4 py-3 text-left font-semibold">Stage</th>
-            <th class="px-4 py-3 text-right font-semibold">Value</th>
-            <th class="px-4 py-3 text-right font-semibold">Conv. Rate</th>
-            <th class="px-4 py-3 text-right font-semibold">Drop-off</th>
+            <th class="px-4 py-3 text-left font-semibold">Veri Adimi</th>
+            <th class="px-4 py-3 text-right font-semibold">Kisi</th>
+            <th class="px-4 py-3 text-right font-semibold">Kapsama</th>
+            <th class="px-4 py-3 text-right font-semibold">Eksik</th>
           </tr>
         </thead>
         <tbody>
@@ -82,14 +88,19 @@ export type FunnelRow = {
   value: number | string
   conversion: number
   dropoff: number
+  description?: string
 }
 
 const props = withDefaults(defineProps<{
   title: string
   eyebrow?: string
+  badgeText?: string
+  description?: string
   rows: FunnelRow[]
 }>(), {
   eyebrow: 'Funnel Analizi',
+  badgeText: 'Funnel',
+  description: '',
 })
 
 const processedRows = computed(() => {

@@ -1194,3 +1194,367 @@ docker exec propel_backend python seed_data.py
 - `ManagerDashboard.vue` parca parca endpointlerden veri birlestirmek yerine yeni `getSoftwareDepartmentDashboard()` response'una baglanmali.
 - 360 coverage su an canli haftalik NLP kaydi yoksa `0` geliyor; veri yoklugu UI'da source badge/confidence ile net gosterilmeli.
 - Cache tablosu (`department_dashboards`) ve AI LLM sentezi, response kontrati frontendde oturduktan sonra ikinci fazda eklenmeli.
+
+## 2026-05-24 Departman Performansi Hibrit Dashboard Frontend Adim 2
+
+- Kullanici frontend sayfanin yeni hibrit dashboard endpoint'ine baglanmasini istedi.
+- `ManagerDashboard.vue` yeniden yapilandirildi ve eski parca parca loader'lar kaldirildi:
+  - `feedbackApi.getDepartment360SummaryReport`
+  - `feedbackApi.getFeedbackCandidates`
+  - `kpiApi.getAllVisibleRecords`
+- Sayfa artik tek kaynak kullanir: `analyticsApi.getSoftwareDepartmentDashboard()`.
+- Baslik guncellendi:
+  - `Departman Performansi`
+  - Alt baslik: `KPI/ML + 360 Feedback + Haftalik Nabiz`
+- Header icinde departman, calisan sayisi, takim sayisi, rapor donemi ve son guncelleme gosteriliyor.
+- Veri kapsama bolumu eklendi:
+  - KPI/ML coverage
+  - Haftalik Nabiz coverage
+  - 360 Feedback coverage
+  - confidence score
+- KPI kartlari hibrit skorlara baglandi:
+  - Departman Sagligi
+  - Performans Ciktilari
+  - Insan Sagligi
+  - Risk Skoru
+- Kaynak bazli ozet bolumu eklendi:
+  - Performans Ciktilari (KPI/ML)
+  - Insan Sagligi Sinyalleri (Nabiz)
+  - Davranis ve Iliskiler (360)
+- Hibrit icgoruler bolumu backend `hybrid_insights` listesinden render ediliyor.
+- Takim karsilastirma tablosu backend `team_breakdown` verisinden render ediliyor.
+- AI ozet paneli backend `ai_summary` verisini kullaniyor; eski ayri insights endpoint paneli kaldirildi.
+- Risk gostergeleri ve hizli aksiyonlar backend `insights/actions` response'undan turetiliyor.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` basarili.
+  - `npm.cmd run build-only` basarili.
+  - Frontend container `docker compose restart frontend` ile yeniden baslatildi.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+  - Backend dashboard smoke testi `success 43.1 72.6` dondu.
+
+## Sonraki Adim
+
+- UI gorsel QA icin browser uzerinde mobil/desktop kontrol yapilmali.
+- 360 verisi olmayan durumda source card'da daha acik `Veri yok` empty state'i gosterilebilir.
+- Grafik/pipeline/funnel bilesenleri yeni hibrit response'taki trend alanlariyla tekrar entegre edilebilir.
+
+## 2026-05-24 Departman Performansi Grafiklerin Geri Eklenmesi
+
+- Kullanici hibrit dashboard'a gecilirken eski sayfadaki grafik, pipeline ve funnel yapilarinin tamamen kalktigini belirtti.
+- `ManagerDashboard.vue` icine eski dashboard katmanlari yeni hibrit endpoint verisiyle yeniden eklendi:
+  - `DepartmentTrendChart`
+  - `PipelineTracking`
+  - `FunnelChart`
+  - Akis ozeti
+  - Funnel ozeti
+- Grafikler artik eski parca parca frontend state'inden degil yeni `SoftwareDepartmentDashboardResponse` uzerinden uretiliyor.
+- Trend chart verisi `team_breakdown` skorlarindan uretiliyor:
+  - KPI performansi
+  - Nabiz/pulse kapasite-insan sinyali
+  - Risk skoru
+- Pipeline verisi coverage ve hibrit aksiyon akisiyle olusturuluyor:
+  - Departman kapsami
+  - KPI/ML verisi
+  - Nabiz verisi
+  - 360 NLP verisi
+  - Saglikli takim
+  - Aksiyon hazir
+- Funnel analizi veri kapsama darbogazlarini gosteriyor; ozellikle 360 coverage dusukse drop-off olarak gorunur.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - Frontend container `docker compose restart frontend` ile yeniden baslatildi.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Browser ekraninda eski ve yeni layout birlikte incelenmeli; gerekirse grafiklerin sirasi ve alan genislikleri kullanici beklentisine gore yeniden duzenlenmeli.
+- Trend chart icin daha iyi backend trend kontrati eklenebilir; su an takim kirilimi uzerinden hibrit trend gorunumu uretiliyor.
+
+## 2026-05-25 Departman Performansi Genel Durum Paneli
+
+- Kullanici hibrit dashboard'da eski `Departman genel durumu` bolumunun de yer almasini istedi.
+- `ManagerDashboard.vue` icine KPI kartlarindan sonra yeni `Departman Genel Durumu` section'i eklendi.
+- Sol panel:
+  - Hibrit saglik ozeti
+  - Genel departman saglik skoru
+  - `ai_summary.summary`
+  - Skor agirliklari: KPI/ML, Nabiz, 360
+  - Veri guveni
+- Sag panel:
+  - Kaynak durumlari ayri ayri gosteriliyor:
+    - KPI/ML Performans
+    - Haftalik Nabiz
+    - 360 Feedback
+    - Birlesik Risk
+  - Her kaynak icin skor/deger, detay, aciklama ve progress bar var.
+- 360 feedback verisi yoksa panel `Veri yok` empty state'i gosteriyor; skor gibi davranmiyor.
+- Yeni helper fonksiyonlar eklendi:
+  - `scoreToneClass`
+  - `barToneClass`
+  - `riskToneClass`
+  - `riskBarClass`
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - Frontend container `docker compose restart frontend` ile yeniden baslatildi.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Bu genel durum paneli icin browser gorsel kontrol yapilip, eski gauge gorunumune daha yakin bir tasarim istenirse radial/gauge layout'a cevrilebilir.
+
+## 2026-05-25 Departman Genel Durumu Gauge Duzeltmesi
+
+- Kullanici eski sayfadaki renkli yarim ay gauge gorunumunun yeni genel durum panelinde olmadigini belirtti.
+- `ManagerDashboard.vue` icine inline `HybridGauge` component'i eklendi.
+- Gauge yari daire olarak CSS `conic-gradient` ile ciziliyor:
+  - Kirmizi risk bolgesi
+  - Sari dikkat bolgesi
+  - Yesil iyi bolgesi
+  - Igne/needle gosterimi
+  - Merkez nokta
+  - Alt segment etiketi
+- Ana `Departman Genel Durumu` bolumunde genel saglik skoru artik yuvarlak skor yerine yarim ay gauge olarak gosteriliyor.
+- Sag taraftaki kaynak durumlari icin de kucuk gauge eklendi:
+  - KPI/ML
+  - Nabiz
+  - 360
+  - Risk
+- Risk gauge'i ters mantikla label uretiyor; yuksek risk daha kotu okunuyor.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `npm.cmd run build-only` basarili.
+  - Frontend container `docker compose restart frontend` ile yeniden baslatildi.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Browser uzerinde gauge igne acisi ve mobil genislik kontrol edilmeli; gerekirse gauge boyutu ya da kart dizilimi viewport'a gore ayarlanabilir.
+
+## 2026-05-25 Departman Performansi Hardcoded/Fallback Skor Analizi
+
+- Kullanici Departman Performansi sayfasinda hardcoded veri kalip kalmadigini ve `veri guveni`, `insan sagligi` gibi basliklarin nereden geldigini sordu.
+- Inceleme sonucu frontenddeki gorunen skorlarin hardcoded olmadigi, backend `GET /analytics/departments/software/dashboard` endpoint'inden geldigi dogrulandi.
+- Ancak backendde veri olmayan kaynaklar icin `50.0` notr fallback'in skor hesaplarina karistigi tespit edildi.
+- Ozellikle 360 feedback verisi yokken:
+  - `feedback_score=50.0`
+  - `feedback_risk=50.0`
+  degerleri departman sagligi, insan sagligi ve risk hesabina giriyordu.
+- Bu davranis duzeltildi:
+  - Pulse/360 verisi yoksa kaynak skoru hesaplamaya katilmiyor.
+  - 360 verisi yoksa `feedback360` agirligi `0.0` oluyor.
+  - Aktif kaynak agirliklari normalize ediliyor.
+  - 360 verisi yokken UI hala `Veri yok` gosteriyor.
+- Ornek canli endpoint sonucu guncellendi:
+  - `department_health: 40.8`
+  - `execution_score: 28.0`
+  - `people_health_score: 66.4`
+  - `risk_score: 60.0`
+  - `confidence_score: 72.6`
+  - `weights: KPI/ML 66.7, Nabiz 33.3, 360 0.0`
+- Frontendde agirlik gosterimindeki `|| 50` / `|| 25` fallback'leri `?? 0` olarak duzeltildi; artik `0` gercekten `0` olarak gorunuyor.
+- Kalan hardcoded kalemler veri degil, UI/urun kurali:
+  - Kaynak basliklari ve aciklama metinleri.
+  - Gauge renk esikleri.
+  - Baslangic/empty-state metinleri.
+  - Base agirlik tasarimi: KPI/ML 50, Nabiz 25, 360 25.
+- Dogrulama:
+  - `py_compile` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `npm.cmd run build-only` basarili.
+  - Backend `docker restart propel_backend` ile yeniden baslatildi.
+  - Frontend `docker compose restart frontend` ile yeniden baslatildi.
+  - Dashboard endpoint smoke testi basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Base agirliklari backendde sabit kural olarak tutmak yerine konfigurable hale getirilebilir.
+- `AI summary` metni deterministik template yerine LLM/kuralli narrative response'u ile ayrica kaynak aciklamalari icerecek sekilde genisletilebilir.
+
+## 2026-05-25 Departman Performansi Veri Hunisi Netlestirmesi
+
+- Kullanici `Hibrit Veri Funnel` / `Darbogaz ve kayip analizi` bolumunun ne anlattiginin belirsiz oldugunu belirtti.
+- Tespit: Bolum aslinda performans veya satis donusum hunisi degil, hibrit dashboard icin veri kapsama/hazirlik hunisiydi; fakat baslik ve icerik bunu acik anlatmiyordu.
+- `FunnelChart.vue` icine opsiyonel `badgeText` prop'u eklendi; boylece sabit `Lead Conversion` etiketi yerine sayfa baglamina uygun etiket kullanilabiliyor.
+- `ManagerDashboard.vue` icindeki funnel bolumu yeniden adlandirildi:
+  - Baslik: `Veri Kapsama Hunisi`
+  - Eyebrow: `Hibrit Analiz Hazirligi`
+  - Badge: `Data Coverage`
+- Sag ozet karti `Hibrit profil nerede eksiliyor?` olarak degistirildi ve bolumun performans dususunu degil, veri kapsamasini gosterdigini anlatan kisa aciklama eklendi.
+- Huni adimlari sade ve dogrudan veri tamamlanma akisi olacak sekilde duzenlendi:
+  - Toplam Calisan
+  - KPI/ML Verisi Olan
+  - Nabiz Yaniti Olan
+  - 360 NLP Analizi Olan
+  - Tam Hibrit Profili Olan
+- Kafa karistiran `Dusuk Riskli Takim` ve `Aksiyon Hazir` adimlari huniden kaldirildi; bunlar performans/aksiyon sonucu oldugu icin veri kapsama hunisinde yanlis baglam olusturuyordu.
+- Ozet cumleleri de `tam hibrit profil`, `en buyuk veri eksigi` ve `360 NLP verisi yoksa neden tam profil olusmadigi` uzerinden yeniden yazildi.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - Frontend container `docker compose restart frontend` ile yeniden baslatildi.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Bu huniye tooltip veya mini yardim metni eklenebilir: `Tam hibrit profil = KPI/ML + Nabiz + 360 NLP sinyali ayni calisan/takim icin mevcut`.
+
+## 2026-05-25 Veri Hunisi Baslik ve Sonuc Aciklamalari Netlestirmesi
+
+- Kullanici `Veri Kapsama Hunisi` ve `Hibrit profil nerede eksiliyor?` basliklarinin hala ne anlattiginin net olmadigini belirtti.
+- Bolumun amaci daha acik hale getirildi: performans sonucu degil, hibrit skor icin veri kaynaklarinin calisan bazinda tamamlanma durumunu gosteriyor.
+- `FunnelChart.vue` icine `description` prop'u ve satir bazli `description` alani eklendi.
+- Sol kart yeni metinlerle guncellendi:
+  - Baslik: `Hibrit analiz icin veri tamamligi`
+  - Eyebrow: `KPI + Nabiz + 360 kapsami`
+  - Badge: `Eksik veri kontrolu`
+  - Aciklama: performans sonucu degil, skor hesaplamasi icin gerekli veri kaynaklarinin kac calisanda mevcut oldugunu anlatir.
+- Huni satirlarinin altina ne anlama geldikleri eklendi:
+  - Departmandaki calisanlar
+  - KPI/ML verisi olanlar
+  - Nabiz yaniti olanlar
+  - 360 NLP analizi olanlar
+  - Tam hibrit profili olanlar
+- Tablo basliklari `Stage/Value/Conv. Rate/Drop-off` yerine `Veri Adimi/Kisi/Kapsama/Eksik` olarak Turkcelestirildi.
+- Sag ozet karti yeni amaca gore guncellendi:
+  - Eyebrow: `Eksik veri etkisi`
+  - Baslik: `Skorun hangi kismi eksik veri yuzunden zayif?`
+  - Her sonuca artik `title`, `description`, `impact` alanlariyla aciklama ekleniyor.
+- 360 verisi yoksa ozet artik acikca soyluyor: 360 NLP sinyali skora katilamiyor; psikolojik guven, is birligi, destek ihtiyaci ve burnout metin sinyalleri hesaplanamiyor.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - Frontend container `docker compose restart frontend` ile yeniden baslatildi.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Gerekirse bu bolumun adi tamamen `Veri Tamamligi ve Guven Etkisi` yapilarak `funnel` kavrami UI'dan tamamen kaldirilabilir.
+
+## 2026-05-25 Hibrit Icgoruler LLM Yorum Katmani
+
+- Kullanici `Hibrit Icgoruler / Kesisim analizi` bolumunun cok detaysiz kaldigini ve LLM ile detayli prompt kullanilip kullanilamayacagini sordu.
+- Yaklasim: Skor ve metrik hesaplari backendde deterministik kaldi; LLM yalnizca verilen gercek dashboard JSON'unu yorumlayan katman olarak eklendi.
+- `DepartmentDashboardInsightResponse` semasi genisletildi:
+  - `evidence`
+  - `manager_interpretation`
+  - `impact`
+  - `follow_up_metrics`
+  - `source`
+  - `model`
+  - `fallback_used`
+- `SoftwareMLService._dashboard_insights` artik deterministik insight'lari da detayli alanlarla olusturuyor.
+- `use_llm=true` geldiginde yeni `_dashboard_llm_insights` akisi calisiyor:
+  - KPI/ML, nabiz, 360, skorlar, veri kapsama ve kural bazli sinyaller prompt payload'una konuyor.
+  - LLM'e yeni sayi/metrik/olay uydurmamasi, 360 verisi yoksa dogrulanamiyor demesi ve yalnizca JSON dondurmesi soyleniyor.
+  - Beklenen JSON: type, severity, title, description, evidence, manager_interpretation, impact, recommendation, action, follow_up_metrics.
+  - LLM provider yoksa veya gecersiz JSON donerse detayli deterministik fallback kullaniliyor.
+- Frontend `ManagerDashboard.vue` artik dashboard endpoint'ini `use_llm: true` ile cagiriyor.
+- Hibrit icgoru kartlari yeniden tasarlandi:
+  - Severity etiketi
+  - Aksiyon etiketi
+  - LLM/kural bazli kaynak etiketi
+  - Kanitlar listesi
+  - Yonetici yorumu
+  - Etki
+  - Onerilen aksiyon
+  - Takip metrikleri
+- `analytics.api.ts` frontend tipleri yeni insight alanlariyla guncellendi.
+- Canli smoke testte `/analytics/departments/software/dashboard?period=week&use_llm=true` Gemini kaynakli detayli insight dondurdu (`source=gemini`, `model=gemini-2.5-flash-lite`, `fallback_used=false`).
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `py_compile`, `npm.cmd run type-check`, `npm.cmd run build-only` basarili.
+  - Backend `docker restart propel_backend` ile yeniden baslatildi.
+  - Frontend `docker compose restart frontend` ile yeniden baslatildi.
+  - Backend dashboard endpoint smoke testi basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- LLM yorumlari yavas gelirse bu endpoint icin cache veya `LLM ile yenile` butonu dusunulebilir; su an sayfa yuklenirken LLM cagrisi senkron calisiyor.
+
+## 2026-05-25 AI Ozet LLM Analizine Baglandi
+
+- Kullanici `AI Ozet / Birlesik departman yorumu` bolumunun gercek AI analizi gibi gorunmedigini belirtti.
+- Tespit: Hibrit icgoruler LLM'e baglanmisti; fakat `ai_summary` hala deterministik skor cumlesi ve insight basliklarindan uretiliyordu.
+- `DepartmentDashboardAISummaryResponse` semasi genisletildi:
+  - `model`
+  - `fallback_used`
+- `SoftwareMLService._dashboard_ai_summary` artik `use_llm=true` geldiginde ayri bir LLM prompt'u calistiriyor.
+- Yeni prompt KPI/ML, nabiz, 360, coverage, skorlar, LLM/kural bazli hibrit icgoruler ve aksiyonlari tek payload olarak veriyor.
+- LLM'den JSON bekleniyor:
+  - `summary`
+  - `strengths`
+  - `risks`
+  - `recommendations`
+- Prompt kurallari:
+  - Yeni sayi/metrik/olay uydurma.
+  - 360 verisi yoksa psikolojik guven/is birligi/burnout tarafinin dogrulanamadigini acikca soyle.
+  - Summary 4-6 cumlelik yonetici ozet raporu olsun.
+  - Riskler ve oneriler baslik listesi degil, aciklayici ve uygulanabilir metinler olsun.
+- LLM basarisiz olursa daha acik deterministik fallback donuyor ve `source=deterministic_llm_fallback`, `fallback_used=true` ile isaretleniyor.
+- Frontend `AI Ozet` kartina kaynak etiketi eklendi:
+  - `LLM yorumu`
+  - `Kural bazli ozet`
+- Kart alt basliklari netlestirildi:
+  - `AI'nin Dayandigi Guclu Kanitlar`
+  - `AI Risk Yorumu`
+  - `AI Aksiyon Onerileri`
+- Canli smoke testte `ai_summary` Gemini'den geldi:
+  - `source=gemini`
+  - `model=gemini-2.5-flash-lite`
+  - `fallback_used=false`
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `py_compile`, `npm.cmd run type-check`, `npm.cmd run build-only` basarili.
+  - Backend `docker restart propel_backend` ile yeniden baslatildi.
+  - Frontend `docker compose restart frontend` ile yeniden baslatildi.
+  - Backend dashboard endpoint smoke testi basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Dashboard yukleme suresi iki LLM cagrisi nedeniyle uzarsa AI ozet ve hibrit icgoruler icin cache veya manuel `AI analizi yenile` butonu eklenebilir.
+
+## 2026-05-25 Hizli Aksiyonlar Veri Dayanagi Gosterimi
+
+- Kullanici `Hizli Aksiyonlar` bolumundeki onerilerin neye gore uretildigini ve hardcoded olmamasi gerektigini belirtti.
+- Tespit:
+  - Aksiyon basliklari backendden geliyordu.
+  - Insight kaynakli aksiyonlar LLM/kural bazli hibrit icgorulerden turetiliyordu.
+  - Takim aksiyonlari `team_breakdown` icindeki dusuk saglik skorlarindan turetiliyordu.
+  - Ancak frontend yalnizca `title + priority` gosterdigi icin aksiyonlar hardcoded gibi gorunuyordu.
+- Backend `SoftwareMLService._dashboard_actions` guncellendi:
+  - Insight aksiyonlarinin `description` alani artik `Dayanak` ve `Yonetici yorumu` bilgisini iceriyor.
+  - Dayanak olarak insight evidence maddeleri kullaniliyor.
+  - Takim aksiyonlari `QA takim sagligini izle` gibi genel metin yerine gercek skor kirilimiyla uretiliyor.
+  - Takim aksiyonlarinda hibrit saglik, KPI/ML, nabiz, 360, risk ve en zayif kaynak yaziyor.
+  - Veri kapsama aksiyonunda veri guveni skoru acikca belirtiliyor.
+- Frontend `QuickActions.vue` guncellendi:
+  - Aksiyon basligi disinda aciklama/dayanak metni gosteriliyor.
+  - Sahip, vade ve kaynak rozetleri eklendi.
+  - Kaynak etiketleri kullanici dostu hale getirildi (`Hibrit risk`, `360 eksigi`, `KPI + Nabiz`, `Takim skoru`, vb.).
+- `ManagerDashboard.vue` quick action mapping'i genisletildi:
+  - `description`
+  - `owner`
+  - `dueDate`
+  - `source`
+  alanlari QuickActions component'ine aktariliyor.
+- Canli smoke testte aksiyonlar artik ornek olarak su dayanaklarla donuyor:
+  - KPI/ML performansi 28.0, ML risk skoru 72.0, yuksek riskli calisan sayisi 14.
+  - 360 kapsami %0 ve davranissal metriklerin dogrulanamadigi.
+  - QA hibrit saglik 24.9, KPI/ML 18.0, nabiz 63.6, 360 0.0, risk 44.3.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `py_compile`, `npm.cmd run type-check`, `npm.cmd run build-only` basarili.
+  - Backend `docker restart propel_backend` ile yeniden baslatildi.
+  - Frontend `docker compose restart frontend` ile yeniden baslatildi.
+  - Backend dashboard endpoint smoke testi basarili.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Aksiyonlar ileride kalici task modeline baglanabilir; checkbox state'i backendde saklanabilir ve aksiyon tamamlanma durumu yonetici bazli takip edilebilir.
