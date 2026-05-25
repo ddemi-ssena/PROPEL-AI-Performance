@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex font-sans text-slate-800">
-    <aside class="w-72 bg-slate-900 border-r border-slate-800 hidden md:flex flex-col shadow-xl z-20">
+  <div class="h-screen overflow-hidden bg-gray-50 flex font-sans text-slate-800">
+    <aside class="sticky top-0 h-screen w-72 shrink-0 bg-slate-900 border-r border-slate-800 hidden md:flex flex-col shadow-xl z-20">
       <div class="p-6 border-b border-slate-800 flex items-center gap-3">
         <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
           <span class="text-white font-bold text-lg">K</span>
@@ -132,7 +132,7 @@
 
     <div class="md:hidden flex flex-col min-h-screen w-full"></div>
 
-    <main class="flex-1 overflow-auto bg-gray-50/50">
+    <main class="h-screen flex-1 overflow-y-auto bg-gray-50/50">
       <header class="bg-white/80 backdrop-blur-md border-b border-gray-200 px-8 py-5 flex items-center justify-between sticky top-0 z-10 transition-shadow hover:shadow-sm">
         <div class="flex items-center gap-4">
           <button @click="goBack" class="p-2 text-slate-400 hover:text-slate-700 hover:bg-gray-100/80 rounded-lg transition-colors" title="Geri Don">

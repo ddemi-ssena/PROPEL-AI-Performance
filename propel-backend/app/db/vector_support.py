@@ -228,3 +228,61 @@ def ensure_employee_profile_columns(engine) -> bool:
     except Exception as exc:
         print(f"employee profile schema setup skipped: {exc}")
         return False
+
+
+def ensure_meeting_columns(engine) -> bool:
+    """
+    Adds meeting fields introduced after the initial demo schema.
+    """
+    if engine.dialect.name != "postgresql":
+        return False
+
+    try:
+        with engine.begin() as conn:
+            table_exists = conn.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.tables
+                        WHERE table_name = 'meetings'
+                    )
+                    """
+                )
+            ).scalar()
+
+            if not table_exists:
+                return True
+
+            columns = {
+                "meeting_url": "VARCHAR(1000)",
+            }
+
+            for column_name, column_type in columns.items():
+                column_exists = conn.execute(
+                    text(
+                        """
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM information_schema.columns
+                            WHERE table_name = 'meetings'
+                              AND column_name = :column_name
+                        )
+                        """
+                    ),
+                    {"column_name": column_name},
+                ).scalar()
+
+                if not column_exists:
+                    conn.execute(
+                        text(
+                            f"""
+                            ALTER TABLE meetings
+                            ADD COLUMN {column_name} {column_type}
+                            """
+                        )
+                    )
+        return True
+    except Exception as exc:
+        print(f"meeting schema setup skipped: {exc}")
+        return False

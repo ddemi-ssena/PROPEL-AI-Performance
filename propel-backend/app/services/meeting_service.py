@@ -28,6 +28,7 @@ class MeetingService:
             scheduled_date=payload.scheduled_date,
             scheduled_time=payload.scheduled_time,
             duration_minutes=payload.duration_minutes,
+            meeting_url=MeetingService._clean_url(payload.meeting_url),
             note=payload.note,
             agenda_items=payload.agenda_items,
             created_by_user_id=current_user.id,
@@ -47,7 +48,7 @@ class MeetingService:
                 recipient_label=display_name,
                 meeting_id=meeting.id,
                 title=f"{payload.team} takim toplantisi planlandi",
-                body=MeetingService._notification_body(payload),
+                body=MeetingService._notification_body(payload, meeting.meeting_url),
             )
             db.add(notification)
             db.flush()
@@ -64,6 +65,19 @@ class MeetingService:
             attendees.append(attendee)
             notifications.append(notification)
 
+        organizer_employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+        organizer_notification = Notification(
+            recipient_user_id=current_user.id,
+            recipient_employee_id=organizer_employee.id if organizer_employee else None,
+            recipient_label=current_user.full_name or current_user.email,
+            meeting_id=meeting.id,
+            title=f"{payload.team} toplantisi takvime hazir",
+            body=MeetingService._notification_body(payload, meeting.meeting_url),
+            notification_type="meeting_organizer",
+        )
+        db.add(organizer_notification)
+        notifications.append(organizer_notification)
+
         db.commit()
         db.refresh(meeting)
         for attendee in attendees:
@@ -79,6 +93,7 @@ class MeetingService:
             scheduled_date=meeting.scheduled_date,
             scheduled_time=meeting.scheduled_time,
             duration_minutes=meeting.duration_minutes,
+            meeting_url=meeting.meeting_url,
             note=meeting.note,
             agenda_items=meeting.agenda_items or [],
             attendee_count=len(attendees),
@@ -95,10 +110,16 @@ class MeetingService:
         return db.query(Employee).filter(Employee.id == db_employee_id).first()
 
     @staticmethod
-    def _notification_body(payload: TeamMeetingCreateRequest) -> str:
+    def _clean_url(meeting_url: str | None) -> str | None:
+        value = (meeting_url or "").strip()
+        return value or None
+
+    @staticmethod
+    def _notification_body(payload: TeamMeetingCreateRequest, meeting_url: str | None = None) -> str:
         agenda = "; ".join(item for item in payload.agenda_items[:3] if item)
         agenda_text = f" Gundem: {agenda}." if agenda else ""
+        link_text = f" Katilim linki: {meeting_url}" if meeting_url else ""
         return (
             f"{payload.scheduled_date.isoformat()} {payload.scheduled_time.strftime('%H:%M')} icin "
-            f"{payload.duration_minutes} dakikalik toplanti planlandi.{agenda_text}"
+            f"{payload.duration_minutes} dakikalik toplanti planlandi.{agenda_text}{link_text}"
         )

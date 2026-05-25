@@ -12,6 +12,7 @@ class Meeting(BaseModel):
     scheduled_date = Column(Date, nullable=False)
     scheduled_time = Column(Time, nullable=False)
     duration_minutes = Column(Integer, nullable=False, default=45)
+    meeting_url = Column(String(1000), nullable=True)
     note = Column(Text, nullable=True)
     agenda_items = Column(JSON, nullable=False, default=list)
     source = Column(String(80), nullable=False, default="team_risk_analysis")

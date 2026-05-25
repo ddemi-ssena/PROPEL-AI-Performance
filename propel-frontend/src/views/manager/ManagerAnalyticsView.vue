@@ -2045,6 +2045,16 @@
             </div>
 
             <label class="block">
+              <span class="text-xs font-semibold text-slate-500">Toplanti Linki</span>
+              <input
+                v-model="meetingDraft.meetingUrl"
+                class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 shadow-sm"
+                placeholder="https://meet.google.com/..."
+                type="url"
+              />
+            </label>
+
+            <label class="block">
               <span class="text-xs font-semibold text-slate-500">Yoneticinin notu</span>
               <textarea
                 v-model="meetingDraft.note"
@@ -2267,6 +2277,7 @@ const meetingDraft = ref({
   date: '',
   time: '10:00',
   duration: '45',
+  meetingUrl: '',
   note: '',
 })
 const showRiskFilterMenu = ref(false)
@@ -3379,6 +3390,7 @@ function openTeamMeetingPlanner() {
     date: defaultMeetingDate(),
     time: '10:00',
     duration: team.high > 0 ? '60' : '45',
+    meetingUrl: '',
     note: selectedTeamProblemDescription.value,
   }
   showMeetingPlanner.value = true
@@ -3432,6 +3444,7 @@ async function confirmTeamMeetingDraft() {
       scheduled_date: meetingDraft.value.date,
       scheduled_time: meetingDraft.value.time,
       duration_minutes: Number(meetingDraft.value.duration),
+      meeting_url: meetingDraft.value.meetingUrl.trim() || null,
       note: meetingDraft.value.note,
       agenda_items: meetingAgendaItems.value,
       attendees: meetingAttendees.value.map((attendee) => ({
@@ -3445,6 +3458,7 @@ async function confirmTeamMeetingDraft() {
       ? ` ${response.unresolved_attendee_count} kisi dataset kaydi olarak saklandi.`
       : ''
     meetingPlanStatus.value = `Toplanti #${response.id} planlandi; ${response.notification_count} bildirim olusturuldu.${unresolved}`
+    if (response.meeting_url) meetingPlanStatus.value += ' Toplanti linki davetlere eklendi.'
   } catch (err: any) {
     meetingPlanStatus.value = err.response?.data?.detail || 'Toplanti planlanamadi.'
   } finally {
