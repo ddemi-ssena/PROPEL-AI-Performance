@@ -870,12 +870,17 @@ class SoftwareMLService:
             pulse_risk=pulse_source["risk_score"],
             feedback_risk=feedback_source["risk_score"],
             confidence_score=coverage.confidence_score,
+            kpi_available=bool(kpi_source["employee_count"]),
+            pulse_available=bool(pulse_source["employee_count"]),
+            feedback_available=bool(feedback_source["employee_count"]),
         )
         insights = SoftwareMLService._dashboard_insights(
             kpi_source=kpi_source,
             pulse_source=pulse_source,
             feedback_source=feedback_source,
             scores=scores,
+            coverage=coverage,
+            use_llm=use_llm,
         )
         team_breakdown = SoftwareMLService._dashboard_team_breakdown(
             employees=employees,
@@ -885,7 +890,16 @@ class SoftwareMLService:
             feedback_source=feedback_source,
         )
         actions = SoftwareMLService._dashboard_actions(insights, team_breakdown, scores)
-        ai_summary = SoftwareMLService._dashboard_ai_summary(insights, actions, scores)
+        ai_summary = SoftwareMLService._dashboard_ai_summary(
+            insights,
+            actions,
+            scores,
+            kpi_source=kpi_source,
+            pulse_source=pulse_source,
+            feedback_source=feedback_source,
+            coverage=coverage,
+            use_llm=use_llm,
+        )
 
         return SoftwareDepartmentDashboardResponse(
             status="success",
@@ -1074,8 +1088,8 @@ class SoftwareMLService:
         motivation = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.score for row in rows]))
         mte = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.mte_score for row in rows]))
         ars = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.ars_score for row in rows]))
-        score = motivation if motivation is not None else 50.0
-        risk_score = ars if ars is not None else (100 - score)
+        score = motivation if motivation is not None else 0.0
+        risk_score = ars if ars is not None else (100 - score if rows else 0.0)
 
         team_rows: dict[str, list[SurveyResponse]] = {}
         for row in rows:
@@ -1084,7 +1098,7 @@ class SoftwareMLService:
                 team_rows.setdefault(team, []).append(row)
         team_scores = {}
         for team, items in team_rows.items():
-            team_score = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.score for item in items])) or 50.0
+            team_score = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.score for item in items])) or 0.0
             team_ars = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.ars_score for item in items]))
             team_scores[team] = {
                 "score": team_score,
@@ -1133,7 +1147,7 @@ class SoftwareMLService:
         collaboration = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.collaboration_score for row in rows]))
         leadership = SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([row.leadership_support_score for row in rows]))
         score = SoftwareMLService._dashboard_avg([motivation, safety, collaboration, leadership])
-        score = score if score is not None else 50.0
+        score = score if score is not None else 0.0
         risk_values = [
             SoftwareMLService._dashboard_risk_level_score(row.burnout_risk)
             for row in rows
@@ -1144,7 +1158,7 @@ class SoftwareMLService:
             if row.flight_risk is not None
         ]
         risk_score = SoftwareMLService._dashboard_avg(risk_values)
-        risk_score = risk_score if risk_score is not None else 100 - score
+        risk_score = risk_score if risk_score is not None else (100 - score if rows else 0.0)
 
         high_burnout = sum(1 for row in rows if row.burnout_risk == RiskLevel.high)
         high_flight = sum(1 for row in rows if row.flight_risk == RiskLevel.high)
@@ -1159,7 +1173,7 @@ class SoftwareMLService:
                 SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.motivation_score for item in items])),
                 SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.psychological_safety_score for item in items])),
                 SoftwareMLService._dashboard_scale_score(SoftwareMLService._dashboard_avg([item.collaboration_score for item in items])),
-            ]) or 50.0
+            ]) or 0.0
             team_scores[team] = {
                 "score": team_score,
                 "risk": 100 - team_score,
@@ -1230,17 +1244,46 @@ class SoftwareMLService:
         pulse_risk: float,
         feedback_risk: float,
         confidence_score: float,
+        kpi_available: bool,
+        pulse_available: bool,
+        feedback_available: bool,
     ) -> DepartmentDashboardScoresResponse:
-        department_health = (kpi_score * 0.5) + (pulse_score * 0.25) + (feedback_score * 0.25)
-        people_health = (pulse_score + feedback_score) / 2
-        risk_score = (kpi_risk + pulse_risk + feedback_risk) / 3
+        base_weights = {
+            "kpiMl": 50.0 if kpi_available else 0.0,
+            "weeklyPulse": 25.0 if pulse_available else 0.0,
+            "feedback360": 25.0 if feedback_available else 0.0,
+        }
+        active_weight_total = sum(base_weights.values()) or 1.0
+        normalized_weights = {
+            key: round((value / active_weight_total) * 100, 1)
+            for key, value in base_weights.items()
+        }
+        department_health = (
+            (kpi_score * normalized_weights["kpiMl"])
+            + (pulse_score * normalized_weights["weeklyPulse"])
+            + (feedback_score * normalized_weights["feedback360"])
+        ) / 100
+
+        people_values = [
+            value
+            for value, available in [(pulse_score, pulse_available), (feedback_score, feedback_available)]
+            if available
+        ]
+        people_health = sum(people_values) / len(people_values) if people_values else 0.0
+
+        risk_values = [
+            value
+            for value, available in [(kpi_risk, kpi_available), (pulse_risk, pulse_available), (feedback_risk, feedback_available)]
+            if available
+        ]
+        risk_score = sum(risk_values) / len(risk_values) if risk_values else 0.0
         return DepartmentDashboardScoresResponse(
             department_health=SoftwareMLService._dashboard_clamp(department_health),
             execution_score=SoftwareMLService._dashboard_clamp(kpi_score),
             people_health_score=SoftwareMLService._dashboard_clamp(people_health),
             risk_score=SoftwareMLService._dashboard_clamp(risk_score),
             confidence_score=SoftwareMLService._dashboard_clamp(confidence_score),
-            weights={"kpiMl": 50, "weeklyPulse": 25, "feedback360": 25},
+            weights=normalized_weights,
         )
 
     @staticmethod
@@ -1250,47 +1293,105 @@ class SoftwareMLService:
         pulse_source: dict[str, Any],
         feedback_source: dict[str, Any],
         scores: DepartmentDashboardScoresResponse,
+        coverage: DepartmentDashboardCoverageResponse,
+        use_llm: bool = False,
     ) -> list[DepartmentDashboardInsightResponse]:
         insights: list[DepartmentDashboardInsightResponse] = []
         kpi = kpi_source["score"]
         pulse = pulse_source["score"]
         feedback = feedback_source["score"]
+        feedback_available = bool(feedback_source.get("details", {}).get("dataAvailable"))
+        common_evidence = SoftwareMLService._dashboard_common_evidence(
+            kpi_source=kpi_source,
+            pulse_source=pulse_source,
+            feedback_source=feedback_source,
+            scores=scores,
+            coverage=coverage,
+        )
 
         if kpi >= 80 and pulse < 65:
             insights.append(DepartmentDashboardInsightResponse(
                 type="performance_vs_health",
                 severity="warning",
                 title="Performans iyi, nabiz zayif",
-                description=f"KPI/ML skoru {kpi:.0f}/100 ama haftalik nabiz {pulse:.0f}/100. Ekip cikti uretirken yorgunluk sinyali veriyor olabilir.",
+                description=(
+                    f"KPI/ML skoru {kpi:.0f}/100 ile iyi seviyede, ancak haftalik nabiz {pulse:.0f}/100. "
+                    "Bu ayrisma ekip hedefleri tasirken motivasyon, stres veya baglilik tarafinda kirilganlik olabilecegini gosterir."
+                ),
                 recommendation="Kapasite, odak ve is yuku dengesi bu hafta takim liderleriyle gozden gecirilmeli.",
                 action="this_week",
+                evidence=common_evidence,
+                manager_interpretation="Cikti iyi gorunse bile insan sinyali zayifladiginda surdurulebilirlik riski artar.",
+                impact="Kisa vadede hedefler tutabilir; orta vadede burnout, kalite dususu veya teslim ritmi bozulmasi gorulebilir.",
+                follow_up_metrics=["Nabiz motivasyon trendi", "Stres seviyesi", "KPI/ML performans skoru"],
             ))
-        if feedback < 65 and kpi >= 70:
+        if feedback_available and feedback < 65 and kpi >= 70:
             insights.append(DepartmentDashboardInsightResponse(
                 type="trust_vs_execution",
                 severity="warning",
                 title="Cikti var, iliski kalitesi zayif",
-                description=f"360 skoru {feedback:.0f}/100 seviyesinde, KPI/ML skoru {kpi:.0f}/100. Is akisi yuruyor ama guven/is birligi sinyalleri takip edilmeli.",
+                description=(
+                    f"360 skoru {feedback:.0f}/100 seviyesinde, KPI/ML skoru {kpi:.0f}/100. "
+                    "Is akisi yuruyor fakat guven, is birligi veya destek sinyalleri ayni gucu gostermiyor."
+                ),
                 recommendation="Takim ici iletisim, code review ritmi ve destek ihtiyaci icin fasilite edilmis 1-on-1 planlanmali.",
                 action="this_week",
+                evidence=common_evidence,
+                manager_interpretation="Performans tek basina saglikli ekip dinamiğini garanti etmiyor; iliski kalitesi ayrica takip edilmeli.",
+                impact="Guven ve is birligi zayif kalirsa iyi KPI sonucu tekrar edilebilir olmaktan cikabilir.",
+                follow_up_metrics=["360 psikolojik guven", "360 is birligi", "KPI/ML hedef uyumu"],
             ))
         if scores.risk_score >= 60:
             insights.append(DepartmentDashboardInsightResponse(
                 type="risk_overlap",
                 severity="critical",
-                title="Birlesik risk seviyesi yuksek",
-                description=f"Birlesik risk skoru {scores.risk_score:.0f}/100. KPI, nabiz ve 360 kaynaklarindan gelen riskler birlikte izlenmeli.",
-                recommendation="Manager, HR ve teknik liderler ile 48 saat icinde risk degerlendirme toplantisi yapilmali.",
+                title="Birlesik risk yuksek: once KPI dususu, sonra insan sinyalleri dogrulanmali",
+                description=(
+                    f"Birlesik risk skoru {scores.risk_score:.0f}/100. KPI/ML performans {kpi:.0f}/100, "
+                    f"insan sagligi {scores.people_health_score:.0f}/100 ve veri guveni {scores.confidence_score:.0f}/100. "
+                    "Riskin ana kaynagi gercek kaynak kirilimlariyla birlikte okunmali."
+                ),
+                recommendation="48 saat icinde KPI dususunun takim/metrik kirilimi incelenmeli; nabiz ve 360 sinyalleriyle risk dogrulanmali.",
                 action="urgent",
+                evidence=common_evidence,
+                manager_interpretation=(
+                    "Bu tablo tek bir alarmdan cok, performans riski ile insan sinyallerinin birlikte ele alinmasi gereken "
+                    "bir yonetim durumu oldugunu gosterir."
+                ),
+                impact="Erken aksiyon alinmazsa dusuk performans, ekip yorgunlugu ve veri eksiginden kaynaklanan karar belirsizligi ayni anda buyuyebilir.",
+                follow_up_metrics=["KPI/ML performans skoru", "Nabiz stres seviyesi", "360 burnout sinyali", "Veri guveni"],
             ))
         if scores.confidence_score < 60:
             insights.append(DepartmentDashboardInsightResponse(
                 type="coverage_gap",
                 severity="info",
                 title="Veri kapsama orani dusuk",
-                description=f"Dashboard guven skoru {scores.confidence_score:.0f}/100. Bazi kaynaklarda yeterli yanit yok.",
+                description=(
+                    f"Dashboard guven skoru {scores.confidence_score:.0f}/100. "
+                    "Bazi kaynaklarda yeterli yanit olmadigi icin hibrit yorumun kanit seviyesi sinirli."
+                ),
                 recommendation="Nabiz ve 360 katilimi artirilarak hibrit skorun guvenilirligi yukseltilmeli.",
                 action="monitoring",
+                evidence=common_evidence,
+                manager_interpretation="Skor hesaplanabilir, fakat eksik kaynaklar nedeniyle kararlar daha temkinli alinmali.",
+                impact="Eksik kaynaklar tamamlanmadan riskin davranissal mi, operasyonel mi oldugu net ayrismayabilir.",
+                follow_up_metrics=["Veri guveni", "Nabiz kapsama", "360 NLP kapsama"],
+            ))
+        if not feedback_available:
+            insights.append(DepartmentDashboardInsightResponse(
+                type="feedback_blind_spot",
+                severity="warning" if scores.risk_score >= 50 else "info",
+                title="360 NLP verisi eksik: davranissal risk kor noktasi var",
+                description=(
+                    "360 feedback NLP analizi olmadigi icin psikolojik guven, is birligi, destek ihtiyaci ve burnout "
+                    "metin sinyalleri bu yorumda dogrulanamiyor."
+                ),
+                recommendation="Bu hafta 360 cevap kapsami artirilmali ve gelen metinler burnout/guven sinyalleri icin yeniden analiz edilmeli.",
+                action="this_week" if scores.risk_score >= 50 else "monitoring",
+                evidence=common_evidence,
+                manager_interpretation="Insan sagligi yorumu su anda daha cok nabiz verisine dayaniyor; 360 eksigi davranissal kok nedeni belirsiz birakir.",
+                impact="360 verisi gelmeden dusuk performansin iletisim, guven veya destek ihtiyaciyla iliskisi netlesmez.",
+                follow_up_metrics=["360 cevap sayisi", "360 psikolojik guven", "360 burnout riski"],
             ))
         if not insights:
             insights.append(DepartmentDashboardInsightResponse(
@@ -1300,8 +1401,239 @@ class SoftwareMLService:
                 description="KPI/ML, haftalik nabiz ve 360 sinyalleri arasinda kritik bir cakisma gorunmuyor.",
                 recommendation="Mevcut ritim korunup dusuk kapsama veya takim bazli sapmalar haftalik izlenmeli.",
                 action="monitoring",
+                evidence=common_evidence,
+                manager_interpretation="Mevcut veri kaynaklari birbirini bozacak kuvvetli bir celiski uretmiyor.",
+                impact="Bu durum izlemeyi birakmak anlamina gelmez; kapsama ve takim bazli sapmalar haftalik kontrol edilmeli.",
+                follow_up_metrics=["Departman sagligi", "Birlesik risk", "Veri guveni"],
             ))
+        if use_llm:
+            return SoftwareMLService._dashboard_llm_insights(
+                fallback=insights,
+                kpi_source=kpi_source,
+                pulse_source=pulse_source,
+                feedback_source=feedback_source,
+                scores=scores,
+                coverage=coverage,
+            )
         return insights
+
+    @staticmethod
+    def _dashboard_common_evidence(
+        *,
+        kpi_source: dict[str, Any],
+        pulse_source: dict[str, Any],
+        feedback_source: dict[str, Any],
+        scores: DepartmentDashboardScoresResponse,
+        coverage: DepartmentDashboardCoverageResponse,
+    ) -> list[str]:
+        feedback_available = bool(feedback_source.get("details", {}).get("dataAvailable"))
+        feedback_text = (
+            f"360: {feedback_source.get('score', 0):.0f}/100, {coverage.feedback_response_count} analiz"
+            if feedback_available
+            else "360: veri yok, davranissal/NLP sinyali skora katilamiyor"
+        )
+        return [
+            f"KPI/ML: {kpi_source.get('score', 0):.0f}/100, {coverage.kpi_employee_count} calisan",
+            f"Nabiz: {pulse_source.get('score', 0):.0f}/100, {coverage.pulse_response_count} cevap",
+            feedback_text,
+            f"Birlesik risk: {scores.risk_score:.0f}/100",
+            f"Veri guveni: {scores.confidence_score:.0f}/100",
+        ]
+
+    @staticmethod
+    def _dashboard_llm_insights(
+        *,
+        fallback: list[DepartmentDashboardInsightResponse],
+        kpi_source: dict[str, Any],
+        pulse_source: dict[str, Any],
+        feedback_source: dict[str, Any],
+        scores: DepartmentDashboardScoresResponse,
+        coverage: DepartmentDashboardCoverageResponse,
+    ) -> list[DepartmentDashboardInsightResponse]:
+        from app.services.software_narrative_service import SoftwareNarrativeService
+
+        prompt = SoftwareMLService._dashboard_insight_prompt(
+            fallback=fallback,
+            kpi_source=kpi_source,
+            pulse_source=pulse_source,
+            feedback_source=feedback_source,
+            scores=scores,
+            coverage=coverage,
+        )
+        raw_output, provider, model_name, errors = SoftwareNarrativeService._generate_llm_json(
+            prompt,
+            timeout_seconds=24,
+        )
+        sanitized = SoftwareMLService._sanitize_dashboard_llm_insights(
+            raw_output=raw_output,
+            provider=provider,
+            model_name=model_name,
+        )
+        if sanitized:
+            return sanitized
+
+        reason = (
+            f"LLM yaniti alinamadi veya beklenen JSON formatinda degildi ({'; '.join(errors)})."
+            if provider
+            else "LLM provider ayarli degil."
+        )
+        enriched: list[DepartmentDashboardInsightResponse] = []
+        for item in fallback:
+            item.source = "deterministic_llm_fallback"
+            item.fallback_used = True
+            item.impact = item.impact or reason
+            enriched.append(item)
+        return enriched
+
+    @staticmethod
+    def _dashboard_insight_prompt(
+        *,
+        fallback: list[DepartmentDashboardInsightResponse],
+        kpi_source: dict[str, Any],
+        pulse_source: dict[str, Any],
+        feedback_source: dict[str, Any],
+        scores: DepartmentDashboardScoresResponse,
+        coverage: DepartmentDashboardCoverageResponse,
+    ) -> str:
+        payload = {
+            "scores": {
+                "departmentHealth": scores.department_health,
+                "kpiMlPerformance": scores.execution_score,
+                "peopleHealth": scores.people_health_score,
+                "risk": scores.risk_score,
+                "confidence": scores.confidence_score,
+                "weights": scores.weights,
+            },
+            "coverage": {
+                "kpiEmployeeCount": coverage.kpi_employee_count,
+                "kpiPercentage": coverage.kpi_percentage,
+                "pulseResponseCount": coverage.pulse_response_count,
+                "pulseEmployeeCount": coverage.pulse_employee_count,
+                "pulsePercentage": coverage.pulse_percentage,
+                "feedbackResponseCount": coverage.feedback_response_count,
+                "feedbackEmployeeCount": coverage.feedback_employee_count,
+                "feedbackPercentage": coverage.feedback_percentage,
+            },
+            "sources": {
+                "kpiMl": {
+                    "score": kpi_source.get("score"),
+                    "risk": kpi_source.get("risk_score"),
+                    "metrics": kpi_source.get("metrics"),
+                    "details": kpi_source.get("details"),
+                },
+                "weeklyPulse": {
+                    "score": pulse_source.get("score"),
+                    "risk": pulse_source.get("risk_score"),
+                    "metrics": pulse_source.get("metrics"),
+                    "details": pulse_source.get("details"),
+                },
+                "feedback360": {
+                    "score": feedback_source.get("score"),
+                    "risk": feedback_source.get("risk_score"),
+                    "metrics": feedback_source.get("metrics"),
+                    "details": feedback_source.get("details"),
+                },
+            },
+            "ruleBasedSignals": [
+                {
+                    "type": item.type,
+                    "severity": item.severity,
+                    "title": item.title,
+                    "description": item.description,
+                    "evidence": item.evidence,
+                    "recommendation": item.recommendation,
+                }
+                for item in fallback
+            ],
+        }
+        return (
+            "Sen kidemli bir yazilim departmani yoneticisi, people analytics danismani ve organizasyon psikologusun.\n"
+            "Gorevin: KPI/ML, haftalik nabiz ve 360 feedback kaynaklarini birlikte yorumlayarak yonetici icin detayli hibrit icgoruler uretmek.\n"
+            "Kurallar:\n"
+            "- Sadece verilen PAYLOAD verisini kullan; yeni sayi, yeni metrik, yeni olay uydurma.\n"
+            "- Sayilari yuvarlama disinda degistirme.\n"
+            "- 360 verisi yoksa bunu acikca 'dogrulanamiyor' diye belirt; 360 sonucu varmis gibi yorumlama.\n"
+            "- Riskleri kisi suclayan dille degil, kapasite/surec/motivasyon/guven baglaminda yorumla.\n"
+            "- Her icgoru yoneticinin neden ilgilenmesi gerektigini ve hangi veriyle dogrulayacagini aciklasin.\n"
+            "- Aksiyonlar uygulanabilir olsun: kim, neye bakacak, hangi kaynakla dogrulayacak, ne zaman.\n"
+            "- Sadece gecerli JSON dondur.\n"
+            "JSON semasi: {"
+            '"insights": ['
+            '{"type": "string", "severity": "critical|warning|info|success", "title": "string", '
+            '"description": "string", "evidence": ["string"], "manager_interpretation": "string", '
+            '"impact": "string", "recommendation": "string", "action": "urgent|this_week|monitoring", '
+            '"follow_up_metrics": ["string"], "team": null}'
+            "]}\n"
+            "Icerik beklentisi:\n"
+            "- 1 ile 4 arasi icgoru uret.\n"
+            "- description: Ana durum ve nedeni, 2-3 cumle.\n"
+            "- evidence: Verilen sayilardan 3-5 madde.\n"
+            "- manager_interpretation: Yonetici bu sinyali nasil okumali, 1-2 cumle.\n"
+            "- impact: Aksiyon alinmazsa veya veri tamamlanmazsa etkisi ne olur, 1-2 cumle.\n"
+            "- recommendation: Somut ve zamanli aksiyon, 1 cumle.\n"
+            f"PAYLOAD:\n{json.dumps(payload, ensure_ascii=False)}"
+        )
+
+    @staticmethod
+    def _sanitize_dashboard_llm_insights(
+        *,
+        raw_output: str | None,
+        provider: str | None,
+        model_name: str | None,
+    ) -> list[DepartmentDashboardInsightResponse] | None:
+        from app.services.software_narrative_service import SoftwareNarrativeService
+
+        if not raw_output:
+            return None
+        text = raw_output.strip()
+        if text.startswith("```"):
+            text = text.strip("`")
+            if text.lower().startswith("json"):
+                text = text[4:].strip()
+        start = text.find("{")
+        end = text.rfind("}")
+        if start >= 0 and end > start:
+            text = text[start : end + 1]
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            return None
+        raw_insights = payload.get("insights")
+        if not isinstance(raw_insights, list):
+            return None
+
+        rows: list[DepartmentDashboardInsightResponse] = []
+        for raw_item in raw_insights[:4]:
+            if not isinstance(raw_item, dict):
+                continue
+            title = SoftwareNarrativeService._clean_text(raw_item.get("title"), 180)
+            description = SoftwareNarrativeService._clean_text(raw_item.get("description"), 900)
+            recommendation = SoftwareNarrativeService._clean_text(raw_item.get("recommendation"), 320)
+            if not title or not description or not recommendation:
+                continue
+            severity = str(raw_item.get("severity") or "info").lower()
+            if severity not in {"critical", "warning", "info", "success"}:
+                severity = "info"
+            action = str(raw_item.get("action") or "monitoring").lower()
+            if action not in {"urgent", "this_week", "monitoring"}:
+                action = "urgent" if severity == "critical" else "this_week" if severity == "warning" else "monitoring"
+            rows.append(DepartmentDashboardInsightResponse(
+                type=SoftwareNarrativeService._clean_text(raw_item.get("type"), 80) or "llm_hybrid_insight",
+                severity=severity,
+                title=title,
+                description=description,
+                recommendation=recommendation,
+                action=action,
+                team=SoftwareNarrativeService._clean_text(raw_item.get("team"), 80) or None,
+                evidence=SoftwareNarrativeService._sanitize_text_list(raw_item.get("evidence"), 5, 220),
+                manager_interpretation=SoftwareNarrativeService._clean_text(raw_item.get("manager_interpretation"), 520),
+                impact=SoftwareNarrativeService._clean_text(raw_item.get("impact"), 520),
+                follow_up_metrics=SoftwareNarrativeService._sanitize_text_list(raw_item.get("follow_up_metrics"), 5, 100),
+                source=provider or "llm",
+                model=model_name,
+                fallback_used=False,
+            ))
+        return rows or None
 
     @staticmethod
     def _dashboard_team_breakdown(
@@ -1355,9 +1687,13 @@ class SoftwareMLService:
         monitoring: list[DepartmentDashboardActionResponse] = []
 
         for insight in insights:
+            evidence_text = "; ".join(insight.evidence[:3]) if insight.evidence else insight.description
             action = DepartmentDashboardActionResponse(
                 title=insight.recommendation,
-                description=insight.description,
+                description=(
+                    f"Dayanak: {evidence_text}. "
+                    f"Yonetici yorumu: {insight.manager_interpretation or insight.description}"
+                ),
                 priority="P0" if insight.severity == "critical" else ("P1" if insight.severity == "warning" else "P2"),
                 due_date="48 saat" if insight.severity == "critical" else ("Bu hafta" if insight.severity == "warning" else "Haftalik"),
                 owner="Manager + HR" if insight.severity == "critical" else "Manager",
@@ -1371,10 +1707,27 @@ class SoftwareMLService:
                 monitoring.append(action)
 
         for team in team_breakdown[:3]:
-            if team.scores.get("health", 100) < 70:
+            health = float(team.scores.get("health", 100))
+            if health < 70:
+                kpi = float(team.scores.get("kpi", 0))
+                pulse = float(team.scores.get("pulse", 0))
+                feedback = float(team.scores.get("feedback", 0))
+                risk = float(team.scores.get("risk", 0))
+                weakest = min(
+                    [
+                        ("KPI/ML", kpi),
+                        ("Nabiz", pulse),
+                        ("360", feedback),
+                    ],
+                    key=lambda item: item[1],
+                )
                 monitoring.append(DepartmentDashboardActionResponse(
-                    title=f"{team.team} takim sagligini izle",
-                    description=f"{team.team} hibrit saglik skoru {team.scores.get('health')}/100.",
+                    title=f"{team.team} icin {weakest[0]} kaynakli saglik dususunu incele",
+                    description=(
+                        f"Dayanak: hibrit saglik {health:.1f}/100, KPI/ML {kpi:.1f}/100, "
+                        f"nabiz {pulse:.1f}/100, 360 {feedback:.1f}/100, risk {risk:.1f}/100. "
+                        f"En zayif kaynak {weakest[0]} oldugu icin takim lideriyle bu kirilim dogrulanmali."
+                    ),
                     priority="P2",
                     due_date="Haftalik",
                     owner="Team Lead",
@@ -1384,7 +1737,10 @@ class SoftwareMLService:
         if scores.confidence_score < 60:
             monitoring.append(DepartmentDashboardActionResponse(
                 title="Veri kapsamasini artir",
-                description="Nabiz ve 360 katilimi dusuk oldugunda hibrit yorumlarin guveni azalir.",
+                description=(
+                    f"Dayanak: veri guveni {scores.confidence_score:.1f}/100. "
+                    "Nabiz ve 360 katilimi dusuk oldugunda hibrit yorumlarin guveni azalir."
+                ),
                 priority="P2",
                 due_date="Bu hafta",
                 owner="Manager",
@@ -1402,6 +1758,34 @@ class SoftwareMLService:
         insights: list[DepartmentDashboardInsightResponse],
         actions: DepartmentDashboardActionsResponse,
         scores: DepartmentDashboardScoresResponse,
+        *,
+        kpi_source: dict[str, Any],
+        pulse_source: dict[str, Any],
+        feedback_source: dict[str, Any],
+        coverage: DepartmentDashboardCoverageResponse,
+        use_llm: bool = False,
+    ) -> DepartmentDashboardAISummaryResponse:
+        fallback = SoftwareMLService._dashboard_ai_summary_fallback(insights, actions, scores)
+        if not use_llm:
+            return fallback
+
+        llm_summary = SoftwareMLService._dashboard_llm_ai_summary(
+            fallback=fallback,
+            insights=insights,
+            actions=actions,
+            scores=scores,
+            kpi_source=kpi_source,
+            pulse_source=pulse_source,
+            feedback_source=feedback_source,
+            coverage=coverage,
+        )
+        return llm_summary or fallback
+
+    @staticmethod
+    def _dashboard_ai_summary_fallback(
+        insights: list[DepartmentDashboardInsightResponse],
+        actions: DepartmentDashboardActionsResponse,
+        scores: DepartmentDashboardScoresResponse,
     ) -> DepartmentDashboardAISummaryResponse:
         risk_titles = [item.title for item in insights if item.severity in {"critical", "warning"}]
         recommendations = [item.title for item in actions.urgent + actions.this_week][:5]
@@ -1411,11 +1795,12 @@ class SoftwareMLService:
         if scores.people_health_score >= 75:
             strengths.append("Insan sagligi kaynaklari dengeli gorunuyor.")
         if not strengths:
-            strengths.append("Hibrit veriler takip edilebilir bir baslangic resmi sunuyor.")
+            strengths.append("KPI/ML, nabiz ve 360 verileri birlikte okunabilir bir karar resmi sunuyor.")
         summary = (
             f"Departman saglik skoru {scores.department_health}/100. "
             f"Performans {scores.execution_score}/100, insan sagligi {scores.people_health_score}/100, "
-            f"birlesik risk {scores.risk_score}/100 ve veri guveni {scores.confidence_score}/100."
+            f"birlesik risk {scores.risk_score}/100 ve veri guveni {scores.confidence_score}/100. "
+            "Bu ozet kural bazli fallback olarak uretilmistir; LLM kullanilamazsa yoneticiye temel risk resmini verir."
         )
         return DepartmentDashboardAISummaryResponse(
             summary=summary,
@@ -1423,6 +1808,183 @@ class SoftwareMLService:
             risks=risk_titles,
             recommendations=recommendations,
             source="deterministic",
+            fallback_used=True,
+        )
+
+    @staticmethod
+    def _dashboard_llm_ai_summary(
+        *,
+        fallback: DepartmentDashboardAISummaryResponse,
+        insights: list[DepartmentDashboardInsightResponse],
+        actions: DepartmentDashboardActionsResponse,
+        scores: DepartmentDashboardScoresResponse,
+        kpi_source: dict[str, Any],
+        pulse_source: dict[str, Any],
+        feedback_source: dict[str, Any],
+        coverage: DepartmentDashboardCoverageResponse,
+    ) -> DepartmentDashboardAISummaryResponse | None:
+        from app.services.software_narrative_service import SoftwareNarrativeService
+
+        prompt = SoftwareMLService._dashboard_ai_summary_prompt(
+            insights=insights,
+            actions=actions,
+            scores=scores,
+            kpi_source=kpi_source,
+            pulse_source=pulse_source,
+            feedback_source=feedback_source,
+            coverage=coverage,
+        )
+        raw_output, provider, model_name, errors = SoftwareNarrativeService._generate_llm_json(
+            prompt,
+            timeout_seconds=24,
+        )
+        summary = SoftwareMLService._sanitize_dashboard_ai_summary(
+            raw_output=raw_output,
+            provider=provider,
+            model_name=model_name,
+        )
+        if summary:
+            return summary
+
+        enriched = fallback.model_copy()
+        enriched.source = "deterministic_llm_fallback"
+        enriched.model = model_name
+        enriched.fallback_used = True
+        reason = (
+            f"LLM ozeti alinamadi veya beklenen JSON formatinda degildi ({'; '.join(errors)})."
+            if provider
+            else "LLM provider ayarli degil."
+        )
+        enriched.recommendations = [*enriched.recommendations[:4], reason][:5]
+        return enriched
+
+    @staticmethod
+    def _dashboard_ai_summary_prompt(
+        *,
+        insights: list[DepartmentDashboardInsightResponse],
+        actions: DepartmentDashboardActionsResponse,
+        scores: DepartmentDashboardScoresResponse,
+        kpi_source: dict[str, Any],
+        pulse_source: dict[str, Any],
+        feedback_source: dict[str, Any],
+        coverage: DepartmentDashboardCoverageResponse,
+    ) -> str:
+        payload = {
+            "scores": {
+                "departmentHealth": scores.department_health,
+                "kpiMlPerformance": scores.execution_score,
+                "peopleHealth": scores.people_health_score,
+                "risk": scores.risk_score,
+                "confidence": scores.confidence_score,
+                "weights": scores.weights,
+            },
+            "coverage": {
+                "kpiEmployeeCount": coverage.kpi_employee_count,
+                "kpiPercentage": coverage.kpi_percentage,
+                "pulseResponseCount": coverage.pulse_response_count,
+                "pulseEmployeeCount": coverage.pulse_employee_count,
+                "pulsePercentage": coverage.pulse_percentage,
+                "feedbackResponseCount": coverage.feedback_response_count,
+                "feedbackEmployeeCount": coverage.feedback_employee_count,
+                "feedbackPercentage": coverage.feedback_percentage,
+            },
+            "sources": {
+                "kpiMl": {
+                    "score": kpi_source.get("score"),
+                    "risk": kpi_source.get("risk_score"),
+                    "metrics": kpi_source.get("metrics"),
+                    "details": kpi_source.get("details"),
+                },
+                "weeklyPulse": {
+                    "score": pulse_source.get("score"),
+                    "risk": pulse_source.get("risk_score"),
+                    "metrics": pulse_source.get("metrics"),
+                    "details": pulse_source.get("details"),
+                },
+                "feedback360": {
+                    "score": feedback_source.get("score"),
+                    "risk": feedback_source.get("risk_score"),
+                    "metrics": feedback_source.get("metrics"),
+                    "details": feedback_source.get("details"),
+                },
+            },
+            "hybridInsights": [
+                {
+                    "type": item.type,
+                    "severity": item.severity,
+                    "title": item.title,
+                    "description": item.description,
+                    "evidence": item.evidence,
+                    "managerInterpretation": item.manager_interpretation,
+                    "impact": item.impact,
+                    "recommendation": item.recommendation,
+                    "followUpMetrics": item.follow_up_metrics,
+                }
+                for item in insights[:4]
+            ],
+            "actions": {
+                "urgent": [item.model_dump() for item in actions.urgent[:3]],
+                "thisWeek": [item.model_dump() for item in actions.this_week[:3]],
+                "monitoring": [item.model_dump() for item in actions.monitoring[:3]],
+            },
+        }
+        return (
+            "Sen kidemli bir yazilim departmani direktoru, people analytics uzmani ve organizasyon psikologusun.\n"
+            "Gorevin: Hibrit dashboard verilerini yoneticiye okunabilir tek bir AI ozet raporu olarak yorumlamak.\n"
+            "Kurallar:\n"
+            "- Sadece PAYLOAD icindeki gercek sayilari ve sinyalleri kullan; yeni sayi, yeni metrik, yeni olay uydurma.\n"
+            "- 360 verisi yoksa psikolojik guven/is birligi/burnout tarafinin dogrulanamadigini acikca soyle.\n"
+            "- Summary 4-6 cumle olsun: once genel durum, sonra ana risk kaynagi, sonra insan/kultur sinyali, sonra veri guveni ve karar odaği.\n"
+            "- Strengths bolumu 'olumlu' diye zorlama yapmasin; veri guveni, takip edilebilirlik veya eldeki kanit gucu gibi gercek guclu noktalar olabilir.\n"
+            "- Risks bolumu sadece baslik listesi degil, 1-2 cumlelik risk aciklamalari olsun.\n"
+            "- Recommendations bolumu somut, sirali ve yonetici aksiyonuna uygun olsun.\n"
+            "- Kisileri suclayan dil kullanma; kapasite, surec, motivasyon, guven ve destek baglaminda yaz.\n"
+            "- Sadece gecerli JSON dondur.\n"
+            "JSON semasi: {"
+            '"summary": "string", '
+            '"strengths": ["string"], '
+            '"risks": ["string"], '
+            '"recommendations": ["string"]'
+            "}\n"
+            f"PAYLOAD:\n{json.dumps(payload, ensure_ascii=False)}"
+        )
+
+    @staticmethod
+    def _sanitize_dashboard_ai_summary(
+        *,
+        raw_output: str | None,
+        provider: str | None,
+        model_name: str | None,
+    ) -> DepartmentDashboardAISummaryResponse | None:
+        from app.services.software_narrative_service import SoftwareNarrativeService
+
+        if not raw_output:
+            return None
+        text = raw_output.strip()
+        if text.startswith("```"):
+            text = text.strip("`")
+            if text.lower().startswith("json"):
+                text = text[4:].strip()
+        start = text.find("{")
+        end = text.rfind("}")
+        if start >= 0 and end > start:
+            text = text[start : end + 1]
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            return None
+
+        summary = SoftwareNarrativeService._clean_text(payload.get("summary"), 1400)
+        if not summary:
+            return None
+        return DepartmentDashboardAISummaryResponse(
+            summary=summary,
+            strengths=SoftwareNarrativeService._sanitize_text_list(payload.get("strengths"), 4, 360),
+            risks=SoftwareNarrativeService._sanitize_text_list(payload.get("risks"), 4, 420),
+            recommendations=SoftwareNarrativeService._sanitize_text_list(payload.get("recommendations"), 5, 420),
+            source=provider or "llm",
+            model=model_name,
+            fallback_used=False,
         )
 
     @staticmethod

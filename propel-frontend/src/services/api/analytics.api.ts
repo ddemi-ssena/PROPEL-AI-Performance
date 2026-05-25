@@ -329,6 +329,13 @@ export interface DepartmentDashboardInsightResponse {
   recommendation: string
   action: string
   team?: string | null
+  evidence: string[]
+  manager_interpretation?: string | null
+  impact?: string | null
+  follow_up_metrics: string[]
+  source: string
+  model?: string | null
+  fallback_used: boolean
 }
 
 export interface DepartmentDashboardTeamResponse {
@@ -361,6 +368,8 @@ export interface DepartmentDashboardAISummaryResponse {
   risks: string[]
   recommendations: string[]
   source: string
+  model?: string | null
+  fallback_used: boolean
 }
 
 export interface SoftwareDepartmentDashboardResponse {
