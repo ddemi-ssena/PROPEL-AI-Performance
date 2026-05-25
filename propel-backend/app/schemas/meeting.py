@@ -17,6 +17,7 @@ class TeamMeetingCreateRequest(BaseModel):
     scheduled_date: date
     scheduled_time: time
     duration_minutes: int = Field(45, ge=15, le=180)
+    meeting_url: Optional[str] = Field(None, max_length=1000)
     note: Optional[str] = None
     agenda_items: list[str] = []
     attendees: list[MeetingAttendeeRequest] = []
@@ -70,6 +71,7 @@ class TeamMeetingCreateResponse(BaseModel):
     scheduled_date: date
     scheduled_time: time
     duration_minutes: int
+    meeting_url: Optional[str] = None
     note: Optional[str] = None
     agenda_items: list[str]
     attendee_count: int

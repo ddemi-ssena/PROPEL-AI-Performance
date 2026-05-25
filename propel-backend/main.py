@@ -9,6 +9,7 @@ from app.db.models import Base
 from app.db.session import engine
 from app.db.vector_support import (
     ensure_employee_profile_columns,
+    ensure_meeting_columns,
     ensure_pgvector_support,
     ensure_weekly_pulse_columns,
 )
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
     print("Starting API... Creating tables...")
     Base.metadata.create_all(bind=engine)
     ensure_employee_profile_columns(engine)
+    ensure_meeting_columns(engine)
     ensure_weekly_pulse_columns(engine)
     ensure_pgvector_support(engine)
     yield

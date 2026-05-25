@@ -73,3 +73,53 @@ class EmployeeSimple(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class TeamHealthStat(BaseModel):
+    key: str
+    label: str
+    value: str
+    hint: str
+    tone: str
+
+
+class TeamHealthSourceSummary(BaseModel):
+    kpi_analyzed_count: int = 0
+    pulse_response_count: int = 0
+    feedback_profile_count: int = 0
+    latest_kpi_period: Optional[date] = None
+    latest_pulse_period: Optional[date] = None
+    latest_feedback_update: Optional[datetime] = None
+
+
+class TeamHealthMember(BaseModel):
+    id: int
+    name: str
+    role: str
+    team: Optional[str] = None
+    external_employee_code: Optional[str] = None
+    latest_pulse_score: Optional[float] = None
+    latest_mte: Optional[float] = None
+    latest_ars: Optional[float] = None
+    kpi_score: Optional[float] = None
+    kpi_trend: Optional[float] = None
+    kpi_latest_period: Optional[date] = None
+    feedback_count: int = 0
+    feedback_sentiment_score: Optional[float] = None
+    feedback_motivation_score: Optional[float] = None
+    feedback_flight_risk_level: Optional[str] = None
+    feedback_burnout_risk_level: Optional[str] = None
+    combined_risk_score: float
+    combined_risk_level: str
+    recommended_action: str
+    data_sources: list[str] = []
+
+
+class TeamHealthResponse(BaseModel):
+    generated_at: datetime
+    department_id: Optional[int] = None
+    department_name: Optional[str] = None
+    member_count: int
+    stats: list[TeamHealthStat]
+    source_summary: TeamHealthSourceSummary
+    members: list[TeamHealthMember]

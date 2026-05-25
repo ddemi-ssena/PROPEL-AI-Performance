@@ -13,6 +13,7 @@ export interface TeamMeetingCreatePayload {
   scheduled_date: string
   scheduled_time: string
   duration_minutes: number
+  meeting_url?: string | null
   note?: string | null
   agenda_items: string[]
   attendees: MeetingAttendeePayload[]
@@ -22,6 +23,10 @@ export interface TeamMeetingCreateResponse {
   id: number
   team: string
   title: string
+  scheduled_date: string
+  scheduled_time: string
+  duration_minutes: number
+  meeting_url?: string | null
   attendee_count: number
   notification_count: number
   unresolved_attendee_count: number

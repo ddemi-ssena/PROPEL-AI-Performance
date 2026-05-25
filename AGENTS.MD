@@ -1558,3 +1558,134 @@ docker exec propel_backend python seed_data.py
 ## Sonraki Adim
 
 - Aksiyonlar ileride kalici task modeline baglanabilir; checkbox state'i backendde saklanabilir ve aksiyon tamamlanma durumu yonetici bazli takip edilebilir.
+
+## 2026-05-25 Sidebar Sticky Layout Duzeltmesi
+
+- Kullanici uzun dashboard sayfasinda asagi inerken sidebar yazilarinin kayboldugunu ve her zaman gorunur kalmasinin daha iyi olacagini belirtti.
+- `AppLayout.vue` layout yapisi guncellendi:
+  - Dis kapsayici `min-h-screen` yerine `h-screen overflow-hidden` oldu.
+  - Sidebar `sticky top-0 h-screen shrink-0` olarak sabitlendi.
+  - Main icerik alani `h-screen overflow-y-auto` yapildi.
+- Bu yapiyla sidebar viewport boyunca sabit kaliyor; sayfa icerigi kendi alaninda scroll ediyor.
+- Sidebar icindeki nav zaten `overflow-y-auto` oldugu icin menu fazla uzarsa sidebar kendi icinde kayabiliyor.
+- Dogrulama:
+  - Degisiklik oncesi `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` ve `npm.cmd run build-only` basarili.
+  - Frontend `docker compose restart frontend` ile yeniden baslatildi.
+  - `http://localhost:5173/manager` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Mobil icin mevcut `md:hidden` davranisi korunuyor; gerekirse ayrica mobil drawer/sidebar tasarimi ele alinabilir.
+
+## 2026-05-25 Demo 360 Feedback Seed Verisi
+
+- Kullanici 360 derece geri bildirim verileri eksik oldugu icin yazilim departmani icin sorulara uygun sahte/demo 360 verisi olusturmanin mantikli olup olmadigini sordu ve onay verdi.
+- Yaklasim:
+  - Dashboard skorlarina direkt veri basilmadi.
+  - Mevcut `feedback_responses` ve `feedback_nlp_analyses` pipeline'i kullanildi.
+  - Veriler `model_provider=synthetic_seed`, `model_name=demo-360-software-v1` ile demo/synthetic olarak isaretlendi.
+- Yeni script eklendi:
+  - `propel-backend/scripts/seed_demo_360_feedback.py`
+- Script davranisi:
+  - Yazilim departmanini ve mevcut calisanlari DB'den bulur.
+  - Mevcut hafta icin 360 sorusu yoksa department + direction bazli soru olusturur.
+  - Her calisan icin en fazla 3 incoming feedback planlar.
+  - Ayni takim, capraz takim ve manager/upward kombinasyonlariyla 360 iliski agi kurar.
+  - Takim bazli sinyal cesitlendirir:
+    - Backend/QA daha fazla risk ve gelisim sinyali
+    - Frontend/DevOps daha dengeli pozitif-gelisim sinyali
+    - Yonetim icin karar netligi/destek sinyali
+  - Cevaplar soru odagina uygun olarak somut durum + davranis + etki + destek/risk onerisi icerecek sekilde uretilir.
+  - NLP analizi `AIService._fallback_weekly_analysis` ve `NLPService.save_weekly_analysis` ile kaydedilir.
+  - Haftalik profil ve aylik rozet refresh islemleri calistirilir.
+  - Tekrar calistirilabilir; default olarak once eski `synthetic_seed` kayitlarini temizler.
+- Calistirma:
+  - `docker exec propel_backend python scripts/seed_demo_360_feedback.py --dry-run`
+  - `docker exec propel_backend python scripts/seed_demo_360_feedback.py`
+- Sonuc:
+  - 31 yazilim calisani bulundu.
+  - 92 yeni demo feedback/NLP kaydi olusturuldu.
+- Dashboard smoke test sonucu:
+  - 360 feedback cevap sayisi: 92
+  - 360 kapsanan calisan: 31
+  - 360 kapsama: %100
+  - 360 skoru: 69.0/100
+  - Departman sagligi: 47.9/100
+  - Insan sagligi: 67.7/100
+  - Birlesik risk: 53.7/100
+  - Agirliklar yeniden KPI/ML %50, Nabiz %25, 360 %25 olarak aktif hale geldi.
+- Dogrulama:
+  - Script `py_compile` basarili.
+  - Container icinde dry-run basarili.
+  - Container icinde gercek seed basarili.
+  - Dashboard endpoint smoke testi basarili.
+
+## Sonraki Adim
+
+- Demo 360 verileri UI'da gercek veri gibi algilanmasin istenirse, 360 kaynak detayinda `synthetic_seed` kayitlari icin kucuk bir `Demo veri` etiketi gosterilebilir.
+
+## 2026-05-25 Ekibim Sayfasi Gercek Veri ve Risk Toplantisi
+
+- Kullanici `Ekibim` sayfasinda hardcoded degerler olup olmadigini, KPI + 360 feedback + nabiz anketi birlesik gercek sonuclarinin gorunmesini ve calismayan butonlarin backend'e baglanmasini istedi.
+- Tespit:
+  - `TeamManagement.vue` ust kartlarinda `Aktif Sprintler=3`, `Devam Eden Gorevler=12`, `Velocity=42 pts` hardcoded idi.
+  - Tablo sadece `/employees/` endpoint'inden gelen son nabiz alanlarini kullaniyordu; KPI ve 360 NLP profili bu sayfada yoktu.
+  - Arama input'u state'e bagli degildi, filtre butonu islevsizdi, satir aksiyon butonu islevsizdi.
+  - `Gorev Atama` butonu backend'e bagli degildi.
+- Backend:
+  - `GET /api/v1/employees/team-health` endpoint'i eklendi.
+  - Endpoint manager/admin yetkisiyle calisir; manager icin kendi departmanini scope eder.
+  - KPI sinyali `AnalyticsService.get_performance_summary`, nabiz sinyali son `weekly_pulse`, 360 sinyali son weekly `EmployeeNLPProfile` kaydindan alinip tek kontratta birlestiriliyor.
+  - Her calisan icin `kpi_score`, `kpi_trend`, `latest_pulse_score`, `latest_mte`, `latest_ars`, `feedback_count`, 360 risk seviyeleri, `combined_risk_score`, `combined_risk_level`, `recommended_action` ve `data_sources` donuyor.
+  - Ust kartlar artik KPI kapsami, nabiz ortalamasi, 360 profil kapsami, risk toplantisi adayi ve veri guveni olarak gercek kaynaktan hesaplanir.
+- Frontend:
+  - `employeeApi.getTeamHealth()` eklendi.
+  - `TeamManagement.vue` yeni team-health kontratina baglandi.
+  - Hardcoded sprint/gorev/velocity kartlari kaldirildi.
+  - Tablo kolonlari KPI, Nabiz, 360 Profil ve Birlesik Risk olacak sekilde yenilendi.
+  - Arama ve risk filtresi calisir hale geldi.
+  - Satir aksiyonlari eklendi: calisan analizine gitme ve tek calisan icin toplantı planlama.
+  - `Gorev Atama` yerine `Risk Toplantisi Planla` butonu geldi; riskli calisanlari secili getiriyor, tarih/saat/sure/not/katilimci modalindan `/meetings/team-risk` endpoint'ine kaydediyor.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `py_compile` ve `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calisti.
+  - `GET /employees/team-health` smoke testinde 31 uye, KPI 30/31, nabiz 30/31, 360 profil 31/31 ve veri guveni %98 dondu.
+  - `POST /meetings/team-risk` smoke testi basarili; meeting id 7, attendee id 40, notification id 43 olustu.
+  - Browser ile `/manager/team` yenilendi; yeni kartlar, KPI/Nabiz/360 tablo kolonlari ve `Risk Toplantisi Planla` modalinin acildigi dogrulandi.
+
+## Sonraki Adim
+
+- Risk esikleri demo veride tum calisanlari orta riske cekiyor; gercek uretim kalibrasyonu icin KPI/ARS/360 agirliklari ve `medium/high` esikleri ekiple birlikte netlestirilebilir.
+
+## 2026-05-25 Toplanti Daveti ve Meet Linki
+
+- Kullanici `Davet olusturuldu` mesajinin gercek kayit olusturup olusturmadigini ve toplantilar icin dogrudan Meet linki gonderilip gonderilemeyecegini sordu.
+- Canli DB kontrolu:
+  - Son toplanti kaydi gercekten olusmustu: `meeting id=9`.
+  - 24 katilimci ve 24 `meeting_invite` bildirimi vardi.
+  - Eski bildirimlerde tarih/saat/gundem vardi fakat toplanti linki yoktu.
+- Tasarim karari:
+  - Google Meet linkini otomatik uretmek Google Calendar/OAuth entegrasyonu gerektirir.
+  - Ilk guvenli surumde yonetici Meet/Teams/Zoom linkini modalda yapistirir; sistem linki toplantida saklar ve davet metnine ekler.
+  - Toplantiyi kuran yoneticiye de ayrica `meeting_organizer` bildirimi olusturulur; boylece calisanlar ve yonetici ayni linke bildirimden ulasir.
+- Backend:
+  - `Meeting.meeting_url` alani eklendi.
+  - `TeamMeetingCreateRequest` ve `TeamMeetingCreateResponse` icine `meeting_url` eklendi.
+  - `ensure_meeting_columns` ile mevcut PostgreSQL DB'ye `meetings.meeting_url` kolonu otomatik eklenir.
+  - `MeetingService` linki temizleyip kaydeder, katilimci bildirimlerine `Katilim linki: ...` ekler ve yoneticiye `meeting_organizer` bildirimi yaratir.
+- Frontend:
+  - `meetings.api.ts` payload/response tiplerine `meeting_url` eklendi.
+  - `TeamManagement.vue` toplantı modalina `Toplantı Linki` input'u eklendi; link varsa davetlere gider.
+  - `ManagerAnalyticsView.vue` takim toplantisi modalina ayni link alani eklendi.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi `py_compile` ve `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calisti.
+  - Linkli smoke test basarili: `meeting id=10`, calisan bildirimi `id=98`, yonetici organizer bildirimi `id=99`.
+  - Bildirim govdesinde `https://meet.google.com/abc-defg-hij` linki hem calisana hem yoneticiye eklendi.
+
+## Sonraki Adim
+
+- Ileride Google Calendar entegrasyonu istenirse OAuth + calendar event create akisi eklenerek Meet linki sistem tarafindan otomatik uretilebilir; mevcut surum link yapistirma ve uygulama ici bildirim dagitimini destekler.

@@ -5,7 +5,7 @@ from typing import List
 from app.db.session import get_db
 from app.db.models.user import User, UserRole
 from app.db.models.employee import Employee
-from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeResponse
+from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeResponse, TeamHealthResponse
 from app.services.employee_service import EmployeeService
 from app.api.dependencies import get_current_user, get_current_active_admin, get_current_manager_or_admin
 
@@ -51,6 +51,17 @@ def list_employees(
     
     # ✅ Employee ise sadece kendisini göster
     return [employee]
+
+@router.get("/team-health", response_model=TeamHealthResponse)
+def get_team_health(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_manager_or_admin),
+):
+    """
+    Manager ekibim ekrani icin KPI, 360 feedback NLP ve haftalik nabiz
+    sinyallerini tek bir gercek veri kontratinda birlestirir.
+    """
+    return EmployeeService.get_team_health(db=db, current_user=current_user)
 
 @router.get("/{emp_id}", response_model=EmployeeResponse)
 def get_employee(
