@@ -14,7 +14,7 @@
           v-model="selectedDepartmentId"
           class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
         >
-          <option :value="null">TÃ¼m Departmanlar</option>
+          <option :value="null">Tüm Departmanlar</option>
           <option v-for="dept in departments" :key="dept.id" :value="dept.id">
             {{ dept.name }}
           </option>
@@ -24,13 +24,13 @@
           v-model="selectedTeam"
           class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
         >
-          <option value="all">TÃ¼m TakÄ±mlar</option>
+          <option value="all">Tüm Takımlar</option>
           <option v-for="team in teamOptions" :key="team" :value="team">
             {{ team }}
           </option>
         </select>
         <div class="rounded-full border border-indigo-100 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700">
-          {{ filteredTeamMembers.length }} Ã§alÄ±ÅŸan listeleniyor
+          {{ filteredTeamMembers.length }} çalışan listeleniyor
         </div>
       </div>
     </div>
@@ -40,7 +40,7 @@
       <aside class="xl:sticky xl:top-24 h-fit max-h-[calc(100vh-120px)] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div class="border-b border-slate-100 px-5 py-4 bg-slate-50/50">
           <div class="flex items-center justify-between mb-3">
-             <h3 class="text-lg font-bold text-slate-900">Ã‡alÄ±ÅŸan SeÃ§imi</h3>
+             <h3 class="text-lg font-bold text-slate-900">Çalışan Seçimi</h3>
              <UsersIcon class="w-5 h-5 text-slate-400" />
           </div>
           <!-- Search Bar -->
@@ -49,7 +49,7 @@
             <input 
               v-model="searchQuery"
               type="text" 
-              placeholder="Ä°sim veya pozisyon ara..." 
+              placeholder="İsim veya pozisyon ara..." 
               class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
             />
           </div>
@@ -75,7 +75,7 @@
                   <p class="font-bold text-slate-900 truncate">{{ employee.user.full_name }}</p>
                 </div>
                 <div class="mt-1 flex flex-col gap-1">
-                  <span class="text-xs text-slate-500 truncate font-medium">{{ employee.position || 'Ã‡alÄ±ÅŸan' }}</span>
+                  <span class="text-xs text-slate-500 truncate font-medium">{{ employee.position || 'Çalışan' }}</span>
                   <div class="flex flex-wrap gap-1.5 mt-1">
                     <span
                       v-if="employee.team"
@@ -116,8 +116,8 @@
           <div class="bg-slate-50 rounded-2xl p-4 mb-4 inline-block">
             <UsersIcon class="w-8 h-8 text-slate-300" />
           </div>
-          <p class="text-sm font-medium text-slate-900">Ã‡alÄ±ÅŸan BulunamadÄ±</p>
-          <p class="text-xs text-slate-500 mt-1">Arama kriterlerini deÄŸiÅŸtirmeyi deneyin.</p>
+          <p class="text-sm font-medium text-slate-900">Çalışan Bulunamadı</p>
+          <p class="text-xs text-slate-500 mt-1">Arama kriterlerini değiştirmeyi deneyin.</p>
         </div>
       </aside>
 
@@ -144,17 +144,17 @@
                     <div class="mt-2 flex flex-wrap items-center gap-4 text-slate-500 font-medium">
                       <span class="flex items-center gap-1.5">
                         <BriefcaseIcon class="w-4 h-4" />
-                        {{ selectedEmployeeReport.position || 'Ã‡alÄ±ÅŸan' }}
+                        {{ selectedEmployeeReport.position || 'Çalışan' }}
                       </span>
                       <span class="w-1 h-1 bg-slate-300 rounded-full"></span>
                       <span class="flex items-center gap-1.5">
                         <BuildingOfficeIcon class="w-4 h-4" />
-                        {{ selectedEmployeeReport.department_name || 'Departman AtanmadÄ±' }}
+                        {{ selectedEmployeeReport.department_name || 'Departman Atanmadı' }}
                       </span>
                       <span v-if="selectedEmployeeReport.team" class="w-1 h-1 bg-slate-300 rounded-full"></span>
                       <span v-if="selectedEmployeeReport.team" class="flex items-center gap-1.5">
                         <UserGroupIcon class="w-4 h-4" />
-                        {{ selectedEmployeeReport.team }} TakÄ±mÄ±
+                        {{ selectedEmployeeReport.team }} Takımı
                       </span>
                     </div>
                  </div>
@@ -165,7 +165,7 @@
                     PDF Raporu
                  </button>
                  <button class="px-5 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20">
-                    Feedback Ä°ste
+                    Feedback İste
                  </button>
               </div>
             </div>
@@ -177,7 +177,7 @@
                    <div class="p-1.5 bg-indigo-600 rounded-lg">
                       <DocumentTextIcon class="w-4 h-4 text-white" />
                    </div>
-                   <h4 class="text-sm font-bold text-slate-900 uppercase tracking-wider">HaftalÄ±k YÃ¶netici Ã–zeti</h4>
+                   <h4 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Haftalık Yönetici Özeti</h4>
                 </div>
                 <p class="text-slate-700 leading-relaxed text-sm md:text-base">
                   {{ renderText(selectedEmployeeReport.report_summary) }}
@@ -186,11 +186,11 @@
                 <div v-if="qualityWarningSection || biasWarningSection" class="mt-6 flex flex-wrap gap-4">
                   <div v-if="qualityWarningSection" class="flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-2 rounded-xl border border-amber-100 text-xs font-bold">
                     <ExclamationTriangleIcon class="w-4 h-4" />
-                    <span>Veri Kalitesi UyarÄ±sÄ±: {{ qualityWarningSection.items.join(', ') }}</span>
+                    <span>Veri Kalitesi Uyarısı: {{ qualityWarningSection.items.join(', ') }}</span>
                   </div>
                   <div v-if="biasWarningSection" class="flex items-center gap-2 bg-rose-50 text-rose-700 px-3 py-2 rounded-xl border border-rose-100 text-xs font-bold">
                     <HandRaisedIcon class="w-4 h-4" />
-                    <span>Bias ÅÃ¼phesi: {{ biasWarningSection.items.join(', ') }}</span>
+                    <span>Bias Şüphesi: {{ biasWarningSection.items.join(', ') }}</span>
                   </div>
                 </div>
               </div>
@@ -198,7 +198,7 @@
               <!-- Mini Stats Sidebar in Profile -->
               <div class="space-y-4">
                 <div v-if="selectedEmployeeReport.badges?.length" class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">KazanÄ±lan Rozetler</p>
+                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Kazanılan Rozetler</p>
                    <div class="flex flex-wrap gap-3">
                       <div v-for="badge in selectedEmployeeReport.badges" :key="`badge-big-${badge.id}`">
                         <BadgeMedal
@@ -221,8 +221,8 @@
             <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
               <div class="flex items-center justify-between gap-4 mb-8">
                 <div>
-                  <h4 class="text-xl font-bold text-slate-900">AylÄ±k Derin Analiz</h4>
-                  <p class="text-sm text-slate-500 mt-1">NLP tabanlÄ± duygu ve trend analizi</p>
+                  <h4 class="text-xl font-bold text-slate-900">Aylık Derin Analiz</h4>
+                  <p class="text-sm text-slate-500 mt-1">NLP tabanlı duygu ve trend analizi</p>
                 </div>
                 <div class="flex gap-2">
                   <select v-model="selectedMonth" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
@@ -249,7 +249,7 @@
                   </div>
                   <div class="bg-slate-50 rounded-2xl p-5 border border-slate-100 flex flex-col items-center text-center">
                     <div class="p-2 bg-rose-100 rounded-xl mb-3"><ExclamationCircleIcon class="w-5 h-5 text-rose-600" /></div>
-                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">AyrÄ±lma Riski</p>
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Ayrılma Riski</p>
                     <p class="mt-2 text-2xl font-bold text-slate-900">{{ monthlyDeepAnalysis.flight_risk_score ?? '-' }}/10</p>
                   </div>
                 </div>
@@ -259,7 +259,7 @@
                   <div class="space-y-4">
                     <h5 class="text-xs font-bold text-rose-600 uppercase tracking-widest flex items-center gap-2">
                        <span class="w-1.5 h-1.5 bg-rose-600 rounded-full"></span>
-                       Åikayet KonularÄ±
+                       Şikayet Konuları
                     </h5>
                     <div class="flex flex-wrap gap-2">
                       <span v-for="item in monthlyDeepAnalysis.top_complaint_topics" :key="item" class="bg-rose-50 text-rose-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-rose-100">
@@ -271,7 +271,7 @@
                   <div class="space-y-4">
                     <h5 class="text-xs font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-2">
                        <span class="w-1.5 h-1.5 bg-emerald-600 rounded-full"></span>
-                       GÃ¼Ã§lÃ¼ Alanlar
+                       Güçlü Alanlar
                     </h5>
                     <div class="flex flex-wrap gap-2">
                       <span v-for="item in monthlyDeepAnalysis.top_praise_topics" :key="item" class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-emerald-100">
@@ -283,7 +283,7 @@
                   <div class="space-y-4">
                     <h5 class="text-xs font-bold text-sky-600 uppercase tracking-widest flex items-center gap-2">
                        <span class="w-1.5 h-1.5 bg-sky-600 rounded-full"></span>
-                       Ã–ne Ã‡Ä±kan Temalar
+                       Öne Çıkan Temalar
                     </h5>
                     <div class="flex flex-wrap gap-2">
                       <span v-for="item in monthlyDeepAnalysis.top_themes" :key="item" class="bg-sky-50 text-sky-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-sky-100">
@@ -303,7 +303,7 @@
                       <div class="flex items-center justify-between mb-4">
                          <h5 class="text-sm font-bold uppercase tracking-widest text-indigo-300">Yapay Zeka Bellek Analizi (RAG)</h5>
                          <div class="bg-white/10 px-2 py-1 rounded-lg text-[10px] font-bold backdrop-blur-sm border border-white/10">
-                            {{ monthlyRagReport.retrieved_memory_count }} Benzer KayÄ±t TaramasÄ±
+                            {{ monthlyRagReport.retrieved_memory_count }} Benzer Kayıt Taraması
                          </div>
                       </div>
                       <p class="text-sm leading-relaxed text-indigo-50 font-medium">
@@ -312,7 +312,7 @@
                       
                       <div class="mt-6 grid grid-cols-2 gap-4">
                          <div class="bg-white/5 rounded-xl p-4 border border-white/10">
-                            <p class="text-[10px] font-bold text-indigo-300 uppercase mb-2">Trend DeÄŸerlendirmesi</p>
+                            <p class="text-[10px] font-bold text-indigo-300 uppercase mb-2">Trend Değerlendirmesi</p>
                             <p class="text-xs text-indigo-100 leading-relaxed">{{ renderText(monthlyRagReport.trend_summary) }}</p>
                          </div>
                          <div class="bg-white/5 rounded-xl p-4 border border-white/10">
@@ -329,7 +329,7 @@
 
               <div v-else class="py-20 text-center text-slate-400">
                 <CloudIcon class="w-12 h-12 mx-auto mb-4 opacity-20" />
-                <p>SeÃ§ili dÃ¶nem iÃ§in analiz verisi henÃ¼z bulunmuyor.</p>
+                <p>Seçili dönem için analiz verisi henüz bulunmuyor.</p>
               </div>
             </div>
 
@@ -339,18 +339,18 @@
               <div class="rounded-2xl border border-slate-900 bg-slate-900 p-8 shadow-xl text-white">
                  <div class="flex items-center gap-3 mb-6">
                     <div class="p-2 bg-indigo-500 rounded-xl"><BoltIcon class="w-5 h-5 text-white" /></div>
-                    <h4 class="text-lg font-bold">YÃ¶netici Aksiyonu</h4>
+                    <h4 class="text-lg font-bold">Yönetici Aksiyonu</h4>
                  </div>
                  <div class="p-5 bg-white/5 rounded-2xl border border-white/10 mb-6">
-                    <p class="text-[10px] font-bold text-indigo-300 uppercase tracking-widest mb-3">Ã–nerilen Ä°lk AdÄ±m</p>
+                    <p class="text-[10px] font-bold text-indigo-300 uppercase tracking-widest mb-3">Önerilen İlk Adım</p>
                     <p class="text-sm leading-relaxed text-slate-200 italic">
-                      "{{ renderText(selectedEmployeeReport.recommended_action || 'Bu Ã§alÄ±ÅŸan iÃ§in belirgin bir aksiyon sinyali henÃ¼z oluÅŸmadÄ±.') }}"
+                      "{{ renderText(selectedEmployeeReport.recommended_action || 'Bu çalışan için belirgin bir aksiyon sinyali henüz oluşmadı.') }}"
                     </p>
                  </div>
                  
                  <div v-if="monthlyDeepAnalysis" class="space-y-4">
                     <div class="flex flex-col gap-1">
-                       <span class="text-[10px] font-bold text-slate-400 uppercase">AyrÄ±lma Nedeni Sinyalleri</span>
+                       <span class="text-[10px] font-bold text-slate-400 uppercase">Ayrılma Nedeni Sinyalleri</span>
                        <div class="flex flex-wrap gap-2 mt-2">
                           <span v-for="item in monthlyDeepAnalysis.flight_risk_reasons" :key="item" class="bg-rose-500/10 text-rose-300 px-2 py-1 rounded text-[10px] font-bold border border-rose-500/20">
                             {{ renderText(item) }}
@@ -363,7 +363,7 @@
               <!-- Metrics Chart -->
               <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                  <div class="flex items-center justify-between mb-6">
-                    <h4 class="font-bold text-slate-900">Yetenek DaÄŸÄ±lÄ±mÄ±</h4>
+                    <h4 class="font-bold text-slate-900">Yetenek Dağılımı</h4>
                     <span class="text-[10px] font-bold text-slate-400 uppercase">1-5 Puan</span>
                  </div>
                  <div class="h-64">
@@ -387,14 +387,14 @@
           <div class="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mb-6">
              <UserPlusIcon class="w-12 h-12 text-indigo-300" />
           </div>
-          <h3 class="text-2xl font-bold text-slate-900">Ã‡alÄ±ÅŸan Analiz Paneli</h3>
+          <h3 class="text-2xl font-bold text-slate-900">Çalışan Analiz Paneli</h3>
           <p class="mt-4 text-slate-500 max-w-sm mx-auto leading-relaxed">
-            Soldaki listeden bir Ã§alÄ±ÅŸan seÃ§tiÄŸinizde kisisel performans trendleri, 360 feedback Ã¶zetleri ve AI destekli yÃ¶netici iÃ§gÃ¶rÃ¼leri burada listelenecektir.
+            Soldaki listeden bir çalışan seçtiğinizde kisisel performans trendleri, 360 feedback özetleri ve AI destekli yönetici içgörüleri burada listelenecektir.
           </p>
           <div class="mt-8 flex gap-4">
              <div class="flex flex-col items-center">
                 <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 mb-2">1</div>
-                <span class="text-[10px] font-bold text-slate-400 uppercase">SeÃ§</span>
+                <span class="text-[10px] font-bold text-slate-400 uppercase">Seç</span>
              </div>
              <div class="w-12 h-px bg-slate-100 mt-4"></div>
              <div class="flex flex-col items-center">
@@ -472,17 +472,17 @@ const selectedYear = ref<number>(today.getFullYear())
 
 const monthOptions = [
   { value: 1, label: 'Ocak' },
-  { value: 2, label: 'Åubat' },
+  { value: 2, label: 'Şubat' },
   { value: 3, label: 'Mart' },
   { value: 4, label: 'Nisan' },
-  { value: 5, label: 'MayÄ±s' },
+  { value: 5, label: 'Mayıs' },
   { value: 6, label: 'Haziran' },
   { value: 7, label: 'Temmuz' },
-  { value: 8, label: 'AÄŸustos' },
-  { value: 9, label: 'EylÃ¼l' },
+  { value: 8, label: 'Ağustos' },
+  { value: 9, label: 'Eylül' },
   { value: 10, label: 'Ekim' },
-  { value: 11, label: 'KasÄ±m' },
-  { value: 12, label: 'AralÄ±k' },
+  { value: 11, label: 'Kasım' },
+  { value: 12, label: 'Aralık' },
 ]
 
 const yearOptions = computed(() => {
@@ -526,15 +526,15 @@ const filteredAndSearchedMembers = computed(() => {
 
 function formatRiskLabel(value?: string | null) {
   const map: Record<string, string> = {
-    low: 'DÃ¼ÅŸÃ¼k',
+    low: 'Düşük',
     medium: 'Orta',
-    high: 'YÃ¼ksek',
+    high: 'Yüksek',
   }
   return value ? (map[value] || value) : '-'
 }
 
 function formatMemoryCount(value: number) {
-  return `${value} benzer kayÄ±t`
+  return `${value} benzer kayıt`
 }
 
 function renderText(value?: string | null) {
@@ -548,15 +548,15 @@ function employeeReportBadges(employeeId: number) {
 
 function getBadgeDescription(badge: BadgeResponse | { badge_type: BadgeType; source_feedback_ids?: number[] }) {
   const baseMap = {
-    team_player: "Ekip enerjisini ve uyumu yÃ¼kseltiyor.",
-    problem_solver: "Blokajlara hÄ±zlÄ± ve soÄŸukkanlÄ± yaklaÅŸÄ±yor.",
-    communicator: "Geri bildirimlerinde net ve Ã¶ÄŸretici bir Ã§izgi var.",
-    speed_champion: "YÃ¼ksek tempo ve hÄ±zlÄ± adaptasyon saÄŸlÄ±yor.",
-    mentor: "Bilgi paylaÅŸÄ±mÄ± ve mentorlukta Ã¶ne Ã§Ä±kÄ±yor.",
-    innovator: "GeliÅŸime aÃ§Ä±k ve Ã§evik ilerliyor.",
-    reliable: "Teknik sahiplenme ve saÄŸlam uygulama disiplini gÃ¶steriyor.",
+    team_player: "Ekip enerjisini ve uyumu yükseltiyor.",
+    problem_solver: "Blokajlara hızlı ve soğukkanlı yaklaşıyor.",
+    communicator: "Geri bildirimlerinde net ve öğretici bir çizgi var.",
+    speed_champion: "Yüksek tempo ve hızlı adaptasyon sağlıyor.",
+    mentor: "Bilgi paylaşımı ve mentorlukta öne çıkıyor.",
+    innovator: "Gelişime açık ve çevik ilerliyor.",
+    reliable: "Teknik sahiplenme ve sağlam uygulama disiplini gösteriyor.",
   } as const
-  return baseMap[badge.badge_type] ?? "Analizlerde istikrarlÄ± bir gÃ¼Ã§ sergiledi."
+  return baseMap[badge.badge_type] ?? "Analizlerde istikrarlı bir güç sergiledi."
 }
 
 const scoreMetrics = computed<SummaryMetric[]>(() =>
@@ -609,8 +609,8 @@ function applyRouteSelection() {
 
 function formatTrend(value: string) {
   const map: Record<string, string> = {
-    yukselis: 'YÃ¼kseliÅŸ',
-    dusus: 'DÃ¼ÅŸÃ¼ÅŸ',
+    yukselis: 'Yükseliş',
+    dusus: 'Düşüş',
     stabil: 'Stabil',
   }
   return map[value] || 'Stabil'
@@ -630,7 +630,7 @@ async function loadData() {
       selectedEmployeeId.value = teamMembers.value[0].id
     }
   } catch (error) {
-    console.error('Veriler yÃ¼klenemedi:', error)
+    console.error('Veriler yüklenemedi:', error)
   }
 }
 
@@ -640,7 +640,7 @@ async function loadEmployeeReport(employeeId: number) {
     employeeReports.value = { ...employeeReports.value, [employeeId]: report }
     selectedEmployeeReport.value = report
   } catch (error) {
-    console.error('Rapor yÃ¼klenemedi:', error)
+    console.error('Rapor yüklenemedi:', error)
     selectedEmployeeReport.value = null
   }
 }
@@ -654,7 +654,7 @@ async function loadMonthlyDeepAnalysis(employeeId: number) {
     monthlyDeepAnalysis.value = deepAnalysis
     monthlyRagReport.value = ragReport
   } catch (error) {
-    console.error('AylÄ±k analizler yÃ¼klenemedi:', error)
+    console.error('Aylık analizler yüklenemedi:', error)
     monthlyDeepAnalysis.value = null
     monthlyRagReport.value = null
   }

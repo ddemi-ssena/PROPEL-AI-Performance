@@ -416,8 +416,8 @@ class SalesMLService:
         employee_rows = [
             row
             for row in rows
-            if SalesMLService._normalize_employee_key(row.get("employee_id")) in candidate_employee_ids
-            or str(row.get("employee_id")) in candidate_employee_ids
+            if SalesMLService._normalize_employee_key(_row_employee_id(row)) in candidate_employee_ids
+            or str(_row_employee_id(row)) in candidate_employee_ids
         ]
         if not employee_rows:
             raise HTTPException(

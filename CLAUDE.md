@@ -653,6 +653,40 @@ Nihan Korkmaz, Baran Özdemir, Ozan Çetin, Tuncay Doğan, Aslı Erdoğan, Burcu
 
 ---
 
+### 2026-05-26 Satış 360° Feedback — Seed, Backend Doğrulama, Frontend View ★
+
+**Eklenen Dosyalar**:
+- `propel-backend/scripts/seed_demo_360_sales.py` → Satış departmanı için demo 360° feedback seed scripti
+  - 31 çalışan × ~3 feedback = 92 `FeedbackResponse` + 92 `FeedbackNLPAnalysis` + 31 `EmployeeNLPProfile`
+  - Bölge bazlı sinyal seçimi (Doğu/Güneydoğu→risk, Marmara/Ege→positive, vb.)
+  - Yönetici tespiti: "Genel" team = manager (SA-031 Hatice Yıldırım)
+  - `model_provider = "synthetic_seed_sales"` → `--no-reset` ile yeniden seed edilebilir
+- `propel-frontend/src/views/sales/SalesFeedbackView.vue` → Satış yöneticisi 360° feedback dashboard
+  - Emerald/teal tema; 4 KPI kartı (analiz edilen çalışan, ort. motivasyon, uçuş riski, ort. işbirliği)
+  - Gradient sinyal paneli (güçlü yönler / risk alanları / destek ihtiyaçları)
+  - Departman 360 raporu (narrative + sections + recommended action)
+  - Metrik çubukları, uçuş riski dağılımı, tükenmişlik dağılımı, risk tema sıralaması
+  - SVG motivasyon trend grafiği (gradient fill + polyline)
+  - TypeScript: `TrendPoint`, `DistributionPoint`, `ThemePoint` ile explicit tipler
+
+**Güncellenen Dosyalar**:
+- `propel-frontend/src/router/index.ts` → `/manager/sales-feedback` route eklendi
+- `propel-frontend/src/layouts/AppLayout.vue` → KPI & ML Analizi grubuna "360 Geri Bildirim" eklendi
+- `propel-frontend/src/views/manager/DepartmentAnalysisView.vue` → 32 mojibake sequence düzeltildi
+- `propel-frontend/src/views/manager/EmployeeAnalysisView.vue` → 35 mojibake sequence düzeltildi
+
+**Backend Doğrulama** (tüm endpointler `manager.satis@propel.com` ile test edildi):
+- `GET /feedbacks/nlp/department-summary` → 31 çalışan, avg_motivation=3.34, flight_risk=5
+- `GET /feedbacks/reports/department` → sections + metrics döndürüyor
+- `GET /feedbacks/charts/department` → 4 trend noktası, flight/burnout dağılımı, risk temaları
+
+**Encoding Düzeltmesi**:
+- `DepartmentAnalysisView.vue` ve `EmployeeAnalysisView.vue` hardcoded template string'leri
+  çift-encode edilmiş durumdaydı (UTF-8 bytes → Windows-1252 → UTF-8 olarak kaydedilmiş)
+- Hedef map ile düzeltildi: `Ä±`→`ı`, `ÅŸ`→`ş`, `Ã¼`→`ü`, `ÄŸ`→`ğ`, `Ã§`→`ç`, `Ä°`→`İ`, `Ã–`→`Ö` vb.
+
+---
+
 ### 2026-05-22 Satış Çalışanı Login Redirect Düzeltmesi ★
 
 **Sorun**: `satis.employee@propel.com` ile giriş yapıldığında `/employee/sales` (SalesEmployeeDashboard, emerald tema) yerine `/employee` (genel EmployeeDashboard, lacivert tema) açılıyordu. Sayfa yenilendikten sonra veya eski oturumda da aynı sorun tekrar ediyordu.
@@ -689,7 +723,9 @@ docker restart propel_frontend
 - [x] Türkçe karakter düzeltmesi (tüm isimler)
 - [x] Hatice Yıldırım — tek satış müdürü (SA-031, dataset'e eklendi)
 - [x] Satış çalışanı login redirect düzeltmesi (router guard async + user restore)
-- [ ] "Veri bekleniyor" durumu — satış müdürü KPI overview endpoint bağlantısı
+- [x] Satış departmanı 360° feedback seed + NLP profil oluşturma (92 kayıt, 31 çalışan)
+- [x] Satış yöneticisi 360° feedback view (SalesFeedbackView.vue) — emerald tema
+- [x] DepartmentAnalysisView + EmployeeAnalysisView mojibake encoding düzeltmesi
 - [ ] Personel listesi performans skorları ML pipeline'ına bağlanacak
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri

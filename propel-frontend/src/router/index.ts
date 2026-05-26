@@ -123,6 +123,24 @@ const router = createRouter({
           component: () => import('@/views/sales/SalesAnalyticsView.vue'),
           meta: { title: 'Satis KPI & ML Analizi' },
         },
+        {
+          path: 'sales-department-analytics',
+          name: 'manager-sales-department-analytics',
+          component: () => import('@/views/sales/SalesDepartmentAnalyticsView.vue'),
+          meta: { title: 'Satis Departman Analizi' },
+        },
+        {
+          path: 'sales-kpi-analysis',
+          name: 'manager-sales-kpi-analysis',
+          component: () => import('@/views/sales/SalesManagerAnalyticsView.vue'),
+          meta: { title: 'Satis KPI & ML Analizi' },
+        },
+        {
+          path: 'sales-feedback',
+          name: 'manager-sales-feedback',
+          component: () => import('@/views/sales/SalesFeedbackView.vue'),
+          meta: { title: '360 Geri Bildirim - Satis' },
+        },
       ],
     },
     {
