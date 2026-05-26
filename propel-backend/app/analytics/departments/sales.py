@@ -47,7 +47,7 @@ class SalesAnalyticsAdapter(DepartmentAnalyticsAdapter):
 
     @staticmethod
     def _resolve_department(db: Session) -> Optional[Department]:
-        return db.query(Department).filter(Department.name == "Satis").first()
+        return db.query(Department).filter(Department.name.ilike("%sat%")).first()
 
     @staticmethod
     def _metric_code(record: KPIRecord) -> str:

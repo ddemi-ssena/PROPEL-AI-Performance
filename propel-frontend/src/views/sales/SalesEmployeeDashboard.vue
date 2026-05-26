@@ -54,13 +54,15 @@
       <div v-for="i in 4" :key="i" class="rounded-2xl border bg-white p-6 shadow-sm animate-pulse h-28"></div>
     </div>
 
-    <!-- No data state --------------------------------------------------------->
-    <div v-else-if="!perfData?.has_upload" class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
-      <p class="text-sm font-semibold text-amber-700">Henüz satış dataset'i yüklenmemiş.</p>
-      <p class="text-xs text-amber-600 mt-1">Admin'den satış verisi yüklemesini isteyin.</p>
+    <!-- No data banner (non-blocking) ---------------------------------------->
+    <div v-if="!loading && !perfData?.has_upload" class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 flex items-center gap-3">
+      <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <p class="text-sm font-medium text-amber-700">Satış dataseti henüz yüklenmedi — veriler yüklenince KPI'lar otomatik dolacak.</p>
     </div>
 
-    <template v-else>
+    <template v-if="!loading">
       <!-- KPI Stats Row ------------------------------------------------------->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
         <div
