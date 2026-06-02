@@ -687,6 +687,46 @@ Nihan Korkmaz, Baran Özdemir, Ozan Çetin, Tuncay Doğan, Aslı Erdoğan, Burcu
 
 ---
 
+### 2026-06-02 Admin Panel Mock Verileri Gerçek Backend'e Bağlandı ★
+
+**Sorun**: Admin panelindeki 3 sayfa tamamen hardcoded/mock verilerle çalışıyordu:
+- `EmployeeDetails.vue`: Her zaman "Canan Dağdelen" gösteriyordu, `route.params.id` okunmuyordu
+- `AdminDashboard.vue`: Uçuş Riski Radarı hardcoded "Elif Demir" ve "Can Kaya"; departman yöneticisi hep "Yönetici Atanmadı"
+- `DataManagement.vue`: "Şablon İndir" butonu tıklanamaz; hardcoded "Pazarlama uyarısı"
+
+**Eklenen Backend Endpoint**:
+- `GET /api/v1/admin/uploads/template?dept=software|sales` → UTF-8 BOM'lu CSV şablon dosyası indirme
+  - Rota çakışması: `/template` rotası `/{upload_id}` ile çakışıyordu → `GET /template` `GET /{upload_id}`'den önce tanımlandı
+  - Windows Docker volume sync gecikmesi: `docker cp` ile manuel kopyalama gerekti
+
+**Güncellenen Frontend Dosyaları**:
+- `views/admin/EmployeeDetails.vue` — tamamen yeniden yazıldı:
+  - `route.params.id` okunarak `GET /employees/{id}` çağrılıyor
+  - `GET /kpis/records/employee/{id}` → dönem bazlı ortalama trend grafiği
+  - Stats: `latest_ms`, `latest_ars`, `experience_years`, KPI kayıt sayısı
+  - Motivasyon gauge: `latest_ms` (0-10) → açı hesabı
+  - AI insights: `risk_level` + `latest_mte` + `experience_years` tabanlı deterministik metin
+  - KPI özeti: en yüksek 5 KPI progress bar olarak
+  - Loading/error state eklendi
+- `views/admin/AdminDashboard.vue`:
+  - Uçuş Riski: employees listesinden `risk_level=High/Medium` filtre, `combined_risk_score`'a göre sıralı top 4
+  - Departman yöneticisi: `user.role === 'department_manager'` ile tespit → gerçek isim ve initials
+  - Departman skoru: `latest_ms` ortalaması (MS: 0-10 skalası)
+- `views/admin/DataManagement.vue`:
+  - "Şablon İndir" butonu `adminUploadApi.downloadTemplate(dept)` çağrısına bağlandı
+  - Hardcoded "Pazarlama uyarısı" → yükleme başarısında gösterilen yeşil banner ile değiştirildi
+- `services/api/employee.api.ts` — `getEmployee(id)` metodu eklendi
+- `services/api/admin_upload.api.ts` — `downloadTemplate(dept)` metodu eklendi (blob download)
+
+**Risk Seviyesi Kaynağı** (önemli not):
+- `risk_level` Excel dosyalarından **gelmez**; nabız anketinden hesaplanır
+- `SurveyResponse.ars_score` (işten ayrılma riski, 0-1): `ars_score ≥ 0.6` → High, `≥ 0.2` → Medium, `< 0.2` → Low
+- `ars_score` iki kaynaktan gelir: (1) gerçek kullanımda ML motoru metin analizi, (2) seed_data.py deterministik formül
+
+**Push**: `cansuyildirimmm/AI-Supported-Department-Employee-Performance-Analysis-System` → branch `99999999.branch` (commit `9061d68`)
+
+---
+
 ### 2026-05-22 Satış Çalışanı Login Redirect Düzeltmesi ★
 
 **Sorun**: `satis.employee@propel.com` ile giriş yapıldığında `/employee/sales` (SalesEmployeeDashboard, emerald tema) yerine `/employee` (genel EmployeeDashboard, lacivert tema) açılıyordu. Sayfa yenilendikten sonra veya eski oturumda da aynı sorun tekrar ediyordu.
@@ -726,6 +766,8 @@ docker restart propel_frontend
 - [x] Satış departmanı 360° feedback seed + NLP profil oluşturma (92 kayıt, 31 çalışan)
 - [x] Satış yöneticisi 360° feedback view (SalesFeedbackView.vue) — emerald tema
 - [x] DepartmentAnalysisView + EmployeeAnalysisView mojibake encoding düzeltmesi
+- [x] Admin panel mock verileri gerçek backend'e bağlandı (EmployeeDetails, AdminDashboard, DataManagement)
+- [x] Şablon indirme endpoint'i eklendi (GET /admin/uploads/template)
 - [ ] Personel listesi performans skorları ML pipeline'ına bağlanacak
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri
