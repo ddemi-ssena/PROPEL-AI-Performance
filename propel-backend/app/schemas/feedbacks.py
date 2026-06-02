@@ -26,6 +26,32 @@ class SubmitFeedbackPayload(BaseModel):
     score_technical: float = Field(..., ge=1, le=5)
 
 
+class NLPTestAnalysisPayload(BaseModel):
+    response_text: str = Field(..., min_length=2, max_length=2000)
+    question_text: str = Field(
+        default=(
+            "Bu hafta ekip icinde motivasyon, destek ihtiyaci veya risk sinyali "
+            "gosteren somut davranisi ve etkisini hangi ornekle aciklarsin?"
+        ),
+        max_length=500,
+    )
+    department_id: Optional[int] = None
+    target_role: str = Field(default="employee", pattern="^(admin|department_manager|employee)$")
+    week_theme: str = Field(default="Motivasyon & Psikolojik Durum", max_length=100)
+    direction_label: str = Field(default="Akran geri bildirimi", max_length=100)
+    score_communication: float = Field(default=3, ge=1, le=5)
+    score_teamwork: float = Field(default=3, ge=1, le=5)
+    score_leadership: float = Field(default=3, ge=1, le=5)
+    score_technical: float = Field(default=3, ge=1, le=5)
+
+
+class NLPTestAnalysisResponse(BaseModel):
+    department_name: str
+    model_provider: str
+    model_name: str
+    analysis: Dict[str, Any]
+
+
 class SubmitFeedbackResponse(BaseModel):
     id: int
     sender_id: int

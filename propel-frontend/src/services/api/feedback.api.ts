@@ -240,6 +240,26 @@ export interface WeeklyNLPInsightResponse {
   recent_analyses: WeeklyNLPAnalysis[]
 }
 
+export interface NLPTestAnalysisPayload {
+  response_text: string
+  question_text?: string
+  department_id?: number
+  target_role?: 'admin' | 'department_manager' | 'employee'
+  week_theme?: string
+  direction_label?: string
+  score_communication?: number
+  score_teamwork?: number
+  score_leadership?: number
+  score_technical?: number
+}
+
+export interface NLPTestAnalysisResponse {
+  department_name: string
+  model_provider: string
+  model_name: string
+  analysis: Record<string, any>
+}
+
 export interface DepartmentWeeklyNLPResponse {
   department_id: number
   period_year: number
@@ -493,6 +513,11 @@ export const feedbackApi = {
 
   async getMyWeeklyNlpProfile(): Promise<WeeklyNLPInsightResponse> {
     const { data } = await apiClient.get<WeeklyNLPInsightResponse>('/feedbacks/nlp/me')
+    return data
+  },
+
+  async testNlpAnalysis(payload: NLPTestAnalysisPayload): Promise<NLPTestAnalysisResponse> {
+    const { data } = await apiClient.post<NLPTestAnalysisResponse>('/feedbacks/nlp/test-analysis', payload)
     return data
   },
 

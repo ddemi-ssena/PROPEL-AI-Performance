@@ -1689,3 +1689,82 @@ docker exec propel_backend python seed_data.py
 ## Sonraki Adim
 
 - Ileride Google Calendar entegrasyonu istenirse OAuth + calendar event create akisi eklenerek Meet linki sistem tarafindan otomatik uretilebilir; mevcut surum link yapistirma ve uygulama ici bildirim dagitimini destekler.
+
+## 2026-06-02 NLP Analizi Kod Inceleme ve Test
+
+- Kullanici NLP analizi tarafinin kodda nerede/nasil calistigini, test cumleleriyle dogruluk kontrolunu ve bitirme sunumunda akademik seviyede nasil anlatilacagini sordu.
+- NLP akisi dogrulandi:
+  - Soru uretimi: `FeedbackService.get_current_weekly_question` -> `AIService.generate_weekly_question` (Gemini/Ollama) + `is_question_nlp_ready` kalite kapisi + deterministic template fallback.
+  - Haftalik analiz: `POST /feedbacks/submit` arka planda `FeedbackService.process_weekly_feedback_analysis_in_background` tetikler.
+  - Analiz motoru: `AIService.analyze_weekly_feedback` (LLM JSON kontrati) -> sanitize -> LLM yoksa `local-fallback-v1` heuristik.
+  - Kayit/profil: `NLPService.save_weekly_analysis` + `rebuild_employee_profile` + `refresh_employee_monthly_badges` + `RAGService.upsert_weekly_feedback_memory`.
+- Canli smoke test yapildi (`docker exec propel_backend python -c ...`) ve 4 test cumlesi calistirildi:
+  - Pozitif senaryo: `sentiment=positive`, `burnout=low`, `flight=low`.
+  - Negatif senaryo: `sentiment=negative`, `burnout=high`, `flight=high`.
+  - Karma toparlanma: `sentiment=neutral`, risk medium/low sinyalleri.
+  - Dusuk kalite ifade: temel skorlar neutral civarda; ayri kalite dedektoru ile low-quality olarak yakalandi.
+- `FeedbackService._detect_low_quality_feedback` ayri test edildi; `Iyi, aynen devam.` ve `cok iyi` ifadeleri `is_low_quality=True` dondu, somut cumle `False` dondu.
+- Sunum icin teknik sonuc:
+  - Mevcut sistem supervised egitimli bir NLP modeli degil; LLM+heuristik hibrid analiz ve kural tabanli guvenlik katmanlari kullaniyor.
+  - Akademik dogruluk icin sonraki adim: etiketli benchmark set, metrik tabanli evaluator (F1/MAE/calibration), prompt/heuristik regressions ve gerekirse Turkish BERT tabanli ince ayar.
+
+## 2026-06-02 NLP Laboratuvari ve Heuristik Duzeltme
+
+- 360 Feedback NLP akisini canli test edebilmek icin kayitsiz test endpoint'i eklendi: `POST /api/v1/feedbacks/nlp/test-analysis`.
+- Endpoint admin/department_manager rolleriyle calisir, `AIService.analyze_weekly_feedback` fonksiyonunu aynen kullanir ve DB'ye `FeedbackResponse` ya da `FeedbackNLPAnalysis` kaydi yazmaz.
+- Frontend `feedbackApi.testNlpAnalysis` eklendi.
+- `DepartmentAnalysisView.vue` icine `NLP Laboratuvari` paneli eklendi:
+  - Olumlu sinyal, burnout riski ve flight riski hazir test cumleleri var.
+  - Serbest metin ve 1-5 skor girdileriyle analiz calistirilir.
+  - Sonucta model/provider, duygu, motivasyon, psikolojik guven, flight risk, tema, risk bayraklari, yonetici ozeti, aksiyon ve guven skoru gorunur.
+- Smoke test sirasinda fallback heuristigin iki hatasi yakalandi ve duzeltildi:
+  - `blokajimi hizla acti` gibi cozulmus blokaj ifadeleri artik `surec blokaji` riski uretmiyor; `blokaj cozumu` praise konusu olarak isleniyor.
+  - `blokajlar cozulmedigi` gibi negasyon iceren ifadeler cozulmus sayilmiyor ve risk olarak kaliyor.
+  - `destek istemekte cekingen` gibi destek ihtiyaci ifadeleri artik `liderlik destegi` praise konusu uretmiyor.
+- Dogrulama:
+  - Degisiklik oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi lokal `py_compile` ve `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` sonrasi DB agi sorunu goruldu; `docker compose up -d backend` ile `propel_db` ve `propel_backend` yeniden ayaga kalkti.
+  - Container icinde `py_compile` basarili.
+  - Container smoke test sonuclari:
+    - Olumlu: `positive`, motivasyon `4.2`, burnout `low`, flight `low`, risk bayragi yok.
+    - Burnout: `negative`, motivasyon `1.32`, burnout `high`, flight `high`, destek ihtiyaci var.
+    - Flight: `negative`, motivasyon `1.47`, burnout `high`, flight `high`, `surec blokaji` riski var.
+
+## Sonraki Adim
+
+- Bitirme sunumu icin NLP bolumunde mevcut yaklasim `LLM JSON extraction + sanitize + deterministic fallback + profile aggregation + RAG memory` olarak anlatilmali.
+- Akademik degerlendirme icin 50-100 etiketli Turkce 360 feedback benchmark seti hazirlanip sentiment/risk/theme alanlarinda expected-vs-actual testleri eklenebilir.
+
+## 2026-06-02 NLP Benchmark Evaluator
+
+- Kullanici dis yorumdaki oneriyi paylasti: fine-tune BERT yerine 50-100 ornek etiketli test seti ile sistem ciktisini olcmek.
+- Karar: Bu proje `LLM destekli kurumsal 360 feedback analiz platformu` olarak konumlanmali; benchmark/evaluator katmani BERT fine-tune eklemekten daha uygun.
+- `app/analytics/evaluation/nlp_benchmark_cases.json` eklendi:
+  - 50 elle etiketli Turkce 360 feedback ornegi.
+  - Senaryo dagilimi: olumlu, notr, burnout riski, flight riski, karma/toparlanma.
+  - Beklenen alanlar: `sentiment_label`, `burnout_risk`, `flight_risk`.
+- `scripts/evaluate_nlp_benchmark.py` eklendi:
+  - `--mode heuristic`: Gemini/Ollama kapali, deterministik fallback reproducible olculur.
+  - `--mode live`: konfigurasyondaki Gemini/Ollama ile canli LLM ciktisi olculur.
+  - Accuracy, macro precision, macro recall, macro F1, ordinal MAE ve mismatch listesi hesaplanir.
+  - JSON ve Markdown raporlarini `scratch/nlp_benchmark/` altina yazar.
+- Benchmark hata analiziyle `AIService._fallback_weekly_analysis` kalibre edildi:
+  - Burnout baglami (`tukend`, `yorul`, `stres`, `baski`, `deadline`, `is yuku`, vb.) ile flight/aidiyet baglami (`kop`, `onemsen`, `aidiyet`, `kalip kalmayac`, vb.) ayrildi.
+  - `sinyali yok` gibi negasyon/no-risk baglamlari negatif sinyali azaltir.
+  - Flight-only orneklerde burnout'un gereksiz `high` olmasi, burnout-only orneklerde flight'in gereksiz `high` olmasi azaltildi.
+- Container benchmark sonucu (`docker exec propel_backend python scripts/evaluate_nlp_benchmark.py --mode heuristic`):
+  - 50 case, exact match accuracy: `%68.0`.
+  - `sentiment_label`: accuracy `%86.0`, macro F1 `%84.3`, MAE `0.14`.
+  - `burnout_risk`: accuracy `%94.0`, macro F1 `%93.9`, MAE `0.06`.
+  - `flight_risk`: accuracy `%84.0`, macro F1 `%84.0`, MAE `0.16`.
+  - Raporlar: `propel-backend/scratch/nlp_benchmark/nlp_benchmark_report.md` ve `nlp_benchmark_results.json`.
+- Dogrulama:
+  - Lokal `py_compile` basarili.
+  - `npm.cmd run type-check` basarili.
+  - Backend container restart edildi.
+  - Container icinde evaluator `py_compile` ve benchmark run basarili.
+
+## Sonraki Adim
+
+- Sunumda bu rapor `heuristic fallback baseline` olarak gosterilmeli; ayrica `--mode live` ile Gemini/Ollama acikken ikinci rapor alinip LLM destekli asil sistemle fallback baseline karsilastirilabilir.

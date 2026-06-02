@@ -214,6 +214,131 @@
       </div>
     </div>
 
+    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">NLP Laboratuvari</p>
+          <h3 class="mt-1 text-lg font-bold text-slate-900">Test cumlesi analizi</h3>
+          <p class="mt-1 text-sm text-slate-500">360 feedback analiz motorunu kayit olusturmadan test eder.</p>
+        </div>
+        <div v-if="nlpTestResult" class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+          <p class="text-xs font-semibold text-slate-500">Model</p>
+          <p class="font-bold text-slate-900">{{ nlpTestResult.model_provider }} / {{ nlpTestResult.model_name }}</p>
+        </div>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-6">
+        <div class="space-y-4">
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="sample in nlpTestSamples"
+              :key="sample.label"
+              type="button"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-indigo-200 hover:bg-indigo-50"
+              @click="applyNlpSample(sample)"
+            >
+              {{ sample.label }}
+            </button>
+          </div>
+
+          <textarea
+            v-model="nlpTestText"
+            rows="5"
+            class="w-full rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+            placeholder="Test edilecek 360 feedback cumlesini yazin..."
+          />
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <label v-for="score in nlpScoreControls" :key="score.key" class="text-xs font-semibold text-slate-500">
+              {{ score.label }}
+              <input
+                v-model.number="score.model.value"
+                type="number"
+                min="1"
+                max="5"
+                step="1"
+                class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+              />
+            </label>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              :disabled="isNlpTestLoading || !nlpTestText.trim()"
+              @click="runNlpTest"
+            >
+              {{ isNlpTestLoading ? 'Analiz ediliyor...' : 'Analiz Et' }}
+            </button>
+            <p v-if="nlpTestError" class="text-sm font-medium text-rose-600">{{ nlpTestError }}</p>
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-900 bg-slate-950 p-5 text-white">
+          <div v-if="nlpTestResult" class="space-y-5">
+            <div class="grid grid-cols-2 gap-3">
+              <div class="rounded-xl border border-white/10 bg-white/5 p-3">
+                <p class="text-xs text-slate-400">Duygu</p>
+                <p class="mt-1 text-lg font-bold">{{ formatSentiment(nlpTestAnalysis.sentiment_label) }}</p>
+                <p class="text-xs text-slate-400">{{ nlpTestAnalysis.sentiment_score ?? 0 }}</p>
+              </div>
+              <div class="rounded-xl border border-white/10 bg-white/5 p-3">
+                <p class="text-xs text-slate-400">Flight risk</p>
+                <p class="mt-1 text-lg font-bold">{{ formatRiskLabel(nlpTestAnalysis.flight_risk) }}</p>
+                <p class="text-xs text-slate-400">{{ nlpTestAnalysis.flight_risk_score ?? '-' }}/10</p>
+              </div>
+              <div class="rounded-xl border border-white/10 bg-white/5 p-3">
+                <p class="text-xs text-slate-400">Motivasyon</p>
+                <p class="mt-1 text-lg font-bold">{{ nlpTestAnalysis.motivation_score ?? '-' }}/5</p>
+              </div>
+              <div class="rounded-xl border border-white/10 bg-white/5 p-3">
+                <p class="text-xs text-slate-400">Psikolojik guven</p>
+                <p class="mt-1 text-lg font-bold">{{ nlpTestAnalysis.psychological_safety_score ?? '-' }}/5</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Yonetici ozeti</p>
+              <p class="mt-2 text-sm leading-relaxed text-slate-200">{{ renderText(nlpTestAnalysis.manager_summary) }}</p>
+            </div>
+
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Aksiyon</p>
+              <p class="mt-2 text-sm leading-relaxed text-slate-200">{{ renderText(nlpTestAnalysis.action_recommendation) }}</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <p class="text-xs font-semibold text-slate-400">Temalar</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span v-for="item in nlpTestList('theme_labels')" :key="`theme-${item}`" class="rounded-full bg-indigo-400/15 px-2 py-1 text-xs text-indigo-100">
+                    {{ renderText(item) }}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <p class="text-xs font-semibold text-slate-400">Risk bayraklari</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span v-for="item in nlpTestList('risk_flags')" :key="`risk-${item}`" class="rounded-full bg-rose-400/15 px-2 py-1 text-xs text-rose-100">
+                    {{ renderText(item) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-white/10 bg-white/5 p-3">
+              <p class="text-xs text-slate-400">Guven skoru</p>
+              <p class="mt-1 text-sm text-slate-200">{{ nlpTestAnalysis.confidence ?? '-' }}</p>
+            </div>
+          </div>
+          <div v-else class="flex h-full min-h-[320px] items-center justify-center text-center text-sm text-slate-400">
+            Test sonucu burada gorunecek.
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_360px] gap-6">
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between gap-3">
@@ -393,7 +518,7 @@ import { BoltIcon, HeartIcon, CheckCircleIcon, ScaleIcon, SparklesIcon, Exclamat
 import StatCard from '@/components/dashboard/StatCard.vue'
 import LineChart from '@/components/dashboard/LineChart.vue'
 import BarChart from '@/components/dashboard/BarChart.vue'
-import { feedbackApi, type Department360SummaryReportResponse, type DepartmentMonthlyDeepAnalysisResponse, type DepartmentMonthlyRAGReportResponse, type DepartmentNLPChartsResponse, type SummaryMetric } from '@/services/api/feedback.api'
+import { feedbackApi, type Department360SummaryReportResponse, type DepartmentMonthlyDeepAnalysisResponse, type DepartmentMonthlyRAGReportResponse, type DepartmentNLPChartsResponse, type NLPTestAnalysisResponse, type SummaryMetric } from '@/services/api/feedback.api'
 import { employeeApi } from '@/services/api/employee.api'
 import { useAuthStore } from '@/stores/auth'
 
@@ -405,6 +530,14 @@ const today = new Date()
 const selectedMonth = ref<number>(today.getMonth() + 1)
 const selectedYear = ref<number>(today.getFullYear())
 const selectedTeam = ref<string>('all')
+const nlpTestText = ref('Bu hafta code review surecinde cok destekleyiciydi; blokajimi hizla acti ve ekibe guven verdi.')
+const nlpScoreCommunication = ref(4)
+const nlpScoreTeamwork = ref(4)
+const nlpScoreLeadership = ref(4)
+const nlpScoreTechnical = ref(4)
+const nlpTestResult = ref<NLPTestAnalysisResponse | null>(null)
+const isNlpTestLoading = ref(false)
+const nlpTestError = ref('')
 
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin' || localStorage.getItem('role') === 'admin')
@@ -431,6 +564,31 @@ const yearOptions = computed(() => {
   const baseYear = today.getFullYear()
   return [baseYear - 1, baseYear, baseYear + 1]
 })
+
+const nlpTestSamples = [
+  {
+    label: 'Olumlu sinyal',
+    text: 'Bu hafta code review surecinde cok destekleyiciydi; blokajimi hizla acti ve ekibe guven verdi.',
+    scores: [4, 4, 4, 4],
+  },
+  {
+    label: 'Burnout riski',
+    text: 'Son iki haftadir deadline baskisi ve toplanti yogunlugu nedeniyle cok yorulmus gorunuyor; destek istemekte cekingen kaliyor.',
+    scores: [2, 2, 2, 2],
+  },
+  {
+    label: 'Flight riski',
+    text: 'Artik fikirlerinin onemsenmedigini soyluyor, ekipten kopuk davraniyor ve blokajlar cozulmedigi icin motivasyonu belirgin dusmus.',
+    scores: [2, 2, 1, 2],
+  },
+]
+
+const nlpScoreControls = [
+  { key: 'communication', label: 'Iletisim', model: nlpScoreCommunication },
+  { key: 'teamwork', label: 'Takim', model: nlpScoreTeamwork },
+  { key: 'leadership', label: 'Liderlik', model: nlpScoreLeadership },
+  { key: 'technical', label: 'Teknik', model: nlpScoreTechnical },
+]
 
 const scopedEmployees = computed(() => employees.value.filter((employee) => {
   const isEmployee = employee?.user?.role === 'employee'
@@ -493,6 +651,15 @@ function formatRiskLabel(value?: string | null) {
     low: 'DÃ¼ÅŸÃ¼k',
     medium: 'Orta',
     high: 'YÃ¼ksek',
+  }
+  return value ? (map[value] || value) : '-'
+}
+
+function formatSentiment(value?: string | null) {
+  const map: Record<string, string> = {
+    positive: 'Olumlu',
+    neutral: 'Notr',
+    negative: 'Olumsuz',
   }
   return value ? (map[value] || value) : '-'
 }
@@ -580,6 +747,43 @@ const burnoutRiskLabels = computed(() => departmentCharts.value?.burnout_risk_di
 const burnoutRiskValues = computed(() => departmentCharts.value?.burnout_risk_distribution.map((item) => item.value) || [0, 0, 0])
 const riskThemeLabels = computed(() => departmentCharts.value?.top_risk_themes.map((item) => item.label) || ['Veri yok'])
 const riskThemeValues = computed(() => departmentCharts.value?.top_risk_themes.map((item) => item.value) || [0])
+const nlpTestAnalysis = computed(() => nlpTestResult.value?.analysis || {})
+
+function applyNlpSample(sample: { text: string; scores: number[] }) {
+  nlpTestText.value = sample.text
+  nlpScoreCommunication.value = sample.scores[0]
+  nlpScoreTeamwork.value = sample.scores[1]
+  nlpScoreLeadership.value = sample.scores[2]
+  nlpScoreTechnical.value = sample.scores[3]
+  nlpTestError.value = ''
+}
+
+function nlpTestList(key: string) {
+  const value = nlpTestAnalysis.value[key]
+  return Array.isArray(value) ? value.filter((item) => String(item).trim()).slice(0, 5) : []
+}
+
+async function runNlpTest() {
+  if (!nlpTestText.value.trim()) return
+  isNlpTestLoading.value = true
+  nlpTestError.value = ''
+  try {
+    nlpTestResult.value = await feedbackApi.testNlpAnalysis({
+      response_text: nlpTestText.value,
+      department_id: currentDepartmentParam(),
+      target_role: 'employee',
+      score_communication: nlpScoreCommunication.value,
+      score_teamwork: nlpScoreTeamwork.value,
+      score_leadership: nlpScoreLeadership.value,
+      score_technical: nlpScoreTechnical.value,
+    })
+  } catch (error) {
+    console.error('NLP test analizi calistirilamadi:', error)
+    nlpTestError.value = 'Analiz calistirilamadi.'
+  } finally {
+    isNlpTestLoading.value = false
+  }
+}
 
 async function loadDepartmentReport() {
   try {
