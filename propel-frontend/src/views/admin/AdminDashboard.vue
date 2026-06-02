@@ -71,7 +71,7 @@
               <td class="px-6 py-4">{{ dept.employees }}</td>
               <td class="px-6 py-4">
                 <span :class="getScoreBadgeClass(dept.score)" class="px-2.5 py-1 rounded-md text-xs font-bold border">
-                  {{ dept.score }}
+                  {{ dept.scoreDisplay ?? dept.score }}
                 </span>
               </td>
               <td class="px-6 py-4 text-right">
@@ -92,53 +92,42 @@
                     <ExclamationTriangleIcon class="w-6 h-6" />
                 </div>
                 <div>
-                   <h3 class="font-bold text-rose-950">Uçuş Riski Radarı</h3> 
+                   <h3 class="font-bold text-rose-950">Uçuş Riski Radarı</h3>
                    <p class="text-xs text-rose-700/80">Ayrılma ihtimali yüksek kilit personeller</p>
                 </div>
             </div>
 
             <div class="space-y-3 relative z-10">
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-rose-100 flex items-center justify-between hover:scale-[1.02] transition-transform duration-200 cursor-pointer">
-                    <div class="flex items-center gap-3">
-                         <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 border border-slate-200">
-                            ED
-                         </div>
-                         <div>
-                             <h4 class="font-bold text-slate-800 text-sm">Elif Demir</h4>
-                             <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Senior DevOps</p>
-                         </div>
-                    </div>
-                    <div class="text-right">
-                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-rose-100 text-rose-700 border border-rose-200">
-                            %85 Risk
-                        </span>
-                        <p class="text-[10px] text-rose-600 mt-1 font-medium">Motivasyon Düşüşü</p>
-                    </div>
+                <div v-if="flightRiskEmployees.length === 0" class="text-sm text-slate-400 text-center py-4">
+                    Yüksek riskli personel bulunamadı.
                 </div>
-
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-rose-100 flex items-center justify-between hover:scale-[1.02] transition-transform duration-200 cursor-pointer">
+                <div
+                    v-for="emp in flightRiskEmployees"
+                    :key="emp.id"
+                    class="bg-white p-4 rounded-xl shadow-sm border border-rose-100 flex items-center justify-between hover:scale-[1.02] transition-transform duration-200 cursor-pointer"
+                    @click="$router.push(`/admin/employees/${emp.id}`)"
+                >
                     <div class="flex items-center gap-3">
-                         <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 border border-slate-200">
-                            CK
+                         <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 border border-slate-200 text-xs">
+                            {{ initials(emp.user?.full_name) }}
                          </div>
                          <div>
-                             <h4 class="font-bold text-slate-800 text-sm">Can Kaya</h4>
-                             <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Sales Lead</p>
+                             <h4 class="font-bold text-slate-800 text-sm">{{ emp.user?.full_name }}</h4>
+                             <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">{{ emp.position || emp.department?.name }}</p>
                          </div>
                     </div>
                     <div class="text-right">
-                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
-                            %65 Risk
+                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold"
+                          :class="emp.risk_level === 'High' ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-amber-100 text-amber-700 border border-amber-200'">
+                            {{ emp.risk_level === 'High' ? 'Yüksek Risk' : 'Orta Risk' }}
                         </span>
-                        <p class="text-[10px] text-amber-600 mt-1 font-medium">Aşırı İş Yükü</p>
+                        <p class="text-[10px] mt-1 font-medium" :class="emp.risk_level === 'High' ? 'text-rose-600' : 'text-amber-600'">
+                            {{ emp.latest_ms !== null && emp.latest_ms !== undefined ? `MS: ${emp.latest_ms.toFixed(1)}` : 'Veri yok' }}
+                        </p>
                     </div>
                 </div>
             </div>
-            
-            <button class="w-full mt-4 py-2.5 bg-white border border-rose-200 text-rose-700 text-xs font-bold rounded-lg hover:bg-rose-50 transition shadow-sm z-10 relative">
-                Tüm Risk Raporunu İncele
-            </button>
-            
+
             <!-- Decor -->
             <div class="absolute -bottom-12 -right-12 w-48 h-48 bg-rose-100/50 rounded-full blur-3xl z-0"></div>
         </div>
@@ -198,7 +187,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { UsersIcon, BuildingOfficeIcon, ChartBarIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import StatCard from '@/components/dashboard/StatCard.vue'
 import { employeeApi } from '@/services/api/employee.api'
@@ -211,7 +200,19 @@ const stats = ref({
   highRiskCount: '0'
 })
 
+const allEmployees = ref<any[]>([])
 const departments = ref<any[]>([])
+
+// Uçuş riski: High önce, sonra Medium — en fazla 4 kişi
+const flightRiskEmployees = computed(() =>
+  allEmployees.value
+    .filter((e: any) => e.risk_level === 'High' || e.risk_level === 'Medium')
+    .sort((a: any, b: any) => {
+      const order: Record<string, number> = { High: 0, Medium: 1 }
+      return (order[a.risk_level] ?? 2) - (order[b.risk_level] ?? 2)
+    })
+    .slice(0, 4)
+)
 
 const fetchDashboardData = async () => {
     try {
@@ -219,31 +220,43 @@ const fetchDashboardData = async () => {
             employeeApi.getEmployees(),
             dashboardApi.getInsights()
         ])
-        
+
+        allEmployees.value = empData
         stats.value.totalEmployees = empData.length.toString()
-        
-        // Count departments
-        const depts = new Set(empData.map((e: any) => e.department_name))
-        stats.value.totalDepartments = depts.size.toString()
-        
-        // Stats from insights
-        const scoreKpi = insightData.kpis.find((k: any) => k.title.includes('Bağlılık') || k.title.includes('Ortalama'))
-        stats.value.avgScore = scoreKpi ? scoreKpi.value : '0'
-        stats.value.highRiskCount = insightData.riskData[2].toString()
-        
-        // Populate departments table (mock or real if API exists)
-        // For now using mock departments but updating with real count logic if needed
-        departments.value = Array.from(depts).map((name, index) => {
-            const deptEmps = empData.filter((e: any) => e.department_name === name)
-            const avgDeptScore = (deptEmps.reduce((acc: number, curr: any) => acc + (curr.latest_ms || 0), 0) / (deptEmps.length || 1)).toFixed(1)
-            
+
+        // Benzersiz departman isimleri
+        const deptNames = new Set<string>(empData.map((e: any) => e.department?.name).filter(Boolean))
+        stats.value.totalDepartments = deptNames.size.toString()
+
+        // İstatistikler
+        const scoreKpi = insightData.kpis?.find((k: any) => k.title?.includes('Bağlılık') || k.title?.includes('Ortalama'))
+        stats.value.avgScore = scoreKpi ? scoreKpi.value : '—'
+        stats.value.highRiskCount = insightData.riskData?.[2]?.toString() ?? '0'
+
+        // Departman tablosu — yönetici: department_manager rolündeki çalışan
+        const managerByDept: Record<string, any> = {}
+        for (const emp of empData) {
+            if (emp.user?.role === 'department_manager' && emp.department?.name) {
+                managerByDept[emp.department.name] = emp
+            }
+        }
+
+        departments.value = Array.from(deptNames).map((name, index) => {
+            const deptEmps = empData.filter((e: any) => e.department?.name === name)
+            const msValues = deptEmps.map((e: any) => e.latest_ms).filter((v: any) => v !== null && v !== undefined)
+            const avgMs = msValues.length ? (msValues.reduce((a: number, b: number) => a + b, 0) / msValues.length).toFixed(1) : '—'
+            const mgr = managerByDept[name as string]
+            const mgrName = mgr?.user?.full_name ?? 'Yönetici Atanmadı'
+            const mgrInitials = mgrName === 'Yönetici Atanmadı' ? 'YA' : initials(mgrName)
+
             return {
                 id: index + 1,
                 name: name,
-                manager: 'Yönetici Atanmadı',
-                managerInitials: 'YA',
+                manager: mgrName,
+                managerInitials: mgrInitials,
                 employees: deptEmps.length,
-                score: parseFloat(avgDeptScore)
+                score: avgMs === '—' ? 0 : parseFloat(avgMs),
+                scoreDisplay: avgMs,
             }
         })
 
@@ -252,13 +265,18 @@ const fetchDashboardData = async () => {
     }
 }
 
+function initials(name: string | undefined): string {
+    if (!name) return '?'
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+}
+
 onMounted(() => {
     fetchDashboardData()
 })
 
 const getScoreBadgeClass = (score: number) => {
-  if (score >= 4.0) return 'bg-emerald-50 text-emerald-700 border-emerald-100'
-  if (score >= 3.0) return 'bg-amber-50 text-amber-700 border-amber-100'
+  if (score >= 7) return 'bg-emerald-50 text-emerald-700 border-emerald-100'
+  if (score >= 4) return 'bg-amber-50 text-amber-700 border-amber-100'
   return 'bg-rose-50 text-rose-700 border-rose-100'
 }
 </script>
