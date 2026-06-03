@@ -185,6 +185,79 @@ def get_survey_insights(
         "recommendations": recs
     }
 
+@router.post("/analytics/gemini-insights")
+def post_survey_gemini_insights(
+    payload: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Frontend'den gelen filtrelenmiş anket verisini Gemini ile yorumla.
+    Payload: { stats, sample_comments, dept_label }
+    """
+    from app.services.ai_service import AIService
+
+    stats = payload.get("stats", {})
+    sample_comments = payload.get("sample_comments", [])  # [{"name", "score", "mte", "ars", "challenge", "success", "suggestion"}]
+    dept_label = payload.get("dept_label", "Tüm Departmanlar")
+
+    if not stats:
+        return {"narrative": None, "stats": {}, "gemini_used": False}
+
+    # Yüksek ARS'li çalışanları öne çıkar
+    risky = [c for c in sample_comments if (c.get("ars") or 0) >= 0.5]
+    negative_mte = [c for c in sample_comments if (c.get("mte") or 0) < -0.1]
+
+    # Gerçek yorumlardan alıntılar oluştur
+    comment_block = ""
+    if sample_comments:
+        shown = sample_comments[:12]  # en fazla 12 kişi
+        lines = []
+        for c in shown:
+            parts = [f"- {c.get('name','?')} (MS={c.get('score','?')}, MTE={c.get('mte','?')}, ARS={c.get('ars','?')})"]
+            if c.get("challenge"):
+                parts.append(f"  Zorluk: \"{c['challenge']}\"")
+            if c.get("success"):
+                parts.append(f"  Başarı: \"{c['success']}\"")
+            if c.get("suggestion"):
+                parts.append(f"  Öneri: \"{c['suggestion']}\"")
+            lines.append("\n".join(parts))
+        comment_block = "\n".join(lines)
+
+    narrative = None
+    if AIService.GEMINI_API_KEY:
+        prompt = f"""Sen bir kurumsal İK ve çalışan deneyimi uzmanısın. Aşağıdaki HAFTALıK NABIZ ANKETİ verilerini analiz et ve Türkçe yönetici raporu hazırla.
+
+## Kapsam: {dept_label}
+Toplam yanıt: {stats.get('total', 0)} | Ortalama Bağlılık (MS): {stats.get('avg_ms', 0)}/5 | Motivasyon Trendi (MTE): {stats.get('avg_mte', 0)} | Ort. Ayrılma Riski (ARS): {stats.get('avg_ars', 0)}
+Risk dağılımı: Yüksek={stats.get('high_risk', 0)}, Orta={stats.get('med_risk', 0)}, Düşük={stats.get('low_risk', 0)}
+Negatif MTE (motivasyon düşüşü): {stats.get('neg_mte', 0)} kişi | Pozitif MTE: {stats.get('pos_mte', 0)} kişi
+
+## Çalışan Yanıtları (Gerçek Veri)
+{comment_block if comment_block else "(Yorum verisi yok)"}
+
+## Yüksek Riskli / Negatif MTE'li Çalışanlar
+{chr(10).join(f"- {c.get('name')} (ARS={c.get('ars')})" for c in risky[:5]) if risky else "Tespit edilmedi"}
+{chr(10).join(f"- {c.get('name')} (MTE={c.get('mte')})" for c in negative_mte[:5]) if negative_mte else ""}
+
+## Görev
+SADECE şu 3 bölümü yaz. Her bölüm net ve kısa olsun:
+
+### GENEL DURUM
+(Yukarıdaki gerçek verilere göre ekibin durumunu 2-3 cümleyle özetle)
+
+### ÖNE ÇIKAN RİSKLER
+(Gerçek veriden tespit ettiğin en kritik 2-3 risk noktasını madde madde yaz)
+
+### YÖNETİCİ İÇİN AKSİYONLAR
+(Bu spesifik verilere göre 3-4 somut, uygulanabilir adım)
+
+Türkçe, profesyonel yaz. Belirsiz genel ifadeler kullanma — verideki gerçek sayılara ve alıntılara atıfta bulun.
+"""
+        narrative = AIService._generate_with_gemini(prompt, timeout_seconds=30)
+
+    return {"narrative": narrative, "stats": stats, "gemini_used": narrative is not None}
+
+
 @router.get("/", response_model=List[SurveyResponseDetailResponse])
 def list_survey_responses(
     skip: int = 0,

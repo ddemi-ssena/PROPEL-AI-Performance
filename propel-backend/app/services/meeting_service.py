@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.models.employee import Employee
 from app.db.models.meeting import Meeting, MeetingAttendee, Notification
 from app.db.models.user import User
-from app.schemas.meeting import TeamMeetingCreateRequest, TeamMeetingCreateResponse
+from app.schemas.meeting import MeetingListItemResponse, TeamMeetingCreateRequest, TeamMeetingCreateResponse
 
 
 class MeetingService:
@@ -102,6 +102,33 @@ class MeetingService:
             attendees=attendees,
             notifications=notifications,
         )
+
+    @staticmethod
+    def list_meetings(
+        db: Session,
+        team: str | None = None,
+        limit: int = 50,
+    ) -> list[MeetingListItemResponse]:
+        query = db.query(Meeting)
+        if team:
+            query = query.filter(Meeting.team == team)
+        meetings = query.order_by(Meeting.scheduled_date.desc()).limit(limit).all()
+        return [
+            MeetingListItemResponse(
+                id=m.id,
+                team=m.team,
+                title=m.title,
+                scheduled_date=m.scheduled_date,
+                scheduled_time=m.scheduled_time,
+                duration_minutes=m.duration_minutes,
+                meeting_url=m.meeting_url,
+                note=m.note,
+                agenda_items=m.agenda_items or [],
+                attendee_count=len(m.attendees),
+                source=m.source,
+            )
+            for m in meetings
+        ]
 
     @staticmethod
     def _resolve_employee(db: Session, db_employee_id: int | None) -> Employee | None:

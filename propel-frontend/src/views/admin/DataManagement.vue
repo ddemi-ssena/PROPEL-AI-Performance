@@ -27,8 +27,6 @@
                  <label class="block text-sm font-medium text-slate-700 mb-1">Veri Tipi</label>
                  <select v-model="selectedDataType" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                      <option>Performans Metrikleri (KPI)</option>
-                     <option>Personel Listesi</option>
-                     <option>Anket Sonuçları</option>
                  </select>
              </div>
 
@@ -109,7 +107,7 @@
                       </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-100">
-                      <tr v-for="item in uploadHistory" :key="item.id" class="hover:bg-slate-50">
+                      <tr v-for="item in visibleHistory" :key="item.id" class="hover:bg-slate-50">
                           <td class="px-6 py-3 text-sm text-slate-600">#{{ item.id }}</td>
                           <td class="px-6 py-3 text-sm text-slate-600">{{ formatDate(item.upload_date) }}</td>
                           <td class="px-6 py-3 text-sm font-medium text-slate-900">
@@ -126,7 +124,7 @@
                               </span>
                           </td>
                       </tr>
-                      <tr v-if="uploadHistory.length === 0 && !isLoadingHistory">
+                      <tr v-if="visibleHistory.length === 0 && !isLoadingHistory">
                           <td colspan="5" class="px-6 py-8 text-center text-slate-500 text-sm">
                               Henüz bir veri yüklemesi yapılmamış.
                           </td>
@@ -135,8 +133,10 @@
               </table>
           </div>
           
-          <div class="p-4 border-t border-slate-200 flex justify-center">
-               <button class="text-sm text-blue-600 hover:text-blue-700 font-medium">Tüm Geçmişi Görüntüle</button>
+          <div v-if="uploadHistory.length > PREVIEW_LIMIT" class="p-4 border-t border-slate-200 flex justify-center">
+               <button @click="showAll = !showAll" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                 {{ showAll ? 'Daha Az Göster' : `Tüm Geçmişi Görüntüle (${uploadHistory.length} kayıt)` }}
+               </button>
           </div>
       </div>
     </div>
@@ -159,7 +159,13 @@ const isLoadingHistory = ref(false)
 const isDownloadingTemplate = ref(false)
 const lastUploadSuccess = ref(false)
 
+const PREVIEW_LIMIT = 6
+const showAll = ref(false)
+
 const latestUpload = computed(() => uploadHistory.value[0] || null)
+const visibleHistory = computed(() =>
+  showAll.value ? uploadHistory.value : uploadHistory.value.slice(0, PREVIEW_LIMIT)
+)
 
 const fetchHistory = async () => {
     isLoadingHistory.value = true

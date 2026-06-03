@@ -709,19 +709,19 @@ Nihan Korkmaz, Baran Özdemir, Ozan Çetin, Tuncay Doğan, Aslı Erdoğan, Burcu
   - KPI özeti: en yüksek 5 KPI progress bar olarak
   - Loading/error state eklendi
 - `views/admin/AdminDashboard.vue`:
-  - Uçuş Riski: employees listesinden `risk_level=High/Medium` filtre, top 4
-  - Departman yöneticisi: `user.role === 'department_manager'` ile tespit → gerçek isim
-  - Departman skoru: `latest_ms` ortalaması
+  - Uçuş Riski: employees listesinden `risk_level=High/Medium` filtre, `combined_risk_score`'a göre sıralı top 4
+  - Departman yöneticisi: `user.role === 'department_manager'` ile tespit → gerçek isim ve initials
+  - Departman skoru: `latest_ms` ortalaması (MS: 0-10 skalası)
 - `views/admin/DataManagement.vue`:
   - "Şablon İndir" butonu `adminUploadApi.downloadTemplate(dept)` çağrısına bağlandı
-  - Hardcoded "Pazarlama uyarısı" → yükleme başarısında yeşil banner ile değiştirildi
+  - Hardcoded "Pazarlama uyarısı" → yükleme başarısında gösterilen yeşil banner ile değiştirildi
 - `services/api/employee.api.ts` — `getEmployee(id)` metodu eklendi
-- `services/api/admin_upload.api.ts` — `downloadTemplate(dept)` metodu eklendi
+- `services/api/admin_upload.api.ts` — `downloadTemplate(dept)` metodu eklendi (blob download)
 
 **Risk Seviyesi Kaynağı** (önemli not):
 - `risk_level` Excel dosyalarından **gelmez**; nabız anketinden hesaplanır
-- `SurveyResponse.ars_score` (0-1): `≥ 0.6` → High, `≥ 0.2` → Medium, `< 0.2` → Low
-- Seed data `seed_data.py` deterministik formülle üretir; gerçek kullanımda ML metin analizi
+- `SurveyResponse.ars_score` (işten ayrılma riski, 0-1): `ars_score ≥ 0.6` → High, `≥ 0.2` → Medium, `< 0.2` → Low
+- `ars_score` iki kaynaktan gelir: (1) gerçek kullanımda ML motoru metin analizi, (2) seed_data.py deterministik formül
 
 **Push**: `cansuyildirimmm/AI-Supported-Department-Employee-Performance-Analysis-System` → branch `99999999.branch` (commit `9061d68`)
 
@@ -755,6 +755,66 @@ docker restart propel_frontend
 
 ---
 
+### 2026-06-03 Admin Panel ML Entegrasyonu + Gemini AI ★ BÜYÜK
+
+**Personel Yönetimi (EmployeeManagement.vue) — Tam ML Entegrasyonu**
+- `GET /admin/uploads/flight-risk` endpoint'i çağrılarak ML verileri alınır
+- `external_employee_code` üzerinden employee listesi ile ML haritası birleştirilir
+- Performans çubuğu: ML'den `performance_score` (0-100) — artık `latest_ms * 20` değil
+- Risk rozeti: ML'den `risk_level` (High/Low) — artık seed ARS formülü değil
+- Departman filtresi: veritabanından dinamik
+- Sıralama (performans ↑↓, risk, isim) gerçekten çalışıyor
+- En altta: hangi upload ID'lerinin kullanıldığı gösteriliyor
+
+**Backend: `GET /admin/uploads/ai-insights` — Yeni Endpoint**
+- ML flight-risk verisini (61 çalışan: 31 satış + 30 yazılım) çeker
+- İstatistikleri derleyip Gemini'ye gönderir
+- Gemini: Genel Durum / Kritik Bulgular / Aksiyon Önerileri raporu üretir
+- KPI kartları, risk donut, çalışan tablosu, Gemini narratifi döndürür
+- `gemini_used: true/false` ile Gemini durumu belirtilir
+
+**Yapay Zeka İçgörüleri (AIInsights.vue) — Tamamen Yeniden Yazıldı**
+- Eski: `GET /surveys/analytics/insights` (deterministik, 1586 kayıt, yanlış sayılar)
+- Yeni: `GET /admin/uploads/ai-insights` (ML + Gemini)
+- 4 KPI kartı: toplam çalışan, yüksek riskli, ort. performans, güvenli çalışan
+- Risk donut: gerçek ML dağılımı
+- Gemini raporu: 3 bölümlü Türkçe yönetici raporu, mor rozet
+- Aksiyon önerileri: Gemini'den çıkarılan maddeler kart formatında
+- Tüm çalışan tablosu: 61 çalışan, filtreli, sayfalı
+
+**Gemini API Entegrasyonu**
+- `GEMINI_API_KEY` `.env` dosyasına eklendi
+- `AIService._generate_with_gemini()` kullanılıyor (mevcut altyapı)
+- Model: `gemini-1.5-flash` (otomatik seçim)
+
+**Veri Yönetimi (DataManagement.vue)**
+- "Veri Tipi" dropdown: sadece "Performans Metrikleri (KPI)" kaldı (Personel Listesi + Anket Sonuçları kaldırıldı)
+- "Tüm Geçmişi Görüntüle" butonu çalışıyor: ilk 6 kayıt görünür, butona tıklayınca tamamı açılır
+
+**Anket Sonuçları (SurveyResults.vue) — Gemini Panel**
+- Departman filtresi: "Haftalık Nabız / Motivasyon" → "Tüm Departmanlar / Satış / Yazılım" olarak değiştirildi
+- Sağ alt köşeye sabitlenmiş mor "Gemini ile Yorumla" butonu eklendi
+- Panel açılınca frontend filtrelenmiş veriyi (stats + gerçek q4/q5/q6 yanıtları) POST eder
+- Backend `POST /surveys/analytics/gemini-insights`: gerçek anket yanıtlarını Gemini'ye iletir
+- Gemini: sayfadaki gerçek çalışan yorumlarına atıfta bulunarak rapor üretir
+- Departman değişince açık panel otomatik yenilenir
+
+**Admin Menü**
+- "Satis ML Analizi" admin sidebar'dan kaldırıldı
+
+**Uçuş Riski Backend Düzeltmesi**
+- Yazılım bloğu backend container'da çalışmıyordu (restart gerekirdi) → düzeltildi
+- Artık flight-risk: 30 yazılım (SE-xxx) + 31 satış (SA-xxx) = 61 çalışan
+- 61/62 employee_code eşleşiyor (MGR-SW datasette olmadığı için ML verisi yok — beklenen)
+
+**Önemli Teknik Notlar**:
+- `GET /admin/uploads/ai-insights` yaklaşık 15-20 sn sürer (ML prediction + Gemini)
+- `POST /surveys/analytics/gemini-insights` yaklaşık 5-8 sn sürer
+- `docker restart propel_backend` sonrası token yenilenmesi gerekiyor (JWT süre sıfırlanır)
+- Flight-risk endpoint'i her çağrıda ML modellerini çalıştırır (cache yok)
+
+---
+
 ## Sonraki Adımlar / Roadmap
 
 - [x] Satış departmanı frontend dashboard'u (Vue 3) — employee/manager/admin görünümleri
@@ -768,10 +828,14 @@ docker restart propel_frontend
 - [x] DepartmentAnalysisView + EmployeeAnalysisView mojibake encoding düzeltmesi
 - [x] Admin panel mock verileri gerçek backend'e bağlandı (EmployeeDetails, AdminDashboard, DataManagement)
 - [x] Şablon indirme endpoint'i eklendi (GET /admin/uploads/template)
-- [ ] Personel listesi performans skorları ML pipeline'ına bağlanacak
+- [x] Personel Yönetimi: ML performans skoru + risk seviyesi (flight-risk endpoint'e bağlandı)
+- [x] Yapay Zeka İçgörüleri: ML + Gemini AI entegrasyonu (AIInsights.vue tamamen yeniden yazıldı)
+- [x] Gemini API anahtarı entegre edildi (gemini-1.5-flash)
+- [x] Anket Sonuçları: departman filtresi + Gemini yorum paneli (gerçek q4/q5/q6 yanıtları)
+- [x] Admin menüden "Satış ML Analizi" kaldırıldı
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri
-- [ ] LLM narrative endpoint'ini async/background job olarak ayır
+- [ ] LLM/Gemini endpoint'lerini async/background job olarak ayır (şu an bloklayıcı)
 - [ ] Departman Analizi AI Modal → PDF İndir ve Email Gönder backend bağlantısı
 - [ ] Yeni departman desteği (İK, Pazarlama): registry + kpi_registry + seed genişletme
 - [ ] WebSocket ile gerçek zamanlı bildirimler

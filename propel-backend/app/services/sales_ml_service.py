@@ -145,12 +145,15 @@ class SalesMLService:
 
     @staticmethod
     def _employee_profile(db: Session, employee_id: int, row: dict[str, Any] | None = None) -> dict[str, Any]:
-        candidate_codes = {SalesMLService._dataset_employee_code(employee_id), str(employee_id)}
-        employee = (
-            db.query(Employee)
-            .filter(Employee.external_employee_code.in_(candidate_codes))
-            .first()
-        )
+        # Try DB primary key first (handles calls from get_my_performance where employee.id is passed)
+        employee = db.query(Employee).filter(Employee.id == employee_id).first()
+        if not employee:
+            candidate_codes = {SalesMLService._dataset_employee_code(employee_id), str(employee_id)}
+            employee = (
+                db.query(Employee)
+                .filter(Employee.external_employee_code.in_(candidate_codes))
+                .first()
+            )
 
         team = _row_get(row or {}, "team") or _row_get(row or {}, "region") or _row_get(row or {}, "department")
         role = _row_get(row or {}, "role") or _row_get(row or {}, "role_level")

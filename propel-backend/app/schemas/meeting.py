@@ -64,6 +64,22 @@ class TeamReportShareResponse(BaseModel):
     recipients: list[NotificationResponse]
 
 
+class MeetingListItemResponse(BaseModel):
+    id: int
+    team: str
+    title: str
+    scheduled_date: date
+    scheduled_time: time
+    duration_minutes: int
+    meeting_url: Optional[str] = None
+    note: Optional[str] = None
+    agenda_items: list[str]
+    attendee_count: int
+    source: str
+
+    model_config = {"from_attributes": True}
+
+
 class TeamMeetingCreateResponse(BaseModel):
     id: int
     team: str
