@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.db.models.department import Department
 from app.db.models.employee import Employee
 from app.db.models.user import User, UserRole
 from app.db.models.nlp import NLPPeriodType
@@ -24,9 +25,12 @@ from app.schemas.feedbacks import (
     DepartmentMonthlyDeepAnalysisResponse,
     EmployeeMonthlyRAGReportResponse,
     DepartmentMonthlyRAGReportResponse,
+    NLPTestAnalysisPayload,
+    NLPTestAnalysisResponse,
 )
 from app.services.feedback_service import FeedbackService
 from app.services.nlp_service import NLPService
+from app.services.ai_service import AIService
 
 router = APIRouter()
 
@@ -154,6 +158,53 @@ def get_progress_alias(
         completed_count=completed,
         remaining_count=remaining,
         is_completed=completed >= required,
+    )
+
+
+@router.post("/nlp/test-analysis", response_model=NLPTestAnalysisResponse)
+def test_weekly_nlp_analysis(
+    payload: NLPTestAnalysisPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in (UserRole.admin, UserRole.department_manager):
+        raise HTTPException(status_code=403, detail="NLP test analizi sadece admin veya yonetici icindir")
+
+    current_employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+    department_name = "Genel"
+    if current_user.role == UserRole.department_manager:
+        if not current_employee or not current_employee.department:
+            raise HTTPException(status_code=404, detail="Yonetici departmani bulunamadi")
+        if payload.department_id and payload.department_id != current_employee.department_id:
+            raise HTTPException(status_code=403, detail="Sadece kendi departmaniniz icin NLP testi yapabilirsiniz")
+        department_name = current_employee.department.name
+    elif payload.department_id:
+        department = db.query(Department).filter(Department.id == payload.department_id).first()
+        if not department:
+            raise HTTPException(status_code=404, detail="Departman bulunamadi")
+        department_name = department.name
+    elif current_employee and current_employee.department:
+        department_name = current_employee.department.name
+
+    target_role = UserRole(payload.target_role)
+    analysis, model_provider, model_name = AIService.analyze_weekly_feedback(
+        dept_name=department_name,
+        target_role=target_role,
+        week_theme=payload.week_theme,
+        direction_label_tr=payload.direction_label,
+        question_text=payload.question_text,
+        response_text=payload.response_text,
+        score_communication=payload.score_communication,
+        score_teamwork=payload.score_teamwork,
+        score_leadership=payload.score_leadership,
+        score_technical=payload.score_technical,
+    )
+
+    return NLPTestAnalysisResponse(
+        department_name=department_name,
+        model_provider=model_provider,
+        model_name=model_name,
+        analysis=analysis,
     )
 
 

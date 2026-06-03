@@ -1,0 +1,302 @@
+[
+  {
+    "id": "P001",
+    "text": "Bu hafta code review surecinde cok destekleyiciydi; blokajimi hizla acti ve ekibe guven verdi.",
+    "scores": {"communication": 4, "teamwork": 4, "leadership": 4, "technical": 4},
+    "expected": {"sentiment_label": "positive", "burnout_risk": "low", "flight_risk": "low"}
+  },
+  {
+    "id": "P002",
+    "text": "Sprint planlamasinda belirsiz konulari acikca netlestirdi, ekibin karar almasini hizlandirdi ve motivasyonu yukseltti.",
+    "scores": {"communication": 5, "teamwork": 4, "leadership": 4, "technical": 4},
+    "expected": {"sentiment_label": "positive", "burnout_risk": "low", "flight_risk": "low"}
+  },
+  {
+    "id": "P003",
+    "text": "Yeni gelen arkadasa sabirli mentorluk yapti, teknik borc alanlarini anlatti ve ekip uyumuna olumlu katki verdi.",
+    "scores": {"communication": 4, "teamwork": 5, "leadership": 4, "technical": 4},
+    "expected": {"sentiment_label": "positive", "burnout_risk": "low", "flight_risk": "low"}
+  },
+  {
+    "id": "P004",
+    "text": "Kriz aninda sakin kaldi, cozum onerilerini net paylasti ve herkesin gorevini sahiplenmesine yardimci oldu.",
+    "scores": {"communication": 4, "teamwork": 4, "leadership": 4, "technical": 5},
+    "expected": {"sentiment_label": "positive", "burnout_risk": "low", "flight_risk": "low"}
+  },
+  {
+    "id": "P005",
+    "text": "Dokumantasyon eksigini fark edip kendi inisiyatifiyle tamamlamasi ekipte guven ve hizli ilerleme sagladi.",
+    "scores": {"communication": 4, "teamwork": 4, "leadership": 3, "technical": 5},
+    "expected": {"sentiment_label": "positive", "burnout_risk": "low", "flight_risk": "low"}
+  },
+  {
+    "id": "P006",
+    "text": "Toplantida acik ve yapici konustu, farkli fikirleri dinledi ve ekip icinde guven veren bir tutum sergiledi.",
+    "scores": {"communication": 5, "teamwork": 5, "leadership": 4, "technical": 3},
+    "expected": {"sentiment_label": "positive", "burnout_risk": "low", "flight_risk": "low"}
+  },
+  {
+    "id": "P007",
+    "text": "Zor bir hatayi sahiplenip hizli cozum uretmesi ekibin stresini azaltti ve olumlu tutum yaratti.",
+    "scores": {"communication": 4, "teamwork": 4, "leadership": 4, "technical": 5},
+    "expected": {"sentiment_label": "positive", "burnout_risk": "low", "flight_risk": "low"}
+  },
+  {
+    "id": "P008",
+    "text": "Geri bildirimleri savunmaya gecmeden dinledi, ogrendiklerini uyguladi ve gelisime acik oldugunu gosterdi.",
+    "scores": {"communication": 4, "teamwork": 4, "leadership": 3, "technical": 4},
+    "expected": {"sentiment_label": "positive", "burnout_risk": "low", "flight_risk": "low"}
+  },
+  {
+    "id": "P009",
+    "text": "Musteri tarafindan gelen baskiya ragmen sakin kaldi, ekibi bilgilendirdi ve sureci seffaf yonetti.",
+    "scores": {"communication": 5, "teamwork": 4, "leadership": 4, "technical": 4},
+    "expected": {"sentiment_label": "positive", "burnout_risk": "low", "flight_risk": "low"}
+  },
+  {
+    "id": "P010",
+    "text": "Pull requestlerde ogretici yorumlar yazdi; bu hafta ekipte kalite ve ogrenme istegini guclendirdi.",
+    "scores": {"communication": 4, "teamwork": 4, "leadership": 4, "technical": 5},
+    "expected": {"sentiment_label": "positive", "burnout_risk": "low", "flight_risk": "low"}
+  },
+  {
+    "id": "N001",
+    "text": "Gorevlerini tamamliyor fakat bu hafta toplantilarda daha sessizdi; belirgin bir risk ya da olumlu enerji gozlemlemedim.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "N002",
+    "text": "Is akisi genel olarak stabil ilerledi, ekip uyumu normaldi ancak ekstra sahiplenme veya motivasyon artisi gorulmedi.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "N003",
+    "text": "Bu hafta teknik gorevlerini zamaninda bitirdi, fakat iletisimde daha proaktif olmasi ekip icin faydali olur.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 4},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "N004",
+    "text": "Yeni surece uyum sagliyor, henuz cok gorunur katkisi yok ama belirgin bir kopma veya stres sinyali de yok.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "N005",
+    "text": "Ekip icinde uyumlu davrandi ancak karar alma noktalarinda biraz cekingen kaldi, destek verilirse toparlanabilir.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "N006",
+    "text": "Hafta boyunca beklenen isleri yerine getirdi; motivasyonunda belirgin artis veya dusus fark etmedim.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "N007",
+    "text": "Kod kalitesi kabul edilebilir seviyedeydi, yalniz review donuslerine daha hizli cevap vermesi gerekiyor.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 4},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "N008",
+    "text": "Planlanan gorevlerde buyuk bir aksama olmadi, yine de ekip ile bilgi paylasimi daha duzenli olabilir.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "N009",
+    "text": "Performansi dengeli gorunuyor; deadline baskisi yoktu, destek ihtiyaci ise sadece kucuk teknik konularda belirdi.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "N010",
+    "text": "Bu hafta ekipte normal bir tempo izledi, olumlu veya olumsuz kuvvetli bir davranis sinyali olusmadi.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "B001",
+    "text": "Son iki haftadir deadline baskisi ve toplanti yogunlugu nedeniyle cok yorulmus gorunuyor; destek istemekte cekingen kaliyor.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "high"}
+  },
+  {
+    "id": "B002",
+    "text": "Surekli fazla mesai yaptigini soyluyor, enerjisi dusmus ve basit kararlar icin bile stres yasiyor.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "medium"}
+  },
+  {
+    "id": "B003",
+    "text": "Bu hafta is yukunu kaldirmakta zorlandi, toplantilarda gergindi ve destek alamadigini birkac kez dile getirdi.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 1, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "high"}
+  },
+  {
+    "id": "B004",
+    "text": "Kisa surede cok fazla gorev almasi onu yormus; motivasyonu dusuk ve hatalara karsi toleransi azaldi.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "medium"}
+  },
+  {
+    "id": "B005",
+    "text": "Toplanti yogunlugu ve belirsiz oncelikler yuzunden kendini tukenmis hissettigini soyledi, yardim istemekte gec kaliyor.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "medium"}
+  },
+  {
+    "id": "B006",
+    "text": "Sprint sonunda cok yoruldugunu ve artik detaylara odaklanamadigini belirtti, is yuku azaltma destegi gerekiyor.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "medium"}
+  },
+  {
+    "id": "B007",
+    "text": "Deadline yetismedigi icin hafta boyunca baski altindaydi, molalari atliyor ve motivasyonu hizla dusuyor.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "medium"}
+  },
+  {
+    "id": "B008",
+    "text": "Cok fazla paralel isin arasinda kaldigini soyledi; yorgunluk ve stres bu hafta performansini belirgin etkiledi.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "medium"}
+  },
+  {
+    "id": "B009",
+    "text": "Surekli acil islerle bolundugu icin odaklanamiyor, yorgun ve destek ihtiyacini artik daha acik ifade ediyor.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 2, "technical": 3},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "medium"}
+  },
+  {
+    "id": "B010",
+    "text": "Son haftalarda hevesi azaldi, fazla is yuku nedeniyle kendini yalniz ve baski altinda hissettigini anlatti.",
+    "scores": {"communication": 2, "teamwork": 1, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "high"}
+  },
+  {
+    "id": "F001",
+    "text": "Artik fikirlerinin onemsenmedigini soyluyor, ekipten kopuk davraniyor ve blokajlar cozulmedigi icin motivasyonu belirgin dusmus.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 1, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "high", "flight_risk": "high"}
+  },
+  {
+    "id": "F002",
+    "text": "Bu isi benim gorevim degil diyerek sorumluluk almaktan kacindi, ekip hedeflerine inanci zayif gorunuyor.",
+    "scores": {"communication": 2, "teamwork": 1, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "medium", "flight_risk": "high"}
+  },
+  {
+    "id": "F003",
+    "text": "Toplantilarda artik katki vermiyor, kararlarin kendisini ilgilendirmedigini soyluyor ve aidiyeti zayiflamis duruyor.",
+    "scores": {"communication": 1, "teamwork": 1, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "medium", "flight_risk": "high"}
+  },
+  {
+    "id": "F004",
+    "text": "Onumuzdeki yil burada kalip kalmayacagindan emin olmadigini soyledi, yonetim destegine guveni dusuk.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 1, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "medium", "flight_risk": "high"}
+  },
+  {
+    "id": "F005",
+    "text": "Ekipten uzaklasmis gibi, sorulara gec donuyor ve islerin sonucunu artik fazla onemsemedigini belirtiyor.",
+    "scores": {"communication": 1, "teamwork": 1, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "medium", "flight_risk": "high"}
+  },
+  {
+    "id": "F006",
+    "text": "Surecler izin vermiyor diyerek pasif kaldi, cozum aramak yerine ekiple arasina mesafe koydu.",
+    "scores": {"communication": 2, "teamwork": 1, "leadership": 2, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "medium", "flight_risk": "high"}
+  },
+  {
+    "id": "F007",
+    "text": "Bu hafta baska ekiplerle calismak istedigini ima etti, mevcut takima baglilik ve guven hissi dusuk.",
+    "scores": {"communication": 2, "teamwork": 1, "leadership": 2, "technical": 3},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "medium", "flight_risk": "high"}
+  },
+  {
+    "id": "F008",
+    "text": "Teknik kararlarin kendisine danisilmadan alindigini soyluyor, bu durum onda kopma ve guvensizlik yaratmis.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 1, "technical": 3},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "medium", "flight_risk": "high"}
+  },
+  {
+    "id": "F009",
+    "text": "Geri bildirimlere kapali degil ama artik bu ekipte ilerleme goremedigini soyluyor, aidiyet riski yuksek.",
+    "scores": {"communication": 2, "teamwork": 2, "leadership": 2, "technical": 3},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "medium", "flight_risk": "high"}
+  },
+  {
+    "id": "F010",
+    "text": "Yoneticiyle guven iliskisi zayiflamis, kararlarin adil olmadigini dusunuyor ve ekipten uzak duruyor.",
+    "scores": {"communication": 2, "teamwork": 1, "leadership": 1, "technical": 2},
+    "expected": {"sentiment_label": "negative", "burnout_risk": "medium", "flight_risk": "high"}
+  },
+  {
+    "id": "M001",
+    "text": "Hafta basinda stresliydi fakat mentorluk destegi aldiktan sonra toparlandi ve gorevlerini sahiplenmeye basladi.",
+    "scores": {"communication": 3, "teamwork": 4, "leadership": 4, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "low"}
+  },
+  {
+    "id": "M002",
+    "text": "Deadline baskisi vardi ama ekiple acik iletisim kurdu, riskleri erken paylasarak guven kaybini onledi.",
+    "scores": {"communication": 4, "teamwork": 4, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "low"}
+  },
+  {
+    "id": "M003",
+    "text": "Motivasyonu dalgalaniyor; bazen cekingen kaliyor ama destek verildiginde hizla cozum uretip uyum sagliyor.",
+    "scores": {"communication": 3, "teamwork": 4, "leadership": 3, "technical": 4},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "M004",
+    "text": "Teknik borc konularinda zorlandi ancak yardim isteyip ogrenmeye acik davrandi, kalici bir kopma sinyali yok.",
+    "scores": {"communication": 3, "teamwork": 4, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "low"}
+  },
+  {
+    "id": "M005",
+    "text": "Is yuku fazla oldugu icin yoruldu ama oncelikleri netlestirince sakinlesti ve ekip destegini olumlu karsiladi.",
+    "scores": {"communication": 3, "teamwork": 4, "leadership": 4, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "low"}
+  },
+  {
+    "id": "M006",
+    "text": "Bir surec blokaji motivasyonunu dusurdu, fakat blokaj kaldirilinca tekrar hizlandi ve olumlu tutum sergiledi.",
+    "scores": {"communication": 3, "teamwork": 4, "leadership": 4, "technical": 4},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "low"}
+  },
+  {
+    "id": "M007",
+    "text": "Ekip icinde bazen kararsiz kaliyor, yine de geri bildirimleri dikkate alip gelisim icin somut adimlar atiyor.",
+    "scores": {"communication": 3, "teamwork": 4, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "M008",
+    "text": "Stresli anlarda iletisimi zayifliyor ama sonrasinda durumu toparlayip ekibe acik bir ozet paylasiyor.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "M009",
+    "text": "Motivasyon dususu sinyali var, ancak mentor desteği ve net hedefler verildiginde ekipte kalma istegi gucleniyor.",
+    "scores": {"communication": 3, "teamwork": 3, "leadership": 4, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "medium"}
+  },
+  {
+    "id": "M010",
+    "text": "Hafta ortasinda gergindi fakat yapici geri bildirimden sonra surece yeniden dahil oldu ve uyum sagladi.",
+    "scores": {"communication": 3, "teamwork": 4, "leadership": 3, "technical": 3},
+    "expected": {"sentiment_label": "neutral", "burnout_risk": "medium", "flight_risk": "low"}
+  }
+]

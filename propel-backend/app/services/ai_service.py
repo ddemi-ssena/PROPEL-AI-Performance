@@ -1170,9 +1170,42 @@ class AIService:
         moderate_negative_hits = sum(1 for keyword in moderate_negative_keywords if keyword in normalized_text)
         strong_positive_hits = sum(1 for keyword in strong_positive_keywords if keyword in normalized_text)
         moderate_positive_hits = sum(1 for keyword in moderate_positive_keywords if keyword in normalized_text)
+        no_risk_context = any(
+            keyword in normalized_text
+            for keyword in ["risk ya da olumlu enerji gozlemlemedim", "sinyali de yok", "sinyali yok", "kopma sinyali yok"]
+        )
+        burnout_context = any(
+            keyword in normalized_text
+            for keyword in [
+                "tukend", "yorul", "yorgun", "stres", "baski", "deadline", "fazla mesai",
+                "is yuku", "toplanti yogunlugu", "odaklanam", "molalari atliyor",
+            ]
+        )
+        flight_context = any(
+            keyword in normalized_text
+            for keyword in [
+                "ayril", "kop", "onemsen", "benim gorevim degil", "aidiyet", "kalip kalmayac",
+                "uzak", "mesafe", "adil olmad", "ekipte ilerleme goremedig",
+            ]
+        ) and not no_risk_context
+        has_blockage_signal = "blokaj" in normalized_text or "engell" in normalized_text
+        has_unresolved_blockage_signal = any(
+            keyword in normalized_text
+            for keyword in ["cozulmed", "Ã§Ã¶zÃ¼lmed", "cozulemed", "Ã§Ã¶zÃ¼lemed", "kalkmad", "asilamad", "aÅŸÄ±lamad"]
+        )
+        has_resolved_blockage_signal = has_blockage_signal and any(
+            keyword in normalized_text
+            for keyword in ["acti", "actÄ±", "coz", "Ã§Ã¶z", "kaldir", "kaldÄ±r", "temizle"]
+        ) and not has_unresolved_blockage_signal
+        has_support_need_context = any(
+            keyword in normalized_text
+            for keyword in ["destek istem", "destek ihtiyac", "destek yok", "destek alam", "destek eksik"]
+        )
 
         negative_signal = strong_negative_hits * 1.0 + moderate_negative_hits * 0.55
         positive_signal = strong_positive_hits * 0.95 + moderate_positive_hits * 0.45
+        if no_risk_context:
+            negative_signal *= 0.4
         signal_balance = positive_signal - negative_signal
 
         sentiment_score = round(
@@ -1222,6 +1255,14 @@ class AIService:
             negative_signal_weight=negative_signal * 0.3,
             positive_signal_weight=min(positive_signal * 0.2, 0.55),
         )
+        if burnout_risk == "high" and flight_context and not burnout_context:
+            burnout_risk = "medium"
+        if flight_risk == "high" and burnout_context and not flight_context:
+            flight_risk = "medium"
+        if no_risk_context and burnout_risk == "high":
+            burnout_risk = "medium"
+        if no_risk_context and flight_risk == "high":
+            flight_risk = "medium"
 
         extracted_keywords = []
         for candidate in ["blokaj", "destek", "guven", "motivasyon", "teknik borc", "code review", "iletisim", "uyum", "mentorluk"]:
@@ -1235,7 +1276,7 @@ class AIService:
             risk_flags.append("motivasyon dususu")
         if flight_risk == "high":
             risk_flags.append("aidiyet ve guven zayifligi")
-        if "blokaj" in normalized_text or "engell" in normalized_text:
+        if has_blockage_signal and not has_resolved_blockage_signal:
             risk_flags.append("surec blokaji")
         if "deadline" in normalized_text or "yetism" in normalized_text:
             risk_flags.append("deadline baskisi")
@@ -1259,7 +1300,7 @@ class AIService:
             support_needs.append("gelisim yonlendirmesi")
 
         complaint_topics = []
-        if ("blokaj" in normalized_text or "engell" in normalized_text) and positive_signal < negative_signal + 0.8:
+        if has_blockage_signal and not has_resolved_blockage_signal and positive_signal < negative_signal + 0.8:
             complaint_topics.append("surec yavasligi")
         if "toplanti" in normalized_text:
             complaint_topics.append("toplanti yogunlugu")
@@ -1269,8 +1310,10 @@ class AIService:
             complaint_topics.append("deadline baskisi")
 
         praise_topics = []
-        if "destek" in normalized_text:
+        if "destek" in normalized_text and not has_support_need_context:
             praise_topics.append("liderlik destegi")
+        if has_resolved_blockage_signal:
+            praise_topics.append("blokaj cozumu")
         if "guven" in normalized_text:
             praise_topics.append("psikolojik guven")
         if "code review" in normalized_text or "pull request" in normalized_text:

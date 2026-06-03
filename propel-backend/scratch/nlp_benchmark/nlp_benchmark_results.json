@@ -1,0 +1,1167 @@
+{
+  "mode": "heuristic",
+  "created_at": "2026-06-02T13:04:20Z",
+  "metrics": {
+    "case_count": 50,
+    "exact_match_accuracy": 0.68,
+    "providers": {
+      "heuristic": 50
+    },
+    "fields": {
+      "sentiment_label": {
+        "accuracy": 0.86,
+        "macro_precision": 0.8627,
+        "macro_recall": 0.8833,
+        "macro_f1": 0.8429,
+        "mae": 0.14,
+        "per_label": {
+          "negative": {
+            "support": 20,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "neutral": {
+            "support": 20,
+            "precision": 1.0,
+            "recall": 0.65,
+            "f1": 0.7879
+          },
+          "positive": {
+            "support": 10,
+            "precision": 0.5882,
+            "recall": 1.0,
+            "f1": 0.7407
+          }
+        },
+        "confusion_matrix": {
+          "negative": {
+            "negative": 20,
+            "neutral": 0,
+            "positive": 0
+          },
+          "neutral": {
+            "negative": 0,
+            "neutral": 13,
+            "positive": 7
+          },
+          "positive": {
+            "negative": 0,
+            "neutral": 0,
+            "positive": 10
+          }
+        }
+      },
+      "burnout_risk": {
+        "accuracy": 0.94,
+        "macro_precision": 0.9325,
+        "macro_recall": 0.9467,
+        "macro_f1": 0.939,
+        "mae": 0.06,
+        "per_label": {
+          "low": {
+            "support": 10,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "medium": {
+            "support": 29,
+            "precision": 0.9643,
+            "recall": 0.931,
+            "f1": 0.9474
+          },
+          "high": {
+            "support": 11,
+            "precision": 0.8333,
+            "recall": 0.9091,
+            "f1": 0.8696
+          }
+        },
+        "confusion_matrix": {
+          "low": {
+            "low": 10,
+            "medium": 0,
+            "high": 0
+          },
+          "medium": {
+            "low": 0,
+            "medium": 27,
+            "high": 2
+          },
+          "high": {
+            "low": 0,
+            "medium": 1,
+            "high": 10
+          }
+        }
+      },
+      "flight_risk": {
+        "accuracy": 0.84,
+        "macro_precision": 0.8417,
+        "macro_recall": 0.8387,
+        "macro_f1": 0.8395,
+        "mae": 0.16,
+        "per_label": {
+          "low": {
+            "support": 16,
+            "precision": 0.8824,
+            "recall": 0.9375,
+            "f1": 0.9091
+          },
+          "medium": {
+            "support": 21,
+            "precision": 0.8095,
+            "recall": 0.8095,
+            "f1": 0.8095
+          },
+          "high": {
+            "support": 13,
+            "precision": 0.8333,
+            "recall": 0.7692,
+            "f1": 0.8
+          }
+        },
+        "confusion_matrix": {
+          "low": {
+            "low": 15,
+            "medium": 1,
+            "high": 0
+          },
+          "medium": {
+            "low": 2,
+            "medium": 17,
+            "high": 2
+          },
+          "high": {
+            "low": 0,
+            "medium": 3,
+            "high": 10
+          }
+        }
+      }
+    }
+  },
+  "mismatches": [
+    {
+      "id": "N007",
+      "text": "Kod kalitesi kabul edilebilir seviyedeydi, yalniz review donuslerine daha hizli cevap vermesi gerekiyor.",
+      "diff": {
+        "flight_risk": {
+          "expected": "medium",
+          "predicted": "high"
+        }
+      }
+    },
+    {
+      "id": "N009",
+      "text": "Performansi dengeli gorunuyor; deadline baskisi yoktu, destek ihtiyaci ise sadece kucuk teknik konularda belirdi.",
+      "diff": {
+        "burnout_risk": {
+          "expected": "medium",
+          "predicted": "high"
+        }
+      }
+    },
+    {
+      "id": "B001",
+      "text": "Son iki haftadir deadline baskisi ve toplanti yogunlugu nedeniyle cok yorulmus gorunuyor; destek istemekte cekingen kaliyor.",
+      "diff": {
+        "flight_risk": {
+          "expected": "high",
+          "predicted": "medium"
+        }
+      }
+    },
+    {
+      "id": "B003",
+      "text": "Bu hafta is yukunu kaldirmakta zorlandi, toplantilarda gergindi ve destek alamadigini birkac kez dile getirdi.",
+      "diff": {
+        "flight_risk": {
+          "expected": "high",
+          "predicted": "medium"
+        }
+      }
+    },
+    {
+      "id": "B004",
+      "text": "Kisa surede cok fazla gorev almasi onu yormus; motivasyonu dusuk ve hatalara karsi toleransi azaldi.",
+      "diff": {
+        "flight_risk": {
+          "expected": "medium",
+          "predicted": "high"
+        }
+      }
+    },
+    {
+      "id": "B010",
+      "text": "Son haftalarda hevesi azaldi, fazla is yuku nedeniyle kendini yalniz ve baski altinda hissettigini anlatti.",
+      "diff": {
+        "flight_risk": {
+          "expected": "high",
+          "predicted": "medium"
+        }
+      }
+    },
+    {
+      "id": "F001",
+      "text": "Artik fikirlerinin onemsenmedigini soyluyor, ekipten kopuk davraniyor ve blokajlar cozulmedigi icin motivasyonu belirgin dusmus.",
+      "diff": {
+        "burnout_risk": {
+          "expected": "high",
+          "predicted": "medium"
+        }
+      }
+    },
+    {
+      "id": "F007",
+      "text": "Bu hafta baska ekiplerle calismak istedigini ima etti, mevcut takima baglilik ve guven hissi dusuk.",
+      "diff": {
+        "burnout_risk": {
+          "expected": "medium",
+          "predicted": "high"
+        }
+      }
+    },
+    {
+      "id": "M001",
+      "text": "Hafta basinda stresliydi fakat mentorluk destegi aldiktan sonra toparlandi ve gorevlerini sahiplenmeye basladi.",
+      "diff": {
+        "sentiment_label": {
+          "expected": "neutral",
+          "predicted": "positive"
+        }
+      }
+    },
+    {
+      "id": "M002",
+      "text": "Deadline baskisi vardi ama ekiple acik iletisim kurdu, riskleri erken paylasarak guven kaybini onledi.",
+      "diff": {
+        "sentiment_label": {
+          "expected": "neutral",
+          "predicted": "positive"
+        },
+        "flight_risk": {
+          "expected": "low",
+          "predicted": "medium"
+        }
+      }
+    },
+    {
+      "id": "M003",
+      "text": "Motivasyonu dalgalaniyor; bazen cekingen kaliyor ama destek verildiginde hizla cozum uretip uyum sagliyor.",
+      "diff": {
+        "sentiment_label": {
+          "expected": "neutral",
+          "predicted": "positive"
+        },
+        "flight_risk": {
+          "expected": "medium",
+          "predicted": "low"
+        }
+      }
+    },
+    {
+      "id": "M004",
+      "text": "Teknik borc konularinda zorlandi ancak yardim isteyip ogrenmeye acik davrandi, kalici bir kopma sinyali yok.",
+      "diff": {
+        "sentiment_label": {
+          "expected": "neutral",
+          "predicted": "positive"
+        }
+      }
+    },
+    {
+      "id": "M005",
+      "text": "Is yuku fazla oldugu icin yoruldu ama oncelikleri netlestirince sakinlesti ve ekip destegini olumlu karsiladi.",
+      "diff": {
+        "sentiment_label": {
+          "expected": "neutral",
+          "predicted": "positive"
+        }
+      }
+    },
+    {
+      "id": "M006",
+      "text": "Bir surec blokaji motivasyonunu dusurdu, fakat blokaj kaldirilinca tekrar hizlandi ve olumlu tutum sergiledi.",
+      "diff": {
+        "sentiment_label": {
+          "expected": "neutral",
+          "predicted": "positive"
+        }
+      }
+    },
+    {
+      "id": "M007",
+      "text": "Ekip icinde bazen kararsiz kaliyor, yine de geri bildirimleri dikkate alip gelisim icin somut adimlar atiyor.",
+      "diff": {
+        "flight_risk": {
+          "expected": "medium",
+          "predicted": "low"
+        }
+      }
+    },
+    {
+      "id": "M010",
+      "text": "Hafta ortasinda gergindi fakat yapici geri bildirimden sonra surece yeniden dahil oldu ve uyum sagladi.",
+      "diff": {
+        "sentiment_label": {
+          "expected": "neutral",
+          "predicted": "positive"
+        }
+      }
+    }
+  ],
+  "results": [
+    {
+      "id": "P001",
+      "expected": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 4.2 ve flight risk seviyesi low. Temel tema: code review.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "P002",
+      "expected": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 4.32 ve flight risk seviyesi low. Temel tema: is birligi.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "P003",
+      "expected": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 4.32 ve flight risk seviyesi low. Temel tema: teknik borc.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "P004",
+      "expected": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 4.55 ve flight risk seviyesi low. Temel tema: is birligi.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "P005",
+      "expected": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 4.07 ve flight risk seviyesi low. Temel tema: dokumantasyon.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "P006",
+      "expected": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 4.7 ve flight risk seviyesi low. Temel tema: toplanti yogunlugu.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "P007",
+      "expected": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 4.53 ve flight risk seviyesi low. Temel tema: is birligi.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "P008",
+      "expected": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 3.97 ve flight risk seviyesi low. Temel tema: is birligi.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "P009",
+      "expected": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 4.22 ve flight risk seviyesi low. Temel tema: is birligi.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "P010",
+      "expected": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "low",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 4.32 ve flight risk seviyesi low. Temel tema: pull request.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "N001",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 3.0 ve flight risk seviyesi medium. Temel tema: toplanti yogunlugu.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "N002",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 3.22 ve flight risk seviyesi medium. Temel tema: is birligi.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "N003",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 3.25 ve flight risk seviyesi medium. Temel tema: genel durum.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "N004",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 2.96 ve flight risk seviyesi medium. Temel tema: is birligi.",
+      "action_recommendation": "yonetsel destek konusunda yonetsel destek planlayin."
+    },
+    {
+      "id": "N005",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 3.12 ve flight risk seviyesi medium. Temel tema: liderlik destegi.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "N006",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 3.0 ve flight risk seviyesi medium. Temel tema: genel durum.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "N007",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 3.07 ve flight risk seviyesi high. Temel tema: genel durum.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "N008",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 3.0 ve flight risk seviyesi medium. Temel tema: genel durum.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "N009",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 2.87 ve flight risk seviyesi medium. Temel tema: deadline baskisi.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "N010",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 3.0 ve flight risk seviyesi medium. Temel tema: genel durum.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "B001",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.32 ve flight risk seviyesi medium. Temel tema: toplanti yogunlugu.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "B002",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.9 ve flight risk seviyesi medium. Temel tema: genel durum.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "B003",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.82 ve flight risk seviyesi medium. Temel tema: is yuku.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "B004",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 2.0 ve flight risk seviyesi high. Temel tema: genel durum.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "B005",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.97 ve flight risk seviyesi medium. Temel tema: toplanti yogunlugu.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "B006",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.82 ve flight risk seviyesi medium. Temel tema: is yuku.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "B007",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.8 ve flight risk seviyesi medium. Temel tema: deadline baskisi.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "B008",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.9 ve flight risk seviyesi medium. Temel tema: genel durum.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "B009",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 2.39 ve flight risk seviyesi medium. Temel tema: genel durum.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "B010",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.47 ve flight risk seviyesi medium. Temel tema: is yuku.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "F001",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.47 ve flight risk seviyesi high. Temel tema: surec yavasligi.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "F002",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.75 ve flight risk seviyesi high. Temel tema: genel durum.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "F003",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.5 ve flight risk seviyesi high. Temel tema: aidiyet.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "F004",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.82 ve flight risk seviyesi high. Temel tema: psikolojik guven.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "F005",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.32 ve flight risk seviyesi high. Temel tema: genel durum.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "F006",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.82 ve flight risk seviyesi high. Temel tema: genel durum.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "F007",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "high",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 2.07 ve flight risk seviyesi high. Temel tema: psikolojik guven.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "F008",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.71 ve flight risk seviyesi high. Temel tema: psikolojik guven.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "F009",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 2.25 ve flight risk seviyesi high. Temel tema: aidiyet.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "F010",
+      "expected": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "predicted": {
+        "sentiment_label": "negative",
+        "burnout_risk": "medium",
+        "flight_risk": "high"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumsuz bir ton var; motivasyon skoru 1.57 ve flight risk seviyesi high. Temel tema: mentorluk eksikligi.",
+      "action_recommendation": "Acil birebir gorusme yapin ve blokajlari temizleyin."
+    },
+    {
+      "id": "M001",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 3.62 ve flight risk seviyesi low. Temel tema: mentorluk eksikligi.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "M002",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 3.45 ve flight risk seviyesi medium. Temel tema: deadline baskisi.",
+      "action_recommendation": "yonetsel destek konusunda yonetsel destek planlayin."
+    },
+    {
+      "id": "M003",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 3.62 ve flight risk seviyesi low. Temel tema: liderlik destegi.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "M004",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 3.39 ve flight risk seviyesi low. Temel tema: teknik borc.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "M005",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 3.5 ve flight risk seviyesi low. Temel tema: is yuku.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "M006",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 3.8 ve flight risk seviyesi low. Temel tema: blokaj cozumu.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "M007",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 3.22 ve flight risk seviyesi low. Temel tema: genel durum.",
+      "action_recommendation": "yonetsel destek konusunda yonetsel destek planlayin."
+    },
+    {
+      "id": "M008",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 2.97 ve flight risk seviyesi medium. Temel tema: genel durum.",
+      "action_recommendation": "yonetsel destek konusunda yonetsel destek planlayin."
+    },
+    {
+      "id": "M009",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "predicted": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "medium"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde karisik bir ton var; motivasyon skoru 3.25 ve flight risk seviyesi medium. Temel tema: motivasyon dususu.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    },
+    {
+      "id": "M010",
+      "expected": {
+        "sentiment_label": "neutral",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "predicted": {
+        "sentiment_label": "positive",
+        "burnout_risk": "medium",
+        "flight_risk": "low"
+      },
+      "provider": "heuristic",
+      "model": "local-fallback-v1",
+      "manager_summary": "Calisan geri bildiriminde olumlu bir ton var; motivasyon skoru 3.47 ve flight risk seviyesi low. Temel tema: is birligi.",
+      "action_recommendation": "Rutini koruyun ve olumlu davranislari takdir edin."
+    }
+  ]
+}
