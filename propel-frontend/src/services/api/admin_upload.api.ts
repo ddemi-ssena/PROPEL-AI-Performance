@@ -22,6 +22,49 @@ export const adminUploadApi = {
         return response.data
     },
 
+    async getOrgNetwork() {
+        const response = await apiClient.get('/admin/uploads/org-network')
+        return response.data as {
+            nodes: Array<{
+                id: number; name: string; employee_count: number
+                centrality: number; is_silo: boolean
+                internal_count: number; external_count: number
+            }>
+            edges: Array<{
+                source_id: number; target_id: number
+                weight: number; strength: string
+            }>
+            summary: {
+                total_interactions: number; cross_dept_interactions: number
+                most_central_dept: string | null
+                silos: string[]; bridges: string[]
+            }
+            data_source: string
+        }
+    },
+
+    async getFlightRisk() {
+        const response = await apiClient.get('/admin/uploads/flight-risk')
+        return response.data as {
+            high_risk_count: number
+            medium_risk_count: number
+            low_risk_count: number
+            employees: Array<{
+                employee_code: string
+                employee_name: string | null
+                department: string
+                position: string | null
+                team: string | null
+                risk_level: 'High' | 'Medium' | 'Low'
+                risk_score: number
+                performance_score: number
+                confidence: number
+                top_driver: string | null
+                predicted_band: string
+            }>
+        }
+    },
+
     async downloadTemplate(dept: 'software' | 'sales' = 'software') {
         const response = await apiClient.get(`/admin/uploads/template?dept=${dept}`, {
             responseType: 'blob',

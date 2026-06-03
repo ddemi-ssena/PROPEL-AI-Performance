@@ -271,7 +271,6 @@ const allNavigation: NavigationItem[] = [
   { name: 'Veri Yonetimi', to: '/admin/data-management', icon: DocumentTextIcon, role: 'admin' },
   { name: 'Yapay Zeka Icgoruleri', to: '/admin/ai-insights', icon: ChartBarIcon, role: 'admin' },
   { name: 'Anket Sonuclari', to: '/admin/survey-results', icon: DocumentTextIcon, role: 'admin' },
-  { name: 'Satis ML Analizi', to: '/admin/sales-analytics', icon: ChartBarIcon, role: 'admin' },
   {
     name: '360 Derece Feedback',
     type: 'group',
