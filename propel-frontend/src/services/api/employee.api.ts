@@ -59,6 +59,10 @@ export const employeeApi = {
     const response = await apiClient.get('/employees/')
     return response.data
   },
+  getEmployee: async (id: number) => {
+    const response = await apiClient.get(`/employees/${id}`)
+    return response.data
+  },
   getTeamHealth: async (): Promise<TeamHealthResponse> => {
     const response = await apiClient.get('/employees/team-health')
     return response.data

@@ -334,7 +334,15 @@ kutup-neww/
 
 **Dataset Kolon Uyumluluğu**: Excel/CSV'deki `Employee_ID`, `Week`, `Region`, `Role_Level` gibi Pascal/mixed case kolonlar otomatik normalize edilir. `year` kolonu olmayan dataset'lerde 2024 varsayılan.
 
-**Önemli Kısıt**: `Burnout_Target` çok seyrek (1560 satırda 1 pozitif örnek tipik) → eğitim başarısız olabilir; `Performance_Drop_Target`, `Resignation_Target`, `High_Risk_Target` çalışır.
+**Önemli Kısıt**: Yeni dataset (1612 satır, 31 çalışan) ile tüm 4 hedef başarıyla eğitiliyor:
+- Performance_Drop: %100 F1, 1240/372 train/test
+- Burnout: %99.4 F1
+- Resignation: %99.5 F1
+- High_Risk: %98.9 F1
+
+**Aktif Dataset**: `KUTUP_Sales_52Week_2024.xlsx` — 31 çalışan (SA-001..SA-031) × 52 hafta = 1612 satır.
+- SA-031: Hatice Yıldırım (Sales Department Manager, Genel bölge)
+- Tüm "Manager" pozisyon unvanları → "Sales Team Lead" olarak güncellendi (sadece Hatice Yıldırım "Manager")
 
 ---
 
@@ -395,163 +403,6 @@ docker exec propel_backend python seed_data.py
 
 ---
 
-## 2026-05-14 Devam Eden Yerel Calisma Notlari
-- Durum: Takim sekmesi buyuk olcude `getBulkSoftwarePredictions` + `team_analytics` ile bagliydi; buna karsin ust KPI kartlari, karsilastirmali trend grafiginde sahte ay etiketleri, risk grafigi tooltip/alt notlari, `Son guncelleme` (istemci saati), Excel export trendinde uydurma motivasyon/kapasite/tarih vardi.
-- Backend: `SoftwareBulkPredictionResponse` icine `generated_at` (UTC) eklendi; `predict_all_from_upload` donusunde set ediliyor. Testte `generated_at` anahtari dogrulaniyor.
-- Frontend: `teamKpiCards` toplu tahmin + `teamRiskSummaries` + `aggregateDepartmentRiskSeries` ile hesaplaniyor; sparkline polyline gercek serilerden. Coklu takim trend grafigi donem yoksa `D1..Dn` etiketleri (sahte takvim yok). Secili takim risk grafigi ekseni `trend_periods` ile hizalaniyor; tooltip ve opsiyonel `selectedTeamRiskLegendHints` veriden turetiliyor. `Son guncelleme` artik `generated_at`. Excel export trend satirlari donem etiketi + `risk_score`; sahte motivasyon/kapasite/tarih fonksiyonlari kaldirildi. Risk faktoru olasilik yuzdesi `count/total` ile. Konusulacaklar alt maddeleri yalnizca narrative `action_plan[].manager_talking_points` varsa gosteriliyor.
-- Dogrulama: `py_compile`, `npm.cmd run type-check` basarili. LLM yokken aksiyon/konusulacaklar metinleri hala KPI/takim alanlarindan turetilen kisa UX fallback'leri kullanabilir (tam metin icin LLM veya genisletilmis narrative gerekir).
-
-## 2026-05-14 360 Feedback Soru Kaynagi Analizi
-
-- Kullanici 360 derece feedback tarafindaki uretilen sorularin API'den gelip gelmedigini sordu.
-- Frontend akisi dogrulandi: `FeedbackModal.vue` kisi secilince `feedbackApi.getCurrentQuestion(receiverId)` cagiriyor; servis `GET /feedbacks/current-question?receiver_id=...` endpoint'ine gidiyor.
-- Backend akisi dogrulandi: `feedbacks.py` endpoint'i `FeedbackService.get_current_weekly_question` sonucunu `question_text` ve `is_ai_generated` ile donuyor.
-- Soru uretim zinciri: once ayni hafta/yon/departman icin DB'deki AI-generated cache aranir; yoksa `AIService.generate_weekly_question` ile Gemini/Ollama denenir; basarisizsa seed edilen `feedback_questions` havuzuna; o da yoksa `AIService.build_template_question` deterministic fallback'ine duser.
-- Canli DB kontrolu: `feedback_questions` tablosunda 9 kayit goruldu; 2 kayit `is_ai_generated=True`, kalanlar seed veya deterministic fallback. Yani soru metni frontend'de hardcoded degil, API/DB uzerinden geliyor; fakat her soru mutlaka canli AI uretimi degil.
-- Sonraki adim: 360 analiz kalitesini iyilestirmek icin once soru lifecycle'i netlestirilmeli: soru kaynagi etiketi UI'da gosterilebilir, haftalik/departman/rol bazli soru kapsami genisletilebilir, seed ve AI promptlari analiz hedeflerine gore yeniden tasarlanabilir.
-
-## 2026-05-14 360 Feedback NLP Uyumlu Soru Iyilestirmesi
-
-- Kullanici Gemini'ye daha iyi komut vererek sorularin NLP analizine uygun, daha spesifik ve nitelikli hale getirilmesini istedi.
-- `AIService._build_prompt` Gemini prompt'u guncellendi: model artik IK stratejisti + organizasyon psikologu + NLP veri tasarim uzmani roluyle calisir.
-- Prompt'a NLP analiz hedefi eklendi: cevap metninden duygu tonu, motivasyon, psikolojik guven, is birligi, destek ihtiyaci, burnout/flight risk ve aksiyon onerisi cikarilabilmeli.
-- Soru kurallari netlestirildi: 18-34 kelime, tek davranis/olay odagi, son haftadan somut ornek veya durum isteme, davranisin etkisini sordurma, destek/risk/motivasyon/guven/aidiyet/gelisim sinyali yakalama.
-- Kompakt Ollama fallback prompt'u da ayni mantikla guncellendi.
-- `AIService.is_question_nlp_ready` kalite kapisi eklendi; soru zorunlu odak terimini, kanit cue'larini (`somut`, `ornek`, `gozlem`, `hangi durumda` vb.) ve analiz sinyal cue'larini (`etki`, `risk`, `motivasyon`, `guven`, `destek` vb.) tasimiyorsa kabul edilmiyor.
-- `generate_weekly_question` artik Gemini/Ollama ciktisini bu kalite kapisindan geciriyor.
-- `build_template_question` fallback'leri yeniden yazildi; eski genel "nasil degerlendirirsin" sorulari yerine somut davranis + etki + risk/destek sinyali isteyen sorular uretiyor.
-- `FeedbackService.get_current_weekly_question` eski AI cache veya seed soruyu yalnizca NLP kalite kapisindan gecerse donduruyor; gecmezse yeni AI sorusu deneniyor, olmazsa yeni nitelikli template fallback kullaniliyor.
-- Dogrulama: lokal `python -m py_compile app/services/ai_service.py app/services/feedback_service.py` basarili; container icinde ayni py_compile basarili. Container icinde 4 ornek template soru `ready=True` dondurdu.
-- Backend container yeniden baslatildi; yeni soru uretim mantigi aktif.
-
-## Sonraki Adim
-
-- 360 Feedback ekraninda farkli rol/departman kombinasyonlariyla soru cekilip DB'deki yeni `is_ai_generated=True` kayitlar incelenmeli.
-- Gerekirse mevcut eski `feedback_questions` kayitlari arsivlenip/temizlenerek yeni prompt'un urettigi nitelikli sorularin daha tutarli gorunmesi saglanabilir.
-
-## 2026-05-23 Yazilim Calisan KPI Metrik Kartlari
-
-- Kullanici satis calisan dashboard'undaki `KPI Detayi / Satis Metrikleri` kartlarinin yazilim departmaninda nerede oldugunu sordu.
-- Tespit: satis ekrani `/employee/sales` route'u ve `SalesEmployeeDashboard.vue` icinde; yazilim calisan karsiligi `/employee` ve `EmployeeDashboard.vue` idi, fakat yazilim KPI detay kartlari yoktu.
-- Backend'e `GET /api/v1/analytics/departments/software/my-performance` endpoint'i eklendi.
-- Endpoint giris yapan kullanicinin `Employee` kaydini bulur, en son basarili `department_key=software` KPI upload'unu secer, dataset satirlarini calisanla eslestirir ve son haftanin KPI kartlarini dondurur.
-- KPI kartlari artik rastgele/secili metinlerden degil `SOFTWARE_KPI_REGISTRY` ve dataset kaynak kolonlarindan uretilir; `KPI-1`..`KPI-20` resmi yazilim KPI listesi desteklenir.
-- Model feature olmayan ama dataset'te bulunan hedef aday KPI'lar (`KPI-18 GPS`, `KPI-19 ARS`, `KPI-20 PPE`) da raw dataset satirindan okunacak sekilde eklendi.
-- Frontend `analyticsApi.getMySoftwarePerformance()` eklendi ve `EmployeeDashboard.vue` icinde `Yazilim Metrikleri` kart bolumu olusturuldu.
-- Kartlar kod, ad, formatli deger, durum, renk tonu, bar yuzdesi, hedef ipucu ve kategori bilgilerini backend response'undan alir.
-- Dogrulama: lokal `python -m py_compile app\\api\\routers\\analytics.py app\\schemas\\analytics.py app\\services\\software_ml_service.py`, `npm.cmd run type-check`, `npm.cmd run build-only` basarili.
-- Docker container icinde py_compile/restart/API smoke test denenmek istendi fakat Docker erisimi icin izin verilmedigi icin calistirilamadi.
-
-## Sonraki Adim
-
-- Backend container yeniden baslatilmali: `docker restart propel_backend`.
-- Ardindan yazilim calisaniyla `/employee` ekraninda `Yazilim Metrikleri` kartlari ve `/analytics/departments/software/my-performance` endpoint'i canli test edilmeli.
-
-## 2026-05-23 Yazilim Dataset-Calisan Eslesmesi Duzeltmesi
-
-- Kullanici v8 CSV dataset'indeki calisanlar ile uygulamadaki seed calisanlarin gercekten birebir eslesip eslesmedigini sordu.
-- Tespit: v8 CSV 30 kisi x 52 hafta = 1560 satir iceriyor; employee_id seti `1,4,5,6,7,9,10,13,14,16,17,18,20,25,26,27,28,31,32,33,34,35,38,40,42,45,46,47,48,49`.
-- Eski seed yazilim calisanlari `SE-001..SE-030` idi. Bu nedenle sayi 30 olsa da birebir kimlik uyumu yoktu; Canan `SE-001 -> employee_id=1` calisiyordu ama bazi seed calisanlarin CSV karsiligi yoktu.
-- `seed_data.py` icindeki `EMPLOYEE_SPECS` v8 dataset ID listesine gore guncellendi. Artik yazilim seed kodlari CSV employee_id setiyle birebir ayni: `SE-001, SE-004, ..., SE-049`.
-- Canli DB'deki mevcut 30 yazilim calisani da iki asamali unique-safe guncellemeyle ayni mapping'e tasindi; kullanici email'leri de kodlarla hizalandi (`developer1@propel.com` SE-001 olarak korundu, digerleri `se-004@propel.com` vb.).
-- Dogrulama: DB `external_employee_code` seti ile CSV `employee_id` seti birebir karsilastirildi; `missing_in_db=[]`, `missing_in_csv=[]`.
-- Canan Dagdelen testi: `/analytics/departments/software/my-performance` endpoint'i Canan icin `2025-W52`, `Backend`, `Mid Backend Engineer` ve v8 metriklerini dondurdu (`GTO %84`, `ZTO %72`, `GKE %125`, `KKKE %49`, `BY 0.37`).
-
-## Sonraki Adim
-
-- Frontendde `/employee` sayfasi yazilim calisaniyla kontrol edilmeli; artik gorulen kisi profili ve KPI metrikleri ayni dataset kimligine dayaniyor.
-
-## 2026-05-14 360 Feedback Speech-to-Text
-
-- Kullanici 360 feedback cevaplarinin yalnizca klavye ile yazilmasinin vakit kaybi oldugunu, Web Speech API ile speech-to-text eklemek istedigini soyledi.
-- `FeedbackModal.vue` icine Web Speech API entegrasyonu eklendi.
-- Modalda `Sesle Cevapla` / `Dinlemeyi Durdur` butonu, mikrofon durum metni, canli ara transkript (`interimTranscript`), karakter sayaci, `Temizle` butonu ve tarayici/mikrofon hata mesajlari eklendi.
-- `recognition.lang = 'tr-TR'`, `continuous = true`, `interimResults = true` ayarlari kullaniliyor.
-- Final transkript mevcut textarea metnine ekleniyor; kullanici isterse elle duzenleyebiliyor. Gonderimde mevcut `response_text` alanina son metin gidiyor, bu nedenle backend NLP akisi degismeden calisiyor.
-- Ses kaydi backend'e gonderilmiyor; metne cevirme tarayici tarafinda yapiliyor. Desteklenmeyen tarayicida buton disable olup uyari gorunuyor.
-- Modal kapaninca veya component unmount olunca mikrofon otomatik durduruluyor.
-- Dogrulama: `npm.cmd run type-check` basarili. Frontend container yeniden baslatildi. Canli Vite modulunde `SpeechRecognition=True`, `Sesle Cevapla=True`, `tr-TR=True` dogrulandi.
-
-## Sonraki Adim
-
-- Tarayicida mikrofon izni verilerek manuel ses testi yapilmali; Chrome/Edge ve `localhost` uzerinde Web Speech API beklenen sekilde calisir.
-- Ileride analizlerde kaynak takibi istenirse backend `feedback_responses` tablosuna `input_method` ve opsiyonel `speech_duration_seconds` alanlari eklenebilir; mevcut ilk surumde ses sadece metin girisini hizlandirir.
-
-## 2026-05-14 360 Feedback Gonderim Yavasligi ve Background NLP
-
-- Kullanici speech-to-text ile cevap yazdiktan sonra `Gonder` isleminin uzun surdugunu soyledi ve testlerin backend'e gidip gitmedigini sordu.
-- Canli DB kontrolu: son testler backend'e yazilmis. `feedback_responses.id=430` ve `id=431` kayitlari goruldu; ikisinde de `nlp_record=True`.
-- Yavasligin nedeni speech-to-text degil; `POST /feedbacks/submit` icinde cevap kaydedildikten sonra ayni request suresince `AIService.analyze_weekly_feedback`, `NLPService.save_weekly_analysis`, `NLPService.rebuild_employee_profile`, `NLPService.refresh_employee_monthly_badges` ve `RAGService.upsert_weekly_feedback_memory` calisiyordu.
-- `feedbacks.py` submit endpoint'i `BackgroundTasks` kullanacak sekilde guncellendi.
-- `FeedbackService.submit_weekly_feedback` icine `process_nlp_sync` parametresi eklendi. Endpoint artik `process_nlp_sync=False` ile cevabi ve zorunlu atama durumunu hemen commit edip 201 donuyor.
-- NLP/LLM/profil/rozet/RAG islemleri `FeedbackService.process_weekly_feedback_analysis_in_background` ile ayri DB session acilarak arka planda calisiyor.
-- Senkron servis kullanimi gereken yerler icin varsayilan `process_nlp_sync=True` korundu.
-- Dogrulama: lokal ve container `py_compile` basarili. Backend container yeniden baslatildi.
-
-## Sonraki Adim
-
-- UI tarafinda gonderimden sonra "Feedback kaydedildi, analiz arka planda hazirlaniyor" gibi kisa durum mesaji gosterilebilir.
-- Daha saglam uretim mimarisi icin FastAPI BackgroundTasks yerine Celery/RQ gibi kalici job queue dusunulebilir; mevcut local/demo akisi icin background task yeterli.
-
-## 2026-05-14 KPI / 360 Feedback Sayfa Ayrimi Analizi
-
-- Kullanici KPI takim analizinden `Detaylar` ile gidilen Calisan Analizi'nin KPI & ML basligi altinda degil, 360 Derece Feedback basligi altinda konumlandigini; ayrica 360 Departman Analizi icinde KPI analizleri gorundugunu belirtti.
-- Route kontrolu:
-  - `ManagerAnalyticsView.vue` KPI & ML sayfasi `/manager/kpi-ml-analysis` altinda calisiyor ve `section=model|department|teams|watchlist|technical` kullaniyor.
-  - KPI Takim Analizi `openEmployeeAnalysis` fonksiyonu su anda dogru rotaya gidiyor: `manager-kpi-ml-analysis?section=watchlist&employeeId=...&uploadId=...`.
-  - Ancak `EmployeeAnalysisView.vue` `/manager/feedback-reports/employees` ve `/admin/feedback-reports/employees` rotalarina bagli; 360 Feedback menusu altinda gorunuyor.
-  - `DepartmentAnalysisView.vue` `/manager/feedback-reports/department` ve `/admin/feedback-reports/department` rotalarina bagli; 360 Feedback menusu altinda gorunuyor.
-- Icerik kontrolu:
-  - `EmployeeAnalysisView.vue` 360 raporlarini (`feedbackApi.getEmployee360SummaryReport`) gosterirken ayni dosyada `analyticsApi.getPerformanceSummary` ile KPI modern tablo ve rol bazli performans chart'i da calistiriyor.
-  - `DepartmentAnalysisView.vue` 360 NLP raporlarini (`feedbackApi.getDepartment360SummaryReport`, NLP charts/deep/RAG) gosterirken ustte KPI kartlari, KPI bubble chart ve KPI AI analiz modal'i da calistiriyor.
-- Sonuc: Yonlendirme artik buyuk olcude dogru; esas problem KPI UI/analiz bloklarinin 360 feedback view dosyalarina yerlestirilmis olmasi. Bu yuzden 360 sayfalari KPI analizi yapiyormus gibi gorunuyor.
-
-## Onerilen Duzeltme Sirasi
-
-- 1. 360 Feedback sayfalarini saf hale getir: `EmployeeAnalysisView.vue` icinde yalnizca 360 feedback/NLP kaynakli calisan raporu kalsin; KPI modern tablo ve rol bazli chart kaldirilsin veya KPI sayfasina tasinsin.
-- 2. `DepartmentAnalysisView.vue` icinde yalnizca 360 feedback/NLP kaynakli departman raporu kalsin; KPI kartlari, performans bubble chart ve KPI AI modal'i KPI & ML tarafina tasinsin.
-- 3. KPI & ML tarafinda `ManagerAnalyticsView.vue` altindaki `section=department` ve `section=watchlist` alanlari bu KPI bloklarinin kalici evi olsun.
-- 4. Admin icin de KPI & ML menusu/rotasi gerekiyorsa ayrica `/admin/kpi-ml-analysis` route'u eklenmeli; aksi halde admin 360 menusu KPI bilesenlerinden arindirilmali.
-- 5. Terminoloji duzeltmesi: 360 sayfalarinda "Calisan Analizi" yerine "360 Calisan Raporu", "Departman Analizi" yerine "360 Departman Raporu"; KPI tarafinda "KPI Calisan Analizi" ve "KPI Departman Analizi" kullanilmali.
-- 6. Son dogrulama: Takim Analizi -> Detaylar KPI & ML watchlist'e gider; 360 menusu sadece feedback/NLP gosterir; KPI menusu sadece KPI/ML gosterir.
-
-## 2026-05-14 KPI / 360 Feedback Ayrimi Uygulamasi
-
-- `EmployeeAnalysisView.vue` 360 sayfasi saf hale getirildi: baslik `360 Calisan Raporu` oldu; KPI modern performans tablosu, rol bazli KPI chart ve KPI detay modal'i gorunur akistan kaldirildi.
-- `EmployeeAnalysisView.vue` icindeki `loadPerformanceSummary()` cagrilari kaldirildi; 360 calisan raporu artik KPI performance summary endpoint'ini yuklemez. Sayfa 360 rapor, aylik deep/RAG ve feedback/NLP verileriyle calisir.
-- `DepartmentAnalysisView.vue` 360 sayfasi saf hale getirildi: baslik `360 Departman Raporu` oldu; KPI kartlari, KPI performans bubble chart, KPI AI analiz paneli ve KPI performans modallari gorunur akistan kaldirildi.
-- `DepartmentAnalysisView.vue` icindeki `loadPerformanceSummary()` cagrilari kaldirildi; 360 departman raporu artik KPI performance summary endpoint'ini yuklemez. Sayfa 360 departman raporu, NLP chart, monthly deep ve monthly RAG akisiyle calisir.
-- `router/index.ts` icine admin KPI route'u eklendi: `/admin/kpi-ml-analysis` (`admin-kpi-ml-analysis`) ayni `ManagerAnalyticsView.vue` component'ini kullanir.
-- 360 route meta basliklari netlestirildi: `360 Calisan Raporu`, `360 Departman Raporu`.
-- `AppLayout.vue` menuleri ayrildi:
-  - KPI & ML: `KPI Departman Analizi`, `Takim Analizi`, `KPI Calisan Analizi`.
-  - 360 Derece Feedback: `360 Calisan Raporu`, `360 Departman Raporu`.
-  - Admin icin de ayri `KPI & ML Analizi` menusu eklendi.
-- `ManagerAnalyticsView.vue` icinde section metinleri `KPI Departman Analizi` ve `KPI Calisan Analizi` olarak netlestirildi.
-- `ManagerAnalyticsView.vue` `openEmployeeAnalysis` fonksiyonu aktif route admin ise `admin-kpi-ml-analysis`, manager ise `manager-kpi-ml-analysis` rotasina gider. Takim Analizi -> Detaylar KPI watchlist deep link akisi korunur.
-- Dogrulama: `npm.cmd run type-check` basarili. Frontend container yeniden baslatildi. Canli Vite modulunde `admin-kpi-ml-analysis`, `KPI Calisan Analizi`, `KPI Departman Analizi`, `360 Calisan Raporu`, `360 Departman Raporu` etiketleri dogrulandi.
-
-## Kalan Not
-
-- Eski KPI tablo/chart kodlarinin bir kismi 360 component dosyalarinda pasif durumda duruyor; gorunur UI ve API yukleme akisi temizlendi. Sonraki temizlik/refactor adiminda bu pasif kodlar tamamen silinebilir veya KPI component'lerine ayrilabilir.
-
-## 2026-05-14 KPI Pasif Kod Temizligi ve KPI Tarafina Tasima
-
-- Kullanici, 360 component dosyalarinda pasif kalan eski KPI tablo/chart kodlarinin tamamen temizlenmesini istedi ve bu kodlarin KPI departman/calisan analizine tasinip tasinmamasini sordu.
-- Netlestirme: KPI kodlari silinmeden once gerekli islevler KPI & ML tarafinda kalici eve tasindi; 360 tarafindan yalnizca pasif/yanlis sahiplikte duran kopyalar temizlendi.
-- `ManagerAnalyticsView.vue?section=department` icine backend `analyticsApi.getPerformanceSummary` verisinden beslenen KPI departman kartlari, rol bazli KPI/trend bar chart'i ve takim KPI ozeti eklendi.
-- `ManagerAnalyticsView.vue?section=watchlist` icine ayni backend performans summary verisinden beslenen KPI calisan tablosu eklendi; calisan, takim/rol, KPI progress, trend, guc ve durum alanlari burada gosteriliyor.
-- `loadOverview()` artik departman overview ile birlikte performans summary'yi de yukler; KPI & ML departman/watchlist alanlari gercek backend KPI verisiyle beslenir.
-- `EmployeeAnalysisView.vue` icindeki pasif KPI tablo/chart script kodlari, `analyticsApi.getPerformanceSummary` importu, chart.js KPI importlari, tablo filtre/siralama/pagination state'leri ve export fonksiyonlari kaldirildi.
-- `DepartmentAnalysisView.vue` icindeki pasif KPI bubble chart, KPI AI modal, performans summary state/computed bloklari, chart.js bubble importlari ve gizli `AI ile Analiz` butonu kaldirildi.
-- 360 dosyalarinda KPI API cagrisi ve KPI chart/table kodu kalmadigi `rg` ile kontrol edildi; KPI ile ilgili kalan kodlar `ManagerAnalyticsView.vue` icinde.
-- Dogrulama: `npm.cmd run type-check` basarili. Frontend container yeniden baslatildi.
-
-## Sonraki Adim
-
-- KPI & ML tarafindaki yeni departman/watchlist bloklari buyurse `ManagerAnalyticsView.vue` icinden `KpiDepartmentAnalysis` ve `KpiEmployeeWatchlist` gibi ayri component'lere bolunebilir.
-- Tarayicida son smoke test olarak 360 menulerinde KPI bloklarinin gorunmedigi, KPI menulerinde departman/calisan KPI bloklarinin gorundugu kontrol edilmeli.
-## PR #25 Satis Departmani Notlari
 ## Test Kullanıcıları (seed_data.py)
 
 | Email | Şifre | Rol | Yönlendirme |
@@ -636,6 +487,23 @@ docker exec propel_backend python seed_data.py
 
 - `ManagerAnalyticsView.vue` → `manager-kpi-ml-analysis` deep-link yönlendirmesi.
 
+### 2026-05-26 Satış Uzmanı Giriş Bugları ve Dashboard İyileştirmesi
+
+**Sorunlar ve Düzeltmeler:**
+
+- **`propel-backend/.env` eksikti** → `DATABASE_URL`, `SECRET_KEY`, `POSTGRES_PASSWORD` içeren `.env` oluşturuldu. Docker Compose `env_file` direktifi bu dosya olmadan başlamıyordu.
+- **`employees` tablosu boştu** → Hiçbir kullanıcının `department_id` / `department_name` bilgisi yoktu. `docker exec propel_backend python seed_data.py` ile 63 kullanıcı, 62 employee kaydı, 45 KPI tanımı, 8250 KPI kaydı yüklendi.
+- **`client.ts` — 401 interceptor login'i engelliyordu** → `/api/v1/auth/login` isteği 401 döndürdüğünde interceptor `window.location.href = '/login'` tetikleyerek mock login fallback'in çalışmasını engelliyordu. `error.config?.url?.includes('/auth/login')` kontrolü eklenerek login isteği 401'leri bypass edildi.
+- **`router/index.ts` — `isSalesUser` hatalıydı** → Satış kullanıcıları `sl-XXX@propel.com` formatındayken fonksiyon yalnızca `sa-` prefix ve yanlış dept ID'lerini (2, 14, 18) kontrol ediyordu. Gerçek Satış departman ID'si 20. `email.startsWith('sl-')` ve `deptId === 20` eklendi.
+- **`LoginView.vue` — `isSales` hatalıydı** → Aynı sorun; `email.startsWith('sl-')` eklendi.
+- **`seed_data.py` — Double UTF-8 encoding (mojibake)** → Dosya UTF-8 karakterleri Latin-1/Windows-1252 olarak okunup yeniden UTF-8 kaydedilmiş; `Ali Yılmaz` → `Ali YÄ±lmaz` gibi görünüyordu. Latin-1+cp1252 byte-level ters çevirme algoritmasıyla düzeltildi.
+- **`SalesEmployeeDashboard.vue` — Veri yokken dashboard tamamen gizleniyordu** → `v-else-if="!perfData?.has_upload"` bloğu kaldırıldı; yerine küçük sarı uyarı banner'ı eklendi. KPI kartları artık her zaman görünür; Excel yüklenmemişse değerler `—` gösterir, yüklenince otomatik dolar.
+
+**Kalıcı Notlar:**
+- Frontend container'ı değişiklik sonrası `docker restart propel_frontend` + tarayıcıda `Ctrl+Shift+R` gerektirir; Vite Windows+Docker ortamında hot-reload'ı algılamayabiliyor.
+- `CLAUDE.md` ve `seed_data.py` dosyaları da mojibake içeriyordu; aynı algoritmayla düzeltildi.
+- Seed sonrası test hesabı: `satis.employee@propel.com` / `satis123` → `/employee/sales` (Zeynep Kaya, SA-011, Satış dept ID: 22).
+
 ### 2026-05-14 Departman Analizi KPI ML Üst Bölüm
 
 - 6 KPI kartı + bubble chart + AI Analiz Özeti paneli eklendi.
@@ -714,24 +582,260 @@ docker exec propel_backend python seed_data.py
 - Admin → her iki departman + Satış ML Analizi linki
 - Satış çalışanı → Satış Performansım → `/employee/sales`
 
-**ML Target Durumu** (upload_id=1, 30 çalışan × 52 hafta):
-- `Performance_Drop_Target` ✅ eğitildi — 8 riskli, 22 güvenli
-- `Burnout_Target` ❌ eğitilemez — dataset'te tek sınıf (tüm satırlar = 0)
-- `Resignation_Target` ✅ eğitildi — 0 riskli, 30 güvenli
-- `High_Risk_Target` ✅ eğitildi — 8 riskli, 22 güvenli
+**ML Target Durumu** (upload_id=4, 31 çalışan × 52 hafta = 1612 satır):
+- `Performance_Drop_Target` ✅ F1=100%, 1240/372
+- `Burnout_Target` ✅ F1=99.4%, 1240/372
+- `Resignation_Target` ✅ F1=99.5%, 1240/372
+- `High_Risk_Target` ✅ F1=98.9%, 1240/372
 
-**Önemli Keşif**: `/api/v1/auth/me` endpoint'i `department_id` döndürmüyordu → frontend sidebar nav ve login yönlendirmesi çalışmıyordu. Backend fix ile çözüldü.
+**Riskli Çalışanlar** (Performans Düşüşü hedefine göre):
+Nihan Korkmaz, Baran Özdemir, Ozan Çetin, Tuncay Doğan, Aslı Erdoğan, Burcu Arslan, Serhat Bulut, Derya Kaplan
+
+**Önemli Keşif**: `/api/v1/auth/me` endpoint'i `department_id` döndürmüyordu → `department_name` de eklendi. Frontend sidebar artık email + department_name + route üzerinden satış tespiti yapıyor.
+
+---
+
+## Geliştirme Günlüğü (Devam)
+
+### 2026-05-21 Satış Çalışan Dashboard Backend Bağlantısı ★
+
+**Yeni Backend Endpoint**:
+- `GET /analytics/departments/sales/my-performance` — kimlik doğrulamalı çalışan için kişisel dashboard verisi
+  - 9 KPI metriği (SHGO, LMDO, TKO, OSDS, CSAT, CRMD, TDO, PSO, MS) — gerçek Excel verisi
+  - 8 haftalık bileşik performans trendi
+  - ML tahmini (Performance_Drop_Target) — `predicted_band`, `recommended_actions`, `top_drivers`
+  - `bar_pct` (0-1) — frontend progress bar için
+
+**Yeni Şemalar** (`schemas/analytics.py`):
+- `SalesKPIMetric` — code, name, raw_value, unit, direction, threshold_status, trend_signal, bar_pct
+- `SalesWeeklyTrendPoint` — label, score
+- `SalesEmployeePerformanceResponse` — tüm dashboard verisi
+
+**Auth `/me` Güncelleme** (`api/routers/auth.py`, `schemas/user.py`):
+- `department_name` alanı eklendi → sidebar ve router yönlendirmesi için
+
+**Frontend Güncellemeleri**:
+- `SalesEmployeeDashboard.vue` — tüm hardcoded veriler gerçek `getMyPerformance()` API'sine bağlandı
+- `survey.api.ts` — `createSurvey()` metodu eklendi (nabız anketi gerçek POST /surveys/)
+- `analytics.api.ts` — `getMyPerformance()`, `SalesEmployeePerformanceResponse`, `SalesKPIMetric`, `SalesWeeklyTrendPoint` eklendi
+- `AppLayout.vue` — `isSalesDept` email + department_name + route tabanlı tespit
+- `router/index.ts` — satış müdürü login sonrası `/manager/sales-analytics`'e yönlendirilir
+- `EmployeePulseView.vue` — "Personel Paneline Dön" butonu kaldırıldı
+
+**EMP_XXX Format Desteği**: `get_my_performance()` metodunda `SA-011` → `EMP_011` eşleştirmesi düzeltildi
+
+### 2026-05-21 Satış Dataset ve Seed Güncellemesi ★
+
+**Yeni Dataset**: `KUTUP_Sales_52Week_2024.xlsx`
+- 31 çalışan (SA-001..SA-031) × 52 hafta = 1612 satır
+- SA-031: Hatice Yıldırım (Sales Department Manager)
+- Tüm pozisyon unvanları: "Sales Manager" → "Sales Team Lead" (sadece SA-031 "Manager")
+- 28 kolon, 4 hedef değişken
+- Target dağılımları: PerfDrop=%34, Burnout=%3.3, Resignation=%5, HighRisk=%6.3
+- Generator script: `generate_sales_dataset.py`
+
+**Seed Data Güncellemeleri** (`seed_data.py`):
+- Tüm isimler Türkçe karakterlerle güncellendi (ı, ş, ğ, ç, ö, ü)
+- `manager.satis@propel.com` → `Hatice Yıldırım` (department_manager, SA-031, Genel bölgesi)
+- `satis.employee@propel.com` → `Zeynep Kaya` (SA-011)
+- SALES_EMPLOYEE_SPECS takım isimleri Excel Region sütunuyla birebir eşleşiyor
+- SA-011 loop'tan hariç tutuldu (ayrıca satis.employee olarak ekleniyor)
+
+**Test Kullanıcıları (Güncel)**:
+| Email | Şifre | Rol | Yönlendirme |
+|---|---|---|---|
+| admin@propel.com | admin123 | Admin | /admin |
+| manager.satis@propel.com | manager123 | Hatice Yıldırım — Satış Müdürü | /manager/sales-analytics |
+| manager.yazilim@propel.com | manager123 | Ahmet Yılmaz — Yazılım Müdürü | /manager |
+| satis.employee@propel.com | satis123 | Zeynep Kaya (SA-011) | /employee/sales |
+| sa-020@propel.com | employee123 | Ozan Çetin — Riskli profil | /employee/sales |
+| sa-001@propel.com | employee123 | Ali Yılmaz — Güvenli profil | /employee/sales |
+
+---
+
+### 2026-05-26 Satış 360° Feedback — Seed, Backend Doğrulama, Frontend View ★
+
+**Eklenen Dosyalar**:
+- `propel-backend/scripts/seed_demo_360_sales.py` → Satış departmanı için demo 360° feedback seed scripti
+  - 31 çalışan × ~3 feedback = 92 `FeedbackResponse` + 92 `FeedbackNLPAnalysis` + 31 `EmployeeNLPProfile`
+  - Bölge bazlı sinyal seçimi (Doğu/Güneydoğu→risk, Marmara/Ege→positive, vb.)
+  - Yönetici tespiti: "Genel" team = manager (SA-031 Hatice Yıldırım)
+  - `model_provider = "synthetic_seed_sales"` → `--no-reset` ile yeniden seed edilebilir
+- `propel-frontend/src/views/sales/SalesFeedbackView.vue` → Satış yöneticisi 360° feedback dashboard
+  - Emerald/teal tema; 4 KPI kartı (analiz edilen çalışan, ort. motivasyon, uçuş riski, ort. işbirliği)
+  - Gradient sinyal paneli (güçlü yönler / risk alanları / destek ihtiyaçları)
+  - Departman 360 raporu (narrative + sections + recommended action)
+  - Metrik çubukları, uçuş riski dağılımı, tükenmişlik dağılımı, risk tema sıralaması
+  - SVG motivasyon trend grafiği (gradient fill + polyline)
+  - TypeScript: `TrendPoint`, `DistributionPoint`, `ThemePoint` ile explicit tipler
+
+**Güncellenen Dosyalar**:
+- `propel-frontend/src/router/index.ts` → `/manager/sales-feedback` route eklendi
+- `propel-frontend/src/layouts/AppLayout.vue` → KPI & ML Analizi grubuna "360 Geri Bildirim" eklendi
+- `propel-frontend/src/views/manager/DepartmentAnalysisView.vue` → 32 mojibake sequence düzeltildi
+- `propel-frontend/src/views/manager/EmployeeAnalysisView.vue` → 35 mojibake sequence düzeltildi
+
+**Backend Doğrulama** (tüm endpointler `manager.satis@propel.com` ile test edildi):
+- `GET /feedbacks/nlp/department-summary` → 31 çalışan, avg_motivation=3.34, flight_risk=5
+- `GET /feedbacks/reports/department` → sections + metrics döndürüyor
+- `GET /feedbacks/charts/department` → 4 trend noktası, flight/burnout dağılımı, risk temaları
+
+**Encoding Düzeltmesi**:
+- `DepartmentAnalysisView.vue` ve `EmployeeAnalysisView.vue` hardcoded template string'leri
+  çift-encode edilmiş durumdaydı (UTF-8 bytes → Windows-1252 → UTF-8 olarak kaydedilmiş)
+- Hedef map ile düzeltildi: `Ä±`→`ı`, `ÅŸ`→`ş`, `Ã¼`→`ü`, `ÄŸ`→`ğ`, `Ã§`→`ç`, `Ä°`→`İ`, `Ã–`→`Ö` vb.
+
+---
+
+### 2026-06-02 Admin Panel Mock Verileri Gerçek Backend'e Bağlandı ★
+
+**Sorun**: Admin panelindeki 3 sayfa tamamen hardcoded/mock verilerle çalışıyordu:
+- `EmployeeDetails.vue`: Her zaman "Canan Dağdelen" gösteriyordu, `route.params.id` okunmuyordu
+- `AdminDashboard.vue`: Uçuş Riski Radarı hardcoded "Elif Demir" ve "Can Kaya"; departman yöneticisi hep "Yönetici Atanmadı"
+- `DataManagement.vue`: "Şablon İndir" butonu tıklanamaz; hardcoded "Pazarlama uyarısı"
+
+**Eklenen Backend Endpoint**:
+- `GET /api/v1/admin/uploads/template?dept=software|sales` → UTF-8 BOM'lu CSV şablon dosyası indirme
+  - Rota çakışması: `/template` rotası `/{upload_id}` ile çakışıyordu → `GET /template` `GET /{upload_id}`'den önce tanımlandı
+  - Windows Docker volume sync gecikmesi: `docker cp` ile manuel kopyalama gerekti
+
+**Güncellenen Frontend Dosyaları**:
+- `views/admin/EmployeeDetails.vue` — tamamen yeniden yazıldı:
+  - `route.params.id` okunarak `GET /employees/{id}` çağrılıyor
+  - `GET /kpis/records/employee/{id}` → dönem bazlı ortalama trend grafiği
+  - Stats: `latest_ms`, `latest_ars`, `experience_years`, KPI kayıt sayısı
+  - Motivasyon gauge: `latest_ms` (0-10) → açı hesabı
+  - AI insights: `risk_level` + `latest_mte` + `experience_years` tabanlı deterministik metin
+  - KPI özeti: en yüksek 5 KPI progress bar olarak
+  - Loading/error state eklendi
+- `views/admin/AdminDashboard.vue`:
+  - Uçuş Riski: employees listesinden `risk_level=High/Medium` filtre, `combined_risk_score`'a göre sıralı top 4
+  - Departman yöneticisi: `user.role === 'department_manager'` ile tespit → gerçek isim ve initials
+  - Departman skoru: `latest_ms` ortalaması (MS: 0-10 skalası)
+- `views/admin/DataManagement.vue`:
+  - "Şablon İndir" butonu `adminUploadApi.downloadTemplate(dept)` çağrısına bağlandı
+  - Hardcoded "Pazarlama uyarısı" → yükleme başarısında gösterilen yeşil banner ile değiştirildi
+- `services/api/employee.api.ts` — `getEmployee(id)` metodu eklendi
+- `services/api/admin_upload.api.ts` — `downloadTemplate(dept)` metodu eklendi (blob download)
+
+**Risk Seviyesi Kaynağı** (önemli not):
+- `risk_level` Excel dosyalarından **gelmez**; nabız anketinden hesaplanır
+- `SurveyResponse.ars_score` (işten ayrılma riski, 0-1): `ars_score ≥ 0.6` → High, `≥ 0.2` → Medium, `< 0.2` → Low
+- `ars_score` iki kaynaktan gelir: (1) gerçek kullanımda ML motoru metin analizi, (2) seed_data.py deterministik formül
+
+**Push**: `cansuyildirimmm/AI-Supported-Department-Employee-Performance-Analysis-System` → branch `99999999.branch` (commit `9061d68`)
+
+---
+
+### 2026-05-22 Satış Çalışanı Login Redirect Düzeltmesi ★
+
+**Sorun**: `satis.employee@propel.com` ile giriş yapıldığında `/employee/sales` (SalesEmployeeDashboard, emerald tema) yerine `/employee` (genel EmployeeDashboard, lacivert tema) açılıyordu. Sayfa yenilendikten sonra veya eski oturumda da aynı sorun tekrar ediyordu.
+
+**Kök Neden**: Pinia store'da `token` localStorage'dan restore ediliyordu (`ref(localStorage.getItem('token'))`) fakat `user` objesi `null` kalıyordu. Router guard `user = null` iken `isSales` kontrolü yapınca `false` döndürüyor ve `/employee`'ye yönlendiriyordu.
+
+**Düzeltilen Dosyalar**:
+
+`propel-frontend/src/stores/auth.ts`:
+- `login()` fonksiyonu: başarılı girişten sonra `userEmail` ve `deptId` localStorage'a kaydediliyor
+- `tryMockLogin()`: mock giriş için de aynı şekilde `userEmail` ve `deptId` kaydediliyor
+- `logout()`: `userEmail` ve `deptId` localStorage'dan temizleniyor
+
+`propel-frontend/src/router/index.ts`:
+- `isSalesUser()` yardımcı fonksiyonu eklendi: `user` objesi yokken `localStorage.getItem('userEmail')` ve `localStorage.getItem('deptId')` fallback olarak kullanılıyor; `department_id === 14/18` kontrolü eklendi
+- `router.beforeEach` guard `async` yapıldı: token varken `user = null` ise (sayfa yenileme / eski oturum) `/me` çekilip user restore ediliyor
+- `requiresGuest` guard: `authStore.userRole || localStorage.getItem('role')` ile role tespiti güçlendirildi
+- `employee-dashboard` guard eklendi: satış çalışanı `/employee`'ye gelirse otomatik `/employee/sales`'e yönlendiriliyor
+
+**Önemli Teknik Not**: Windows'ta Docker Desktop volume sync gecikmesi nedeniyle HMR çalışmayabiliyor. Dosya değişikliklerinden sonra `docker cp` ile container'a manuel kopyalama gerekebilir:
+```bash
+docker cp propel-frontend/src/router/index.ts propel_frontend:/app/src/router/index.ts
+docker cp propel-frontend/src/stores/auth.ts propel_frontend:/app/src/stores/auth.ts
+docker restart propel_frontend
+```
+
+---
+
+### 2026-06-03 Admin Panel ML Entegrasyonu + Gemini AI ★ BÜYÜK
+
+**Personel Yönetimi (EmployeeManagement.vue) — Tam ML Entegrasyonu**
+- `GET /admin/uploads/flight-risk` endpoint'i çağrılarak ML verileri alınır
+- `external_employee_code` üzerinden employee listesi ile ML haritası birleştirilir
+- Performans çubuğu: ML'den `performance_score` (0-100) — artık `latest_ms * 20` değil
+- Risk rozeti: ML'den `risk_level` (High/Low) — artık seed ARS formülü değil
+- Departman filtresi: veritabanından dinamik
+- Sıralama (performans ↑↓, risk, isim) gerçekten çalışıyor
+- En altta: hangi upload ID'lerinin kullanıldığı gösteriliyor
+
+**Backend: `GET /admin/uploads/ai-insights` — Yeni Endpoint**
+- ML flight-risk verisini (61 çalışan: 31 satış + 30 yazılım) çeker
+- İstatistikleri derleyip Gemini'ye gönderir
+- Gemini: Genel Durum / Kritik Bulgular / Aksiyon Önerileri raporu üretir
+- KPI kartları, risk donut, çalışan tablosu, Gemini narratifi döndürür
+- `gemini_used: true/false` ile Gemini durumu belirtilir
+
+**Yapay Zeka İçgörüleri (AIInsights.vue) — Tamamen Yeniden Yazıldı**
+- Eski: `GET /surveys/analytics/insights` (deterministik, 1586 kayıt, yanlış sayılar)
+- Yeni: `GET /admin/uploads/ai-insights` (ML + Gemini)
+- 4 KPI kartı: toplam çalışan, yüksek riskli, ort. performans, güvenli çalışan
+- Risk donut: gerçek ML dağılımı
+- Gemini raporu: 3 bölümlü Türkçe yönetici raporu, mor rozet
+- Aksiyon önerileri: Gemini'den çıkarılan maddeler kart formatında
+- Tüm çalışan tablosu: 61 çalışan, filtreli, sayfalı
+
+**Gemini API Entegrasyonu**
+- `GEMINI_API_KEY` `.env` dosyasına eklendi
+- `AIService._generate_with_gemini()` kullanılıyor (mevcut altyapı)
+- Model: `gemini-1.5-flash` (otomatik seçim)
+
+**Veri Yönetimi (DataManagement.vue)**
+- "Veri Tipi" dropdown: sadece "Performans Metrikleri (KPI)" kaldı (Personel Listesi + Anket Sonuçları kaldırıldı)
+- "Tüm Geçmişi Görüntüle" butonu çalışıyor: ilk 6 kayıt görünür, butona tıklayınca tamamı açılır
+
+**Anket Sonuçları (SurveyResults.vue) — Gemini Panel**
+- Departman filtresi: "Haftalık Nabız / Motivasyon" → "Tüm Departmanlar / Satış / Yazılım" olarak değiştirildi
+- Sağ alt köşeye sabitlenmiş mor "Gemini ile Yorumla" butonu eklendi
+- Panel açılınca frontend filtrelenmiş veriyi (stats + gerçek q4/q5/q6 yanıtları) POST eder
+- Backend `POST /surveys/analytics/gemini-insights`: gerçek anket yanıtlarını Gemini'ye iletir
+- Gemini: sayfadaki gerçek çalışan yorumlarına atıfta bulunarak rapor üretir
+- Departman değişince açık panel otomatik yenilenir
+
+**Admin Menü**
+- "Satis ML Analizi" admin sidebar'dan kaldırıldı
+
+**Uçuş Riski Backend Düzeltmesi**
+- Yazılım bloğu backend container'da çalışmıyordu (restart gerekirdi) → düzeltildi
+- Artık flight-risk: 30 yazılım (SE-xxx) + 31 satış (SA-xxx) = 61 çalışan
+- 61/62 employee_code eşleşiyor (MGR-SW datasette olmadığı için ML verisi yok — beklenen)
+
+**Önemli Teknik Notlar**:
+- `GET /admin/uploads/ai-insights` yaklaşık 15-20 sn sürer (ML prediction + Gemini)
+- `POST /surveys/analytics/gemini-insights` yaklaşık 5-8 sn sürer
+- `docker restart propel_backend` sonrası token yenilenmesi gerekiyor (JWT süre sıfırlanır)
+- Flight-risk endpoint'i her çağrıda ML modellerini çalıştırır (cache yok)
 
 ---
 
 ## Sonraki Adımlar / Roadmap
 
 - [x] Satış departmanı frontend dashboard'u (Vue 3) — employee/manager/admin görünümleri
-- [ ] `Burnout_Target` için dataset'e pozitif örnek ekleme veya UI'dan gizleme
-- [ ] Satış çalışanı dashboard KPI kartlarını backend'e bağla (`/kpis/records?employee_id=X`)
+- [x] Satış çalışanı dashboard KPI kartlarını backend'e bağla
+- [x] Tüm 4 ML hedefi eğitilebilir hale getirildi
+- [x] Türkçe karakter düzeltmesi (tüm isimler)
+- [x] Hatice Yıldırım — tek satış müdürü (SA-031, dataset'e eklendi)
+- [x] Satış çalışanı login redirect düzeltmesi (router guard async + user restore)
+- [x] Satış departmanı 360° feedback seed + NLP profil oluşturma (92 kayıt, 31 çalışan)
+- [x] Satış yöneticisi 360° feedback view (SalesFeedbackView.vue) — emerald tema
+- [x] DepartmentAnalysisView + EmployeeAnalysisView mojibake encoding düzeltmesi
+- [x] Admin panel mock verileri gerçek backend'e bağlandı (EmployeeDetails, AdminDashboard, DataManagement)
+- [x] Şablon indirme endpoint'i eklendi (GET /admin/uploads/template)
+- [x] Personel Yönetimi: ML performans skoru + risk seviyesi (flight-risk endpoint'e bağlandı)
+- [x] Yapay Zeka İçgörüleri: ML + Gemini AI entegrasyonu (AIInsights.vue tamamen yeniden yazıldı)
+- [x] Gemini API anahtarı entegre edildi (gemini-1.5-flash)
+- [x] Anket Sonuçları: departman filtresi + Gemini yorum paneli (gerçek q4/q5/q6 yanıtları)
+- [x] Admin menüden "Satış ML Analizi" kaldırıldı
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri
-- [ ] LLM narrative endpoint'ini async/background job olarak ayır
+- [ ] LLM/Gemini endpoint'lerini async/background job olarak ayır (şu an bloklayıcı)
 - [ ] Departman Analizi AI Modal → PDF İndir ve Email Gönder backend bağlantısı
 - [ ] Yeni departman desteği (İK, Pazarlama): registry + kpi_registry + seed genişletme
 - [ ] WebSocket ile gerçek zamanlı bildirimler

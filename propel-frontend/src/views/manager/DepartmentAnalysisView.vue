@@ -25,7 +25,7 @@
           </option>
         </select>
         <button class="px-4 py-2 bg-white border border-gray-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-gray-50 flex items-center gap-2 shadow-sm transition-all">
-          Rapor Ä°ndir
+          Rapor İndir
         </button>
       </div>
     </div>
@@ -43,7 +43,7 @@
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="text-sm text-slate-500">{{ departmentReport.report_title }}</p>
-            <h3 class="text-xl font-bold text-slate-900 mt-1">{{ departmentReport.department_name }} DepartmanÄ±</h3>
+            <h3 class="text-xl font-bold text-slate-900 mt-1">{{ departmentReport.department_name }} Departmanı</h3>
           </div>
           <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
             Hafta {{ departmentReport.period_week }}
@@ -51,7 +51,7 @@
         </div>
 
         <div class="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
-          <p class="text-xs font-semibold text-indigo-700 mb-1">HaftalÄ±k Departman Ã–zeti</p>
+          <p class="text-xs font-semibold text-indigo-700 mb-1">Haftalık Departman Özeti</p>
           <p class="text-sm text-slate-700">{{ renderText(departmentReport.report_summary) }}</p>
         </div>
 
@@ -60,7 +60,7 @@
             v-if="departmentQualityWarningSection"
             class="rounded-xl border border-amber-200 bg-amber-50 p-4"
           >
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">Veri Kalitesi UyarÄ±sÄ±</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">Veri Kalitesi Uyarısı</p>
             <div class="mt-3 flex flex-wrap gap-2">
               <span
                 v-for="item in departmentQualityWarningSection.items"
@@ -76,7 +76,7 @@
             v-if="departmentBiasWarningSection"
             class="rounded-xl border border-rose-200 bg-rose-50 p-4"
           >
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">KarÅŸÄ±lÄ±klÄ± Bias ÅÃ¼phesi</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">Karşılıklı Bias Şüphesi</p>
             <div class="mt-3 flex flex-wrap gap-2">
               <span
                 v-for="item in departmentBiasWarningSection.items"
@@ -113,7 +113,7 @@
       </div>
 
       <div class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-          <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Departman SkorlarÄ±</p>
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Departman Skorları</p>
         <div class="mt-5 space-y-4">
           <div
             v-for="metric in departmentReport.metrics"
@@ -132,7 +132,7 @@
       <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div class="flex justify-between items-center mb-6">
           <h3 class="font-bold text-slate-800">NLP Trendleri</h3>
-          <span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">AylÄ±k takip</span>
+          <span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">Aylık takip</span>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="h-72">
@@ -140,7 +140,7 @@
             <LineChart :labels="motivationTrendLabels" :data="motivationTrendValues" label="Motivasyon" color="#4f46e5" />
           </div>
           <div class="h-72">
-            <p class="text-sm text-slate-500 mb-3">Psikolojik gÃ¼ven trendi</p>
+            <p class="text-sm text-slate-500 mb-3">Psikolojik güven trendi</p>
             <LineChart :labels="safetyTrendLabels" :data="safetyTrendValues" label="Psikolojik Guven" color="#ef4444" />
           </div>
         </div>
@@ -152,7 +152,7 @@
             <SparklesIcon class="w-5 h-5 text-indigo-300" />
           </div>
           <div>
-            <h3 class="font-bold text-white">Rapor NotlarÄ±</h3>
+            <h3 class="font-bold text-white">Rapor Notları</h3>
             <p class="text-xs text-slate-400">Tema ve aksiyon odagi</p>
           </div>
         </div>
@@ -168,17 +168,17 @@
           <div class="bg-white/5 p-4 rounded-xl border border-white/10">
             <div class="flex gap-2 text-emerald-400 text-xs font-bold mb-2 items-center">
               <TrophyIcon class="w-4 h-4" />
-              <span>GÃ¼Ã§lÃ¼ Alan</span>
+              <span>Güçlü Alan</span>
             </div>
             <p class="text-xs text-slate-300 leading-relaxed">{{ renderText(topDepartmentStrengthNarrative) }}</p>
           </div>
           <div class="bg-white/5 p-4 rounded-xl border border-white/10">
             <div class="flex gap-2 text-amber-400 text-xs font-bold mb-2 items-center">
               <SparklesIcon class="w-4 h-4" />
-              <span>Ã–nerilen Aksiyon</span>
+              <span>Önerilen Aksiyon</span>
             </div>
             <p class="text-xs text-slate-300 leading-relaxed">
-              {{ renderText(departmentReport?.recommended_action || 'Departman iÃ§in belirgin bir aksiyon sinyali henÃ¼z oluÅŸmadÄ±.') }}
+              {{ renderText(departmentReport?.recommended_action || 'Departman için belirgin bir aksiyon sinyali henüz oluşmadı.') }}
             </p>
           </div>
         </div>
@@ -188,7 +188,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <div class="flex items-center justify-between mb-6">
-          <h3 class="font-bold text-slate-800">Risk DaÄŸÄ±lÄ±mÄ±</h3>
+          <h3 class="font-bold text-slate-800">Risk Dağılımı</h3>
           <span class="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-full border border-amber-100">Son hafta</span>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -205,7 +205,7 @@
 
       <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <div class="flex items-center justify-between mb-6">
-          <h3 class="font-bold text-slate-800">En SÄ±k Risk TemalarÄ±</h3>
+          <h3 class="font-bold text-slate-800">En Sık Risk Temaları</h3>
           <span class="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-full border border-rose-100">NLP sinyali</span>
         </div>
         <div class="h-80">
@@ -343,8 +343,8 @@
       <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">AylÄ±k Derin Analiz</p>
-            <h4 class="mt-1 text-lg font-bold text-slate-900">Departman trend ve tema Ã¶zeti</h4>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Aylık Derin Analiz</p>
+            <h4 class="mt-1 text-lg font-bold text-slate-900">Departman trend ve tema özeti</h4>
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <select
@@ -377,14 +377,14 @@
               <p class="mt-2 text-xl font-bold text-slate-900">{{ formatTrend(monthlyDeepAnalysis.sentiment_trend_direction) }}</p>
             </div>
             <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
-              <p class="text-xs text-slate-500">Ortalama ayrÄ±lma riski</p>
+              <p class="text-xs text-slate-500">Ortalama ayrılma riski</p>
               <p class="mt-2 text-xl font-bold text-slate-900">{{ monthlyDeepAnalysis.avg_flight_risk_score ?? '-' }}/10</p>
             </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="rounded-xl border border-rose-100 bg-rose-50 p-4">
-              <p class="text-xs font-semibold text-rose-700">En sÄ±k ÅŸikayet konularÄ±</p>
+              <p class="text-xs font-semibold text-rose-700">En sık şikayet konuları</p>
               <div class="mt-3 flex flex-wrap gap-2">
                 <span
                   v-for="item in monthlyDeepAnalysis.top_complaint_topics"
@@ -398,7 +398,7 @@
             </div>
 
             <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-              <p class="text-xs font-semibold text-emerald-700">En sÄ±k Ã¶vgÃ¼ konularÄ±</p>
+              <p class="text-xs font-semibold text-emerald-700">En sık övgü konuları</p>
               <div class="mt-3 flex flex-wrap gap-2">
                 <span
                   v-for="item in monthlyDeepAnalysis.top_praise_topics"
@@ -412,7 +412,7 @@
             </div>
 
             <div class="rounded-xl border border-sky-100 bg-sky-50 p-4">
-              <p class="text-xs font-semibold text-sky-700">Ã–ne Ã§Ä±kan temalar</p>
+              <p class="text-xs font-semibold text-sky-700">Öne çıkan temalar</p>
               <div class="mt-3 flex flex-wrap gap-2">
                 <span
                   v-for="item in monthlyDeepAnalysis.top_themes"
@@ -428,13 +428,13 @@
         </div>
 
         <div v-else class="mt-6 text-sm text-slate-400">
-          Bu ay iÃ§in departman derin analiz verisi henÃ¼z oluÅŸmadÄ±.
+          Bu ay için departman derin analiz verisi henüz oluşmadı.
         </div>
 
         <div v-if="monthlyRagReport" class="mt-6 rounded-2xl border border-violet-100 bg-violet-50 p-5">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">AylÄ±k HafÄ±zalÄ± Analiz</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">Aylık Hafızalı Analiz</p>
               <p class="mt-2 text-sm leading-6 text-slate-700">{{ renderText(monthlyRagReport.report_summary) }}</p>
             </div>
             <span class="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-semibold text-violet-700">
@@ -444,7 +444,7 @@
 
           <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="rounded-xl border border-violet-100 bg-white p-4">
-              <p class="text-xs font-semibold text-violet-700">Trend deÄŸerlendirmesi</p>
+              <p class="text-xs font-semibold text-violet-700">Trend değerlendirmesi</p>
               <p class="mt-2 text-sm leading-6 text-slate-700">{{ renderText(monthlyRagReport.trend_summary) }}</p>
             </div>
             <div class="rounded-xl border border-violet-100 bg-white p-4">
@@ -459,10 +459,10 @@
       </div>
 
       <div class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-        <p class="text-xs uppercase tracking-[0.2em] text-slate-400">AylÄ±k Departman Ä°Ã§gÃ¶rÃ¼sÃ¼</p>
+        <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Aylık Departman İçgörüsü</p>
         <div v-if="monthlyDeepAnalysis" class="mt-5 space-y-4">
           <div class="rounded-xl border border-white/10 bg-white/5 p-4">
-            <p class="text-xs font-semibold text-rose-300">Ã–ne Ã§Ä±kan risk nedenleri</p>
+            <p class="text-xs font-semibold text-rose-300">Öne çıkan risk nedenleri</p>
             <div class="mt-3 flex flex-wrap gap-2">
               <span
                 v-for="item in monthlyDeepAnalysis.top_flight_risk_reasons"
@@ -476,16 +476,16 @@
           </div>
 
           <div class="rounded-xl border border-white/10 bg-white/5 p-4">
-            <p class="text-xs font-semibold text-amber-300">Aksiyon Ã¶nerisi</p>
+            <p class="text-xs font-semibold text-amber-300">Aksiyon önerisi</p>
             <p class="mt-2 text-sm leading-6 text-slate-200">
-              {{ renderText(monthlyDeepAnalysis.action_recommendation || 'Departman iÃ§in aylÄ±k aksiyon Ã¶nerisi henÃ¼z oluÅŸmadÄ±.') }}
+              {{ renderText(monthlyDeepAnalysis.action_recommendation || 'Departman için aylık aksiyon önerisi henüz oluşmadı.') }}
             </p>
           </div>
 
           <div class="rounded-xl border border-white/10 bg-white/5 p-4">
-            <p class="text-xs font-semibold text-indigo-300">Analiz kapsamÄ±</p>
+            <p class="text-xs font-semibold text-indigo-300">Analiz kapsamı</p>
             <p class="mt-2 text-sm leading-6 text-slate-200">
-              Bu rapor {{ monthlyDeepAnalysis.analyzed_employee_count }} Ã§alÄ±ÅŸanÄ±n toplam {{ monthlyDeepAnalysis.analyzed_feedback_count }} feedback cevabÄ±ndan oluÅŸtu.
+              Bu rapor {{ monthlyDeepAnalysis.analyzed_employee_count }} çalışanın toplam {{ monthlyDeepAnalysis.analyzed_feedback_count }} feedback cevabından oluştu.
             </p>
           </div>
 
@@ -504,7 +504,7 @@
           </div>
         </div>
         <div v-else class="mt-5 text-sm text-slate-500">
-          AylÄ±k departman iÃ§gÃ¶rÃ¼leri veri geldikÃ§e burada gÃ¶sterilecek.
+          Aylık departman içgörüleri veri geldikçe burada gösterilecek.
         </div>
       </div>
     </div>
@@ -639,8 +639,8 @@ function getSectionPillClass(title: string) {
 
 function formatTrend(value: string) {
   const map: Record<string, string> = {
-    yukselis: 'YÃ¼kseliÅŸ',
-    dusus: 'DÃ¼ÅŸÃ¼ÅŸ',
+    yukselis: 'Yükseliş',
+    dusus: 'Düşüş',
     stabil: 'Stabil',
   }
   return map[value] || 'Stabil'
@@ -648,9 +648,9 @@ function formatTrend(value: string) {
 
 function formatRiskLabel(value?: string | null) {
   const map: Record<string, string> = {
-    low: 'DÃ¼ÅŸÃ¼k',
+    low: 'Düşük',
     medium: 'Orta',
-    high: 'YÃ¼ksek',
+    high: 'Yüksek',
   }
   return value ? (map[value] || value) : '-'
 }
@@ -665,32 +665,32 @@ function formatSentiment(value?: string | null) {
 }
 
 function formatMemoryCount(value: number) {
-  return `${value} benzer kayÄ±t`
+  return `${value} benzer kayıt`
 }
 
 function renderText(value?: string | null) {
   if (!value) return ''
 
   const replacements: Array<[string, string]> = [
-    ['surec yavasligi', 'sÃ¼reÃ§ yavaÅŸlÄ±ÄŸÄ±'],
-    ['toplanti yogunlugu', 'toplantÄ± yoÄŸunluÄŸu'],
-    ['deadline baskisi', 'deadline baskÄ±sÄ±'],
-    ['mentorluk eksikligi', 'mentorluk eksikliÄŸi'],
-    ['psikolojik guven', 'psikolojik gÃ¼ven'],
-    ['is birligi', 'iÅŸ birliÄŸi'],
-    ['gelisime aciklik', 'geliÅŸime aÃ§Ä±klÄ±k'],
-    ['teknik borc', 'teknik borÃ§'],
-    ['liderlik destegi', 'liderlik desteÄŸi'],
-    ['yonetsel destek', 'yÃ¶netsel destek'],
-    ['yukselis', 'yÃ¼kseliÅŸ'],
-    ['dusus', 'dÃ¼ÅŸÃ¼ÅŸ'],
-    ['gorunuyor', 'gÃ¶rÃ¼nÃ¼yor'],
-    ['Tekrarlanan sikayet konulari', 'Tekrarlanan ÅŸikayet konularÄ±'],
-    ['En belirgin sikayet alanlari', 'En belirgin ÅŸikayet alanlarÄ±'],
-    ['Gecmis benzer yorumlar', 'GeÃ§miÅŸ benzer yorumlar'],
-    ['kayitta', 'kayÄ±tta'],
-    ['ayrilma riski', 'ayrÄ±lma riski'],
-    ['Departmanda tekrar eden ana risk temasi', 'Departmanda tekrar eden ana risk temasÄ±'],
+    ['surec yavasligi', 'süreç yavaşlığı'],
+    ['toplanti yogunlugu', 'toplantı yoğunluğu'],
+    ['deadline baskisi', 'deadline baskısı'],
+    ['mentorluk eksikligi', 'mentorluk eksikliği'],
+    ['psikolojik guven', 'psikolojik güven'],
+    ['is birligi', 'iş birliği'],
+    ['gelisime aciklik', 'gelişime açıklık'],
+    ['teknik borc', 'teknik borç'],
+    ['liderlik destegi', 'liderlik desteği'],
+    ['yonetsel destek', 'yönetsel destek'],
+    ['yukselis', 'yükseliş'],
+    ['dusus', 'düşüş'],
+    ['gorunuyor', 'görünüyor'],
+    ['Tekrarlanan sikayet konulari', 'Tekrarlanan şikayet konuları'],
+    ['En belirgin sikayet alanlari', 'En belirgin şikayet alanları'],
+    ['Gecmis benzer yorumlar', 'Geçmiş benzer yorumlar'],
+    ['kayitta', 'kayıtta'],
+    ['ayrilma riski', 'ayrılma riski'],
+    ['Departmanda tekrar eden ana risk temasi', 'Departmanda tekrar eden ana risk teması'],
     ['Departmanda olumlu sinyal veren ana alan', 'Departmanda olumlu sinyal veren ana alan'],
   ]
 

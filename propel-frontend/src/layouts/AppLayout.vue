@@ -219,7 +219,7 @@ const isSalesDept = computed(() => {
 const userName = computed(() => authStore.user?.full_name || 'Kullanici')
 
 const userInitials = computed(() =>
-  userName.value.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2)
+  userName.value.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2)
 )
 
 const userRoleLabel = computed(() => {
@@ -271,7 +271,6 @@ const allNavigation: NavigationItem[] = [
   { name: 'Veri Yonetimi', to: '/admin/data-management', icon: DocumentTextIcon, role: 'admin' },
   { name: 'Yapay Zeka Icgoruleri', to: '/admin/ai-insights', icon: ChartBarIcon, role: 'admin' },
   { name: 'Anket Sonuclari', to: '/admin/survey-results', icon: DocumentTextIcon, role: 'admin' },
-  { name: 'Satis ML Analizi', to: '/admin/sales-analytics', icon: ChartBarIcon, role: 'admin' },
   {
     name: '360 Derece Feedback',
     type: 'group',
@@ -305,14 +304,18 @@ const allNavigation: NavigationItem[] = [
   // ── Satis Yoneticisi ────────────────────────────────────────────────────────
   { name: 'Departman Performansi', to: '/manager', icon: ChartBarIcon, role: 'department_manager', dept: 'sales' },
   {
-    name: 'Satis KPI & ML',
+    name: 'KPI & ML Analizi',
     type: 'group',
     icon: ChartBarIcon,
     role: 'department_manager',
     dept: 'sales',
     children: [
-      { name: 'Performans Analizi', to: '/manager/sales-analytics', icon: ChartBarIcon },
-      { name: 'Takim Riski', to: '/manager/sales-analytics', icon: UsersIcon },
+      { name: 'Model Durumu', to: '/manager/sales-analytics', icon: ChartBarIcon },
+      { name: 'Departman Analizi', to: '/manager/sales-kpi-analysis?section=department', icon: DocumentTextIcon },
+      { name: 'Takım Analizi', to: '/manager/sales-kpi-analysis?section=teams', icon: UsersIcon },
+      { name: 'Çalışan Analizi', to: '/manager/sales-kpi-analysis?section=watchlist', icon: UsersIcon },
+      { name: 'Teknik Detaylar', to: '/manager/sales-kpi-analysis?section=technical', icon: Cog6ToothIcon },
+      { name: '360 Geri Bildirim', to: '/manager/sales-feedback', icon: ChatBubbleLeftRightIcon },
     ],
   },
 
@@ -356,7 +359,7 @@ const navigation = computed(() =>
   })
 )
 
-const openGroups = ref<string[]>(['360 Derece Feedback', 'KPI & ML Analizi', 'Satis KPI & ML'])
+const openGroups = ref<string[]>(['360 Derece Feedback', 'KPI & ML Analizi'])
 
 const isActiveRoute = (target: string) => {
   if (target.includes('?')) {
@@ -373,7 +376,7 @@ const isGroupOpen = (groupName: string) => openGroups.value.includes(groupName)
 
 const toggleGroup = (groupName: string) => {
   if (isGroupOpen(groupName)) {
-    openGroups.value = openGroups.value.filter((item) => item !== groupName)
+    openGroups.value = openGroups.value.filter((item: string) => item !== groupName)
     return
   }
   openGroups.value = [...openGroups.value, groupName]

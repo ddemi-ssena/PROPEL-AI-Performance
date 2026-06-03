@@ -6,8 +6,13 @@
         <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Veri Yönetimi</h1>
         <p class="text-slate-500 mt-1">Sistem verilerini içe aktarın, dışa aktarın ve yönetin.</p>
       </div>
-      <button class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2 shadow-sm">
-        <ArrowDownTrayIcon class="w-5 h-5" />
+      <button
+        @click="downloadTemplate"
+        :disabled="isDownloadingTemplate"
+        class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-60"
+      >
+        <span v-if="isDownloadingTemplate" class="w-4 h-4 border-2 border-slate-400/30 border-t-slate-600 rounded-full animate-spin"></span>
+        <ArrowDownTrayIcon v-else class="w-5 h-5" />
         Şablon İndir
       </button>
     </div>
@@ -22,8 +27,6 @@
                  <label class="block text-sm font-medium text-slate-700 mb-1">Veri Tipi</label>
                  <select v-model="selectedDataType" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                      <option>Performans Metrikleri (KPI)</option>
-                     <option>Personel Listesi</option>
-                     <option>Anket Sonuçları</option>
                  </select>
              </div>
 
@@ -70,12 +73,12 @@
              </button>
          </div>
 
-         <!-- Warning Alert -->
-         <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
-             <ExclamationTriangleIcon class="w-5 h-5 text-amber-600 flex-shrink-0" />
+         <!-- Upload Success Banner -->
+         <div v-if="lastUploadSuccess" class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex gap-3">
+             <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
              <div>
-                 <p class="text-sm font-bold text-amber-800">Eksik Veri Tespiti</p>
-                 <p class="text-xs text-amber-700 mt-1">Son yüklenen veri setinde "Pazarlama" departmanı için 2 aylık KPI verisi eksik görünüyor.</p>
+                 <p class="text-sm font-bold text-emerald-800">Yükleme Başarılı</p>
+                 <p class="text-xs text-emerald-700 mt-1">Veri başarıyla sisteme aktarıldı.</p>
              </div>
          </div>
       </div>
@@ -104,7 +107,7 @@
                       </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-100">
-                      <tr v-for="item in uploadHistory" :key="item.id" class="hover:bg-slate-50">
+                      <tr v-for="item in visibleHistory" :key="item.id" class="hover:bg-slate-50">
                           <td class="px-6 py-3 text-sm text-slate-600">#{{ item.id }}</td>
                           <td class="px-6 py-3 text-sm text-slate-600">{{ formatDate(item.upload_date) }}</td>
                           <td class="px-6 py-3 text-sm font-medium text-slate-900">
@@ -121,7 +124,7 @@
                               </span>
                           </td>
                       </tr>
-                      <tr v-if="uploadHistory.length === 0 && !isLoadingHistory">
+                      <tr v-if="visibleHistory.length === 0 && !isLoadingHistory">
                           <td colspan="5" class="px-6 py-8 text-center text-slate-500 text-sm">
                               Henüz bir veri yüklemesi yapılmamış.
                           </td>
@@ -130,8 +133,10 @@
               </table>
           </div>
           
-          <div class="p-4 border-t border-slate-200 flex justify-center">
-               <button class="text-sm text-blue-600 hover:text-blue-700 font-medium">Tüm Geçmişi Görüntüle</button>
+          <div v-if="uploadHistory.length > PREVIEW_LIMIT" class="p-4 border-t border-slate-200 flex justify-center">
+               <button @click="showAll = !showAll" class="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                 {{ showAll ? 'Daha Az Göster' : `Tüm Geçmişi Görüntüle (${uploadHistory.length} kayıt)` }}
+               </button>
           </div>
       </div>
     </div>
@@ -140,7 +145,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { CloudArrowUpIcon, ArrowDownTrayIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import { CloudArrowUpIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 import { adminUploadApi } from '@/services/api/admin_upload.api'
 
 const uploadHistory = ref<any[]>([])
@@ -151,8 +156,16 @@ const selectedFile = ref<File | null>(null)
 const isDragging = ref(false)
 const isUploading = ref(false)
 const isLoadingHistory = ref(false)
+const isDownloadingTemplate = ref(false)
+const lastUploadSuccess = ref(false)
+
+const PREVIEW_LIMIT = 6
+const showAll = ref(false)
 
 const latestUpload = computed(() => uploadHistory.value[0] || null)
+const visibleHistory = computed(() =>
+  showAll.value ? uploadHistory.value : uploadHistory.value.slice(0, PREVIEW_LIMIT)
+)
 
 const fetchHistory = async () => {
     isLoadingHistory.value = true
@@ -190,8 +203,9 @@ const handleDrop = (event: DragEvent) => {
 
 const startUpload = async () => {
     if (!selectedFile.value) return
-    
+
     isUploading.value = true
+    lastUploadSuccess.value = false
     try {
         await adminUploadApi.uploadFile(
           selectedFile.value,
@@ -199,11 +213,24 @@ const startUpload = async () => {
           selectedDataType.value === 'Performans Metrikleri (KPI)' ? selectedDepartmentKey.value : undefined
         )
         selectedFile.value = null
+        lastUploadSuccess.value = true
         await fetchHistory()
     } catch (e: any) {
         alert(e.response?.data?.detail || "Yükleme sırasında bir hata oluştu.")
     } finally {
         isUploading.value = false
+    }
+}
+
+const downloadTemplate = async () => {
+    isDownloadingTemplate.value = true
+    try {
+        const dept = selectedDepartmentKey.value === 'sales' ? 'sales' : 'software'
+        await adminUploadApi.downloadTemplate(dept as 'software' | 'sales')
+    } catch (e: any) {
+        alert(e.response?.data?.detail || "Şablon indirilemedi.")
+    } finally {
+        isDownloadingTemplate.value = false
     }
 }
 

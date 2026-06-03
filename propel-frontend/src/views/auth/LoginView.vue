@@ -276,7 +276,7 @@ async function handleLogin() {
       const departmentName = authStore.user?.department_name?.toLocaleLowerCase('tr-TR') || ''
       const normalizedDepartmentName = departmentName.replace(/\u0131/g, 'i').replace(/\u015f/g, 's')
       const email = authStore.user?.email?.toLocaleLowerCase('tr-TR') || ''
-      const isSales = normalizedDepartmentName.includes('satis') || email.includes('satis') || email.startsWith('sa-')
+      const isSales = normalizedDepartmentName.includes('satis') || email.includes('satis') || email.startsWith('sa-') || email.startsWith('sl-')
       router.push(isSales ? '/employee/sales' : '/employee')
     } else {
       router.push('/dashboard')
