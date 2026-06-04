@@ -368,9 +368,9 @@ class AnalyticsService:
                     # Map department name to analytics key
                     # This is a bit brittle, but works for Software/Sales
                     dept_name = employee.department.name.lower()
-                    if "yazilim" in dept_name or "software" in dept_name:
+                    if "yaz" in dept_name or "software" in dept_name:
                         allowed_keys = ["software"]
-                    elif "satis" in dept_name or "sales" in dept_name:
+                    elif "sat" in dept_name or "sales" in dept_name:
                         allowed_keys = ["sales"]
             finally:
                 db.close()

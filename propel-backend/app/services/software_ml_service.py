@@ -185,7 +185,7 @@ class SoftwareMLService:
         software_uploads = [
             upload
             for upload in uploads
-            if (upload.raw_info or {}).get("department_key") == "software"
+            if SoftwareMLService._is_software_upload(upload)
         ]
 
         return [
@@ -351,8 +351,7 @@ class SoftwareMLService:
         if upload.status != "Success":
             raise HTTPException(status_code=400, detail="Sadece basarili yuklemeler ML egitiminde kullanilabilir.")
 
-        department_key = (upload.raw_info or {}).get("department_key")
-        if department_key and department_key != "software":
+        if not SoftwareMLService._is_software_upload(upload):
             raise HTTPException(status_code=400, detail="Bu endpoint yalnizca software upload'lari icindir.")
 
         return upload
@@ -370,7 +369,7 @@ class SoftwareMLService:
             .all()
         )
         for upload in uploads:
-            if (upload.raw_info or {}).get("department_key") == "software":
+            if SoftwareMLService._is_software_upload(upload):
                 return upload
         raise HTTPException(status_code=404, detail="Basarili software KPI dataset'i bulunamadi.")
 
@@ -527,6 +526,40 @@ class SoftwareMLService:
         if not path.exists():
             raise HTTPException(status_code=404, detail=f"Yuklenen dosya bulunamadi: {path}")
         return path
+
+    @staticmethod
+    def _upload_headers(upload: DataUpload) -> set[str]:
+        path = SoftwareMLService._upload_path(upload)
+        ext = path.suffix.lower()
+        if ext == ".csv":
+            with path.open(encoding="utf-8-sig", newline="") as file:
+                return {str(header) for header in (csv.DictReader(file).fieldnames or [])}
+        if ext == ".json":
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+                return {str(header) for header in payload[0].keys()}
+            return set()
+        if ext in {".xlsx", ".xls"}:
+            try:
+                import pandas as pd
+            except ImportError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="XLSX okuma icin pandas backend ortaminda kurulu olmali.",
+                ) from exc
+            dataframe = pd.read_excel(path, nrows=0)
+            return {str(header) for header in dataframe.columns}
+        return set()
+
+    @staticmethod
+    def _is_software_upload(upload: DataUpload) -> bool:
+        if (upload.raw_info or {}).get("department_key") != "software":
+            return False
+        try:
+            headers = {header.lower() for header in SoftwareMLService._upload_headers(upload)}
+        except HTTPException:
+            return False
+        return bool(headers & SUPPORTED_TARGETS)
 
     @staticmethod
     def _load_rows(path: Path) -> list[dict[str, Any]]:
@@ -839,7 +872,15 @@ class SoftwareMLService:
             raise HTTPException(status_code=400, detail="period week, month, quarter veya year olmali.")
 
         department = SoftwareMLService._dashboard_department(db, current_user)
-        employees = db.query(Employee).filter(Employee.department_id == department.id).all()
+        employees = (
+            db.query(Employee)
+            .join(Employee.user)
+            .filter(
+                Employee.department_id == department.id,
+                User.role == UserRole.employee,
+            )
+            .all()
+        )
         teams = sorted({employee.team for employee in employees if employee.team})
         period_start = SoftwareMLService._dashboard_period_start(period)
 
@@ -1800,7 +1841,7 @@ class SoftwareMLService:
             f"Departman saglik skoru {scores.department_health}/100. "
             f"Performans {scores.execution_score}/100, insan sagligi {scores.people_health_score}/100, "
             f"birlesik risk {scores.risk_score}/100 ve veri guveni {scores.confidence_score}/100. "
-            "Bu ozet kural bazli fallback olarak uretilmistir; LLM kullanilamazsa yoneticiye temel risk resmini verir."
+            "Bu ozet backend kural bazli analiz katmani tarafindan, mevcut KPI/ML, nabiz ve 360 sinyallerine gore uretilmistir."
         )
         return DepartmentDashboardAISummaryResponse(
             summary=summary,
