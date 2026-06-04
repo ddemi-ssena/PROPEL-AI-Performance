@@ -1921,3 +1921,122 @@ docker restart propel_frontend
   - `docker restart propel_frontend` calistirildi.
 - Kalan nokta:
   - Acik tarayici sekmesinde eski JS runtime kalirsa hard refresh veya yeniden giris sonrasi isimlerin `Hatice Yıldırım` / `Satış` olarak gorunmesi beklenir.
+
+## 2026-06-04 Departman Performansi Hibrit Dashboard Duzeltmesi
+
+- Kullanici Departman Performansi ekraninda calisan/takim/kapsama kartlarinin 0/0 kaldigini ve `Hibrit departman dashboard verisi yuklenemedi.` hatasini bildirdi.
+- Kök neden:
+  - `GET /analytics/departments/software/dashboard` endpoint'i `upload_id` verilmeden acildiginda `_latest_successful_upload` eski mantikla sadece `raw_info.department_key=software` alanina bakiyordu.
+  - Gecmisten yanlis etiketli satis dosyasi son upload olarak seciliyor, yeni sema guard'i da bunu `Bu endpoint yalnizca software upload'lari icindir.` diyerek 400'e dusuruyordu.
+  - KPI Analizi sayfasi secili `upload_id=6` ile calistigi icin orada analiz gorunurken Departman Performansi otomatik latest seciminde patliyordu.
+- Backend duzeltmeleri:
+  - `SoftwareMLService._latest_successful_upload` artik `SoftwareMLService._is_software_upload(upload)` kullanarak hem department_key hem de gercek kolon semasini dogruluyor.
+  - Hibrit dashboard calisan kapsami manager dahil 31 kisi yerine sadece `User.role == employee` olan 30 yazilim calisanini sayacak sekilde duzeltildi.
+- Veri tamamlama:
+  - Yazilim departmaninda KPI kaydi zaten vardi: 30 calisan icin KPI/ML kapsam `30/30`.
+  - Haftalik nabiz zaten vardi: `30/30`.
+  - 360 feedback/NLP bu hafta 0 oldugu icin 30 calisan icin demo `FeedbackNLPAnalysis` kaydi olusturuldu.
+- Frontend duzeltmesi:
+  - `ManagerDashboard.vue` otomatik dashboard yuklemesinde `use_llm=false` yapildi; ana sayfa LLM gecikmesi veya provider sorunuyla bloke olmayacak.
+- Dogrulama:
+  - `GET /analytics/departments/software/dashboard?period=week&target_column=performance_band&use_llm=false` artik `status=success`, `upload_id=6` donuyor.
+  - Donen kapsam: `member_count=30`, `team_count=4`, KPI/ML `30/30`, nabiz `30/30`, 360 feedback `30/30`, confidence `%100`.
+  - Skorlar: department health `50.6`, KPI/ML score `28.0`, weekly pulse `66.0`, feedback360 `80.3`.
+  - `py_compile` ve `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+## 2026-06-04 Departman Performansi Kart Kaynaklari ve Turkce Karakter Duzeltmesi
+
+- Kullanici Departman Performansi ekraninda `YazÄ±lÄ±m GeliÅŸtirme` gibi mojibake metinlerin gorunmesini ve hibrit kart skorlarinin kaynaginin belirsiz olmasini bildirdi.
+- Kontrol:
+  - Canli API ham JSON kontrolunde `department.name=Yazılım Geliştirme` dogru donuyor.
+  - Frontend ekranda eski runtime/bundle veya mojibake string gelirse normalize edilmeyen dashboard metni bozuk gorunebiliyordu.
+- Frontend duzeltmeleri:
+  - `ManagerDashboard.vue` icine `repairText` eklendi; dashboard departman adi ve takim adlari ekrana basilmeden once mojibake onarimindan geciyor.
+  - `KPICard.vue` icinde `Target` -> `Hedef`, `vs Ort` -> `Kaynak` yapildi.
+  - Hibrit skor kartlarina `sourceNote` eklendi; her kart backend kaynagi/formulunu ekranda acikliyor.
+  - Gorunen kart basliklari ve durum etiketleri Turkce karakterli hale getirildi: `Departman Sağlığı`, `Performans Çıktıları`, `İnsan Sağlığı`, `Düşük`, `Yüksek`, `Başarılı`, `Uyarı`.
+- Skor kaynaklari:
+  - Departman Sagligi: backend `SoftwareMLService._dashboard_scores`, KPI/ML %50 + haftalik nabiz %25 + 360 feedback %25.
+  - Performans Ciktilari: backend KPI/ML toplu tahmin sonucu; risk skoru `high*100 + medium*55 + low*15` agirlikli ortalama, performans skoru `100 - risk`.
+  - Insan Sagligi: haftalik nabiz skoru ile 360 NLP skorunun ortalamasi.
+  - Risk Skoru: KPI/ML risk, nabiz risk ve 360 NLP burnout/flight risk ortalamasi.
+- Dogrulama:
+  - Canli backend endpointi `department.name=Yazılım Geliştirme`, skorlar `department_health=50.6`, `execution_score=28.0`, `people_health_score=73.2`, `risk_score=49.1` dondurdu.
+  - `npm.cmd run type-check` basarili.
+  - Backend degisen dosyalar icin `py_compile` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## 2026-06-04 Departman Performansi Gauge ve LLM Analizi
+
+- Kullanici hibrit dashboarddaki yarim daire grafiklerin ayni gorundugunu, degerleri gercek yansitmadigini ve LLM analizinin daha acik olmasi gerektigini bildirdi.
+- Duzeltmeler:
+  - `HybridGauge` CSS/conic sabit bant yerine SVG tabanli gercek yarim daire gauge olacak sekilde degistirildi.
+  - Gauge progress arc uzunlugu ve needle konumu dogrudan `value` uzerinden hesaplanir; risk modunda renk esikleri ters okunur.
+  - Departman genel durumu paneline `LLM ile detaylı yorumla` butonu eklendi.
+  - Normal `Yenile` ve period degisimi `use_llm=false` ile hizli backend/kural bazli analiz getirir; LLM butonu `use_llm=true` ile ayni backend skorlarini Gemini/Ollama yorumuna yollar.
+  - Backend fallback summary metni `LLM kullanilamazsa...` gibi teknik/karisik dilden cikarildi; artik backend kural bazli analiz oldugunu soyler.
+- Canli dogrulama:
+  - `use_llm=false`: `source=deterministic`, `fallback_used=true`, summary backend skorlarini ve kural bazli analiz oldugunu soyluyor.
+  - `use_llm=true`: `source=gemini`, `fallback_used=false`, `model=gemini-2.5-flash-lite`; uzun yonetici yorumu ve aksiyon onerileri dondu.
+  - `npm.cmd run type-check` ve backend `py_compile` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+## 2026-06-04 Departman Performansi Gauge Hizalama Duzeltmesi
+
+- Kullanici SVG yarim daire gauge'larin kaydigini, renklerin yanlis/ayni gibi gorundugunu bildirdi.
+- Duzeltmeler:
+  - `HybridGauge` viewBox genisletildi (`0 0 140 86`), merkez ve radius yeniden ayarlandi; stroke artik ustten kirpilmiyor.
+  - Gauge icindeki 0/50/100 text marker'lari kaldirildi; kucuk kartlarda tasma ve hizalama bozulmasi engellendi.
+  - Gauge artik sade gri zemin + deger rengine gore tek progress arc + needle olarak gorunur.
+  - Saglik/performance skor renk esikleri `>=80 iyi`, `60-79 dikkat`, `<60 risk` olarak guncellendi.
+  - Risk modunda esik ters okunuyor: `<=40 iyi`, `40-60 dikkat`, `>60 risk`.
+  - Gorunen bazi ASCII/Turkce metinler temizlendi: `Genel Sağlık`, `Nabız`, `Birleşik Risk`, `Ne ölçüyor?` vb.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - Backend `py_compile` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## 2026-06-04 Departman Performansi Gauge Koruma ve Turkce Metin Temizligi
+
+- Kullanici yarim daire gauge'in kaldirilmasini istemedigini, sadece kayma ve metin bozulmalarinin duzeltilmesi gerektigini belirtti.
+- Frontend duzeltmeleri:
+  - `ManagerDashboard.vue` icindeki `HybridGauge` korunarak hizalandi; viewBox `0 0 160 108`, merkez `80/84`, radius `46/54` olacak sekilde ayarlandi.
+  - Gauge progress arc, needle ve center noktasi ayni koordinat sistemine alindi; kucuk kartlarda sabit `w-32`, ana kartta `w-40` kullanildi.
+  - Gauge icinde yarim daire kaldirilmadi; sadece kirpilme/kayma yapan olculer duzeltildi.
+  - Ekranda gorunen `Nab?z`, `kaynaklar?na g?re`, `?retkenlik`, `Kural bazl? ?zet` gibi bozuk string'ler dogru Turkce karakterlerle temizlendi.
+  - JS string icinde HTML entity olarak kalan `Haftal&#305;k Nab&#305;z` etiketi gercek `Haftalık Nabız` metnine cevrildi.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile app/services/software_ml_service.py` basarili.
+  - `docker restart propel_frontend` ve `docker restart propel_backend` calistirildi.
+  - Browser/Playwright gorsel smoke testi bu ortamda calistirilamadi; browser araci acilmadi ve Playwright dependency yok.
+
+## 2026-06-04 Departman Performansi Kaynak Kartlari Okunurluk ve Durum Kurali
+
+- Kullanici kaynak kartlarindaki `Ne olcuyor?` aciklama kutularinin arka plan/metin kontrastinin dusuk oldugunu ve `Risk` / `Dikkat` etiketlerinin neye gore belirlendigini sordu.
+- Frontend duzeltmeleri:
+  - `ManagerDashboard.vue` icindeki `SourceSummaryCard` renk siniflari ayrildi; border, badge ve aciklama kutusu artik ayri tonlarla uretiliyor.
+  - Aciklama kutulari koyu dolgu yerine acik arka plan + koyu okunabilir metin kullanacak sekilde duzeltildi.
+  - Kaynak basliginin altina durum kurali eklendi: `Risk: kaynak skoru 70'in altinda`, `Dikkat: kaynak skoru 70-84 arasi`, `OK: kaynak skoru 85 ve uzeri`.
+- Not:
+  - Bu status backend `SoftwareMLService._dashboard_status` kuralindan gelir; frontend sadece backend status alanini okunur sekilde aciklar.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## 2026-06-04 Departman Performansi Takim Karsilastirma Grafigi
+
+- Kullanici `Hibrit Performans Trendi` grafigindeki verilerin nereden geldigini ve ne anlattigini sordu.
+- Tespit:
+  - Grafik zaman serisi degil; `team_breakdown` uzerinden QA, Frontend, Backend, DevOps takimlarini karsilastiriyor.
+  - `Performans = team.scores.kpi`, `Kapasite = team.scores.pulse`, `Risk Skoru = team.scores.risk`.
+- Frontend duzeltmeleri:
+  - `DepartmentTrendChart.vue` componentine `description`, `xLabelPrefix` ve `showGuide` prop'lari eklendi.
+  - Tooltip basligi varsayilan `Ay` kalmak yerine ilgili sayfada `Takim` olarak ayarlandi.
+  - Y ekseni etiketi `Skor (0-100)` yapildi.
+  - Grafigin altina manager icin kisa okuma rehberi eklendi: Performans, Kapasite, Risk Skoru ne anlama geliyor.
+  - `ManagerDashboard.vue` grafigi `Hibrit Takim Karsilastirmasi` / `Takim Bazli Hibrit Okuma` olarak yeniden adlandirildi.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` calistirildi.

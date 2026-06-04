@@ -369,7 +369,7 @@ class SoftwareMLService:
             .all()
         )
         for upload in uploads:
-            if (upload.raw_info or {}).get("department_key") == "software":
+            if SoftwareMLService._is_software_upload(upload):
                 return upload
         raise HTTPException(status_code=404, detail="Basarili software KPI dataset'i bulunamadi.")
 
@@ -872,7 +872,15 @@ class SoftwareMLService:
             raise HTTPException(status_code=400, detail="period week, month, quarter veya year olmali.")
 
         department = SoftwareMLService._dashboard_department(db, current_user)
-        employees = db.query(Employee).filter(Employee.department_id == department.id).all()
+        employees = (
+            db.query(Employee)
+            .join(Employee.user)
+            .filter(
+                Employee.department_id == department.id,
+                User.role == UserRole.employee,
+            )
+            .all()
+        )
         teams = sorted({employee.team for employee in employees if employee.team})
         period_start = SoftwareMLService._dashboard_period_start(period)
 
@@ -1833,7 +1841,7 @@ class SoftwareMLService:
             f"Departman saglik skoru {scores.department_health}/100. "
             f"Performans {scores.execution_score}/100, insan sagligi {scores.people_health_score}/100, "
             f"birlesik risk {scores.risk_score}/100 ve veri guveni {scores.confidence_score}/100. "
-            "Bu ozet kural bazli fallback olarak uretilmistir; LLM kullanilamazsa yoneticiye temel risk resmini verir."
+            "Bu ozet backend kural bazli analiz katmani tarafindan, mevcut KPI/ML, nabiz ve 360 sinyallerine gore uretilmistir."
         )
         return DepartmentDashboardAISummaryResponse(
             summary=summary,
