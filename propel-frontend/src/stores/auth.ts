@@ -76,7 +76,7 @@ export const useAuthStore = defineStore('auth', () => {
       'manager.satis@propel.com': {
         id: 155,
         email: 'manager.satis@propel.com',
-        full_name: 'Mehmet Satis',
+        full_name: 'Hatice Yildirim',
         role: 'department_manager',
         is_active: true,
         department_id: 18,
@@ -159,7 +159,7 @@ export const useAuthStore = defineStore('auth', () => {
             'manager.satis@propel.com': {
               id: 155,
               email: 'manager.satis@propel.com',
-              full_name: 'Mehmet Satis',
+              full_name: 'Hatice Yildirim',
               role: 'department_manager',
               is_active: true,
               department_id: 18,
