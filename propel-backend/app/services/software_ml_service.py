@@ -47,7 +47,14 @@ from app.schemas.analytics import (
 
 
 UPLOAD_DIR = Path("uploads")
-SUPPORTED_TARGETS = {"performance_band", "attrition_risk_band"}
+SUPPORTED_TARGETS = {
+    "performance_band",
+    "attrition_risk_band",
+    "Performance_Drop_Target",
+    "Burnout_Target",
+    "Resignation_Target",
+    "High_Risk_Target",
+}
 SUPPORTED_MODELS = {
     "logistic_regression",
     "random_forest",
@@ -55,9 +62,20 @@ SUPPORTED_MODELS = {
     "stacking_lgbm_xgb_rf_lr",
 }
 TARGET_LABELS = {
-    "performance_band": "Performans",
-    "attrition_risk_band": "Ayrilma Riski",
+    "performance_band":        "Performans",
+    "attrition_risk_band":     "Ayrilma Riski",
+    "Performance_Drop_Target": "Performans Dususu",
+    "Burnout_Target":          "Tukenmislik",
+    "Resignation_Target":      "Istifa Riski",
+    "High_Risk_Target":        "Yuksek Risk",
 }
+# Yeni dataset'te kullanılan 4 binary hedef
+SW_BINARY_TARGETS = (
+    "Performance_Drop_Target",
+    "Burnout_Target",
+    "Resignation_Target",
+    "High_Risk_Target",
+)
 EMPLOYEE_DASHBOARD_KPIS = tuple(f"KPI-{index}" for index in range(1, 21))
 logger = logging.getLogger(__name__)
 
@@ -206,6 +224,7 @@ class SoftwareMLService:
         upload = SoftwareMLService._resolve_upload(db, upload_id)
         rows = SoftwareMLService._load_rows(SoftwareMLService._upload_path(upload))
 
+        import re as _re2
         employees: dict[int, dict[str, Any]] = {}
         for row in rows:
             raw_employee_id = row.get("employee_id")
@@ -214,7 +233,10 @@ class SoftwareMLService:
             try:
                 employee_id = int(float(raw_employee_id))
             except (TypeError, ValueError):
-                continue
+                digits = _re2.sub(r"[^0-9]", "", str(raw_employee_id))
+                if not digits:
+                    continue
+                employee_id = int(digits)
 
             if employee_id not in employees:
                 profile = SoftwareMLService._employee_profile(db, employee_id, row)
@@ -703,6 +725,7 @@ class SoftwareMLService:
         stage_start = time.perf_counter()
         grouped_rows: dict[int, list[dict[str, Any]]] = {}
 
+        import re as _re
         for row in rows:
             raw_employee_id = row.get("employee_id")
             if raw_employee_id in (None, ""):
@@ -710,7 +733,11 @@ class SoftwareMLService:
             try:
                 employee_id = int(float(raw_employee_id))
             except (TypeError, ValueError):
-                continue
+                # SE-001, MGR-SW, vb. formatlar
+                digits = _re.sub(r"[^0-9]", "", str(raw_employee_id))
+                if not digits:
+                    continue
+                employee_id = int(digits)
             grouped_rows.setdefault(employee_id, []).append(row)
         timings_ms["group_rows_ms"] = round((time.perf_counter() - stage_start) * 1000)
 
@@ -2190,3 +2217,93 @@ class SoftwareMLService:
             )
 
         return sorted(analytics, key=lambda item: item["risk_score"], reverse=True)
+
+    @staticmethod
+    def predict_all_targets(
+        db: Session,
+        upload_id: int,
+        use_llm_narrative: bool = False,
+    ):
+        """4 binary hedef için toplu tahmin — satış servisindeki ile aynı yapı."""
+        from app.schemas.analytics import (
+            SalesAllTargetsBulkResponse,
+            SalesEmployeeAllTargets,
+            SalesTargetResult,
+        )
+
+        TARGET_MAP = {
+            "Performance_Drop_Target": "perf_drop",
+            "Burnout_Target":          "burnout",
+            "Resignation_Target":      "resignation",
+            "High_Risk_Target":        "high_risk",
+        }
+
+        # Her hedef için bulk tahmin çalıştır
+        target_items: dict[str, list] = {}
+        base_bulk = None
+        for target_col, field_name in TARGET_MAP.items():
+            try:
+                bulk = SoftwareMLService.predict_all_from_upload(
+                    db=db,
+                    upload_id=upload_id,
+                    target_column=target_col,
+                    use_llm_narrative=(use_llm_narrative and target_col == "Performance_Drop_Target"),
+                )
+                target_items[target_col] = bulk.items
+                if target_col == "Performance_Drop_Target":
+                    base_bulk = bulk
+            except Exception:
+                target_items[target_col] = []
+
+        # Çalışan bazında birleştir
+        emp_map: dict[int, dict] = {}
+        for target_col, items in target_items.items():
+            field_name = TARGET_MAP[target_col]
+            for item in items:
+                eid = item.employee_id
+                if eid not in emp_map:
+                    sp = item.summary_payload
+                    emp_map[eid] = {
+                        "employee_id":            eid,
+                        "employee_name":          sp.get("employee_name"),
+                        "team":                   sp.get("team"),
+                        "role":                   sp.get("role"),
+                        "external_employee_code": sp.get("external_employee_code"),
+                        "top_drivers":            item.top_drivers or [],
+                        "recommended_actions":    item.recommended_actions or [],
+                        "perf_drop":   None,
+                        "burnout":     None,
+                        "resignation": None,
+                        "high_risk":   None,
+                    }
+                emp_map[eid][field_name] = SalesTargetResult(
+                    predicted_band=str(item.predicted_band),
+                    confidence=round(item.confidence, 4),
+                )
+
+        def _risk_score(e: dict) -> float:
+            score = 0.0
+            weights = {"perf_drop": 0.35, "burnout": 0.20, "resignation": 0.25, "high_risk": 0.20}
+            for field, w in weights.items():
+                r = e.get(field)
+                if r is None:
+                    continue
+                band = r.predicted_band if hasattr(r, "predicted_band") else r.get("predicted_band")
+                conf = r.confidence if hasattr(r, "confidence") else r.get("confidence", 0)
+                if str(band) == "1":
+                    score += conf * w
+            return score
+
+        emp_list = list(emp_map.values())
+        emp_list.sort(key=_risk_score, reverse=True)
+        employees = [SalesEmployeeAllTargets(**e) for e in emp_list]
+
+        from datetime import datetime, timezone
+        return SalesAllTargetsBulkResponse(
+            upload_id=upload_id,
+            employee_count=len(employees),
+            employees=employees,
+            department_narrative=base_bulk.department_narrative if base_bulk else None,
+            team_analytics=base_bulk.team_analytics if base_bulk else [],
+            generated_at=datetime.now(timezone.utc).isoformat(),
+        )

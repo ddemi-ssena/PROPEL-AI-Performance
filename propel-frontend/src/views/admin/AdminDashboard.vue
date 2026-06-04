@@ -346,7 +346,7 @@ const fetchDashboardData = async () => {
             const mgrName = mgr?.user?.full_name ?? 'Yönetici Atanmadı'
             const mgrInitials = mgrName === 'Yönetici Atanmadı' ? 'YA' : initials(mgrName)
             const isSales = name.toLowerCase().includes('sat')
-            const analyticsRoute = isSales ? '/manager/sales-analytics' : '/manager/kpi-ml-analysis'
+            const analyticsRoute = isSales ? '/manager/sales-analytics' : '/manager/software-analytics'
             return { id: index + 1, name, manager: mgrName, managerInitials: mgrInitials, employees: deptEmps.length, isSales, analyticsRoute }
         })
     } catch (_err: unknown) {

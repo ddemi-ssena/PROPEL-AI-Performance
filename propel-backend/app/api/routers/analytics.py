@@ -9,6 +9,7 @@ from app.schemas.analytics import (
     DepartmentAnalyticsConfigResponse,
     DepartmentAnalyticsOverviewResponse,
     DepartmentPerformanceSummaryResponse,
+    SalesAllTargetsBulkResponse,
     SalesBulkPredictionResponse,
     SalesDatasetEmployeeResponse,
     SalesDatasetResponse,
@@ -299,6 +300,38 @@ def get_bulk_sales_predictions(
         target_column=target_column,
         use_llm_narrative=use_llm_narrative,
         llm_team=llm_team,
+    )
+
+
+@router.get("/departments/software/predictions/bulk-all-targets", response_model=SalesAllTargetsBulkResponse)
+def get_bulk_software_all_targets(
+    upload_id: int,
+    use_llm_narrative: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Yazılım departmanı 4 hedef toplu tahmin."""
+    from app.services.software_ml_service import SoftwareMLService
+    return SoftwareMLService.predict_all_targets(
+        db=db,
+        upload_id=upload_id,
+        use_llm_narrative=use_llm_narrative,
+    )
+
+
+@router.get("/departments/sales/predictions/bulk-all-targets", response_model=SalesAllTargetsBulkResponse)
+def get_bulk_sales_all_targets(
+    upload_id: int,
+    use_llm_narrative: bool = True,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """4 hedef için toplu tahmin — feature engineering tek seferde yapılır."""
+    from app.services.sales_ml_service import SalesMLService
+    return SalesMLService.predict_all_targets(
+        db=db,
+        upload_id=upload_id,
+        use_llm_narrative=use_llm_narrative,
     )
 
 

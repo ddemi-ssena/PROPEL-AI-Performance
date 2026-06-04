@@ -187,10 +187,20 @@ const triggerFileInput = () => {
     fileInput.value?.click()
 }
 
+function autoDetectDept(file: File) {
+    const name = file.name.toLowerCase()
+    if (name.includes('sales') || name.includes('satis') || name.includes('sale')) {
+        selectedDepartmentKey.value = 'sales'
+    } else if (name.includes('software') || name.includes('yazilim') || name.includes('sw_') || name.includes('_sw')) {
+        selectedDepartmentKey.value = 'software'
+    }
+}
+
 const handleFileChange = (event: Event) => {
     const target = event.target as HTMLInputElement
     if (target.files && target.files[0]) {
         selectedFile.value = target.files[0]
+        autoDetectDept(target.files[0])
     }
 }
 
@@ -198,6 +208,7 @@ const handleDrop = (event: DragEvent) => {
     isDragging.value = false
     if (event.dataTransfer?.files && event.dataTransfer.files[0]) {
         selectedFile.value = event.dataTransfer.files[0]
+        autoDetectDept(event.dataTransfer.files[0])
     }
 }
 

@@ -5,18 +5,18 @@
     <div class="bg-white border-b border-slate-200 px-6 py-5 shadow-sm">
       <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 max-w-screen-2xl mx-auto">
         <div class="flex items-start gap-4">
-          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600 shadow-sm">
+          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-600 shadow-sm">
             <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
             </svg>
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <span class="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Satış Departmanı · KPI & ML</p>
+              <span class="inline-flex h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Yazılım Departmanı · KPI & ML</p>
             </div>
-            <h1 class="mt-0.5 text-xl font-bold text-slate-900">Satış Performansı Analizi</h1>
-            <p class="mt-0.5 text-xs text-slate-400 max-w-lg">LightGBM + XGBoost + RandomForest stacking ensemble — performans düşüşü, tükenmişlik, istifa ve yüksek risk tahmini</p>
+            <h1 class="mt-0.5 text-xl font-bold text-slate-900">Yazılım Performansı Analizi</h1>
+            <p class="mt-0.5 text-xs text-slate-400 max-w-lg">Random Forest / Hist Gradient Boosting / Logistic Regression — performans düşüşü, tükenmişlik, istifa ve yüksek risk tahmini</p>
           </div>
         </div>
         <div class="flex flex-wrap items-end gap-3 shrink-0">
@@ -24,7 +24,7 @@
             <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 ml-0.5">Dataset</label>
             <select
               v-model.number="uploadId"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm min-w-[210px] focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 transition"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm min-w-[210px] focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition"
               @change="onDatasetChange"
             >
               <option :value="null">Dataset seçin</option>
@@ -35,7 +35,7 @@
             <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 ml-0.5">Hedef</label>
             <select
               v-model="targetColumn"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm min-w-[155px] focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 transition"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm min-w-[155px] focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition"
             >
               <option v-for="t in TARGETS" :key="t.value" :value="t.value">{{ t.label }}</option>
             </select>
@@ -68,14 +68,14 @@
               </svg>
             </div>
             <div>
-              <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Stacking Ensemble</p>
-              <p class="text-sm font-bold text-slate-900">LightGBM + XGB + RF <span class="text-slate-400 font-normal">→</span> LR</p>
+              <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">ML Pipeline</p>
+              <p class="text-sm font-bold text-slate-900">RF + HGB <span class="text-slate-400 font-normal">→</span> LR</p>
             </div>
           </div>
           <button
             @click="trainModel"
             :disabled="!!loading || !uploadId"
-            class="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+            class="inline-flex items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
           >
             <svg v-if="loading !== 'train'" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -90,8 +90,8 @@
 
         <!-- Status row -->
         <div v-if="trainResult || error" class="px-6 py-2.5 border-b border-slate-100 flex flex-wrap items-center gap-2 bg-slate-50/50">
-          <span v-if="trainResult" class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+          <span v-if="trainResult" class="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+            <span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
             Model hazır: {{ targetLabel(trainResult.target_column) }} — F1 {{ formatPct(trainResult.metrics?.weighted_f1) }}
           </span>
           <span v-if="error" class="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
@@ -107,7 +107,7 @@
             <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-300 hidden sm:block">Bireysel</span>
             <select
               v-model.number="employeeId"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm min-w-[190px] focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-200 transition"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm min-w-[190px] focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-200 transition"
             >
               <option :value="null">Çalışan seçin</option>
               <option v-for="e in datasetEmployees" :key="e.employee_id" :value="e.employee_id">
@@ -117,7 +117,7 @@
             <button
               @click="predict"
               :disabled="!!loading || !uploadId || !employeeId"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3.5 py-2 text-sm font-semibold text-indigo-800 shadow-sm transition hover:bg-indigo-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <svg v-if="loading !== 'predict'" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
@@ -167,23 +167,40 @@
         </div>
 
         <!-- Model state grid -->
-        <div v-if="uploadId && modelStates.length" class="p-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div v-if="uploadId && filteredModelStates.length" class="p-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           <div
-            v-for="state in modelStates"
+            v-for="state in filteredModelStates"
             :key="state.target_column"
-            class="rounded-xl border p-4 transition-shadow hover:shadow-sm"
-            :class="stateCardClass(state)"
+            class="rounded-xl border p-4 transition-all"
+            :class="currentTrainingTarget === state.target_column
+              ? 'border-indigo-400 bg-indigo-50 shadow-md ring-2 ring-indigo-200'
+              : stateCardClass(state)"
           >
             <div class="flex items-start justify-between gap-2">
-              <p class="text-sm font-bold text-slate-800 leading-tight">{{ state.target_label }}</p>
-              <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="stateBadgeClass(state)">
+              <p class="text-sm font-bold leading-tight"
+                :class="state.is_trained && state.is_current_dataset ? 'text-indigo-900' : 'text-slate-800'">
+                {{ state.target_label }}
+              </p>
+              <!-- Eğitiliyor animasyonu -->
+              <span v-if="currentTrainingTarget === state.target_column"
+                class="shrink-0 inline-flex items-center gap-1 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                <svg class="h-2.5 w-2.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                </svg>
+                Eğitiliyor...
+              </span>
+              <span v-else class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="stateBadgeClass(state)">
                 {{ stateLabel(state) }}
               </span>
             </div>
-            <p class="mt-1.5 text-[11px] text-slate-500">
-              {{ state.is_trained ? `Son eğitim: ${formatDt(state.trained_at)}` : 'Henüz eğitilmedi' }}
+            <p class="mt-1.5 text-[11px]"
+              :class="currentTrainingTarget === state.target_column ? 'text-indigo-600 font-medium' : 'text-slate-500'">
+              {{ currentTrainingTarget === state.target_column
+                ? 'Model şu an eğitiliyor, lütfen bekleyin...'
+                : state.is_trained ? `Son eğitim: ${formatDt(state.trained_at)}` : 'Henüz eğitilmedi' }}
             </p>
-            <div v-if="state.is_trained" class="mt-3 grid grid-cols-2 gap-2">
+            <div v-if="state.is_trained && currentTrainingTarget !== state.target_column" class="mt-3 grid grid-cols-2 gap-2">
               <div class="rounded-lg bg-white/70 px-2.5 py-2 text-xs">
                 <p class="text-slate-400 text-[10px]">Weighted F1</p>
                 <p class="mt-0.5 font-bold text-slate-800">{{ formatPct(state.metrics?.weighted_f1) }}</p>
@@ -192,6 +209,10 @@
                 <p class="text-slate-400 text-[10px]">Train / Test</p>
                 <p class="mt-0.5 font-bold text-slate-800">{{ state.train_count }} / {{ state.test_count }}</p>
               </div>
+            </div>
+            <!-- Eğitim sırasında animasyonlu progress bar -->
+            <div v-if="currentTrainingTarget === state.target_column" class="mt-3 h-1.5 rounded-full bg-indigo-100 overflow-hidden">
+              <div class="h-full bg-indigo-500 rounded-full animate-pulse" style="width: 60%"/>
             </div>
           </div>
         </div>
@@ -215,7 +236,7 @@
             <div class="relative flex h-20 w-20 items-center justify-center">
               <svg class="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 36 36">
                 <circle cx="18" cy="18" r="14" fill="none" stroke="#f1f5f9" stroke-width="3"/>
-                <circle cx="18" cy="18" r="14" fill="none" stroke="#10b981" stroke-width="3"
+                <circle cx="18" cy="18" r="14" fill="none" stroke="#6366f1" stroke-width="3"
                   stroke-dasharray="87.96"
                   :stroke-dashoffset="87.96 - (predResult.confidence * 87.96)"
                   stroke-linecap="round"/>
@@ -250,7 +271,7 @@
                   :class="d.trend_signal === 'declining'
                     ? 'bg-rose-50 text-rose-700 border-rose-100'
                     : d.trend_signal === 'improving'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
                     : 'bg-slate-100 text-slate-500 border-slate-200'"
                 >
                   {{ d.trend_signal === 'declining' ? 'Trend olumsuzlaşıyor'
@@ -261,14 +282,14 @@
             </div>
           </div>
           <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600 mb-3">Önerilen Aksiyonlar</p>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-600 mb-3">Önerilen Aksiyonlar</p>
             <div class="space-y-2">
               <div
                 v-for="(a, i) in predResult.recommended_actions"
                 :key="a"
-                class="flex items-start gap-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-2.5"
+                class="flex items-start gap-3 rounded-lg border border-indigo-100 bg-indigo-50/60 px-4 py-2.5"
               >
-                <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-bold mt-0.5">{{ (i as number) + 1 }}</span>
+                <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white text-[10px] font-bold mt-0.5">{{ (i as number) + 1 }}</span>
                 <p class="text-sm text-slate-700 leading-5">{{ a }}</p>
               </div>
             </div>
@@ -315,14 +336,14 @@
             <p class="mt-3 text-4xl font-bold text-amber-600 tabular-nums">{{ riskCounts.medium }}</p>
             <p class="mt-1 text-xs text-slate-500">dikkat listesinde</p>
           </div>
-          <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-emerald-500 p-5 shadow-sm">
+          <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-indigo-500 p-5 shadow-sm">
             <div class="flex items-center justify-between gap-2">
-              <p class="text-xs font-semibold uppercase tracking-[0.15em] text-emerald-600">Düşük Risk</p>
-              <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
-                <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <p class="text-xs font-semibold uppercase tracking-[0.15em] text-indigo-600">Düşük Risk</p>
+              <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50">
+                <svg class="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
               </div>
             </div>
-            <p class="mt-3 text-4xl font-bold text-emerald-700 tabular-nums">{{ riskCounts.low }}</p>
+            <p class="mt-3 text-4xl font-bold text-indigo-700 tabular-nums">{{ riskCounts.low }}</p>
             <p class="mt-1 text-xs text-slate-500">stabil çalışan</p>
           </div>
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
@@ -392,8 +413,8 @@
         <!-- Team analytics table -->
         <div v-if="teamRows.length" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div class="px-6 py-4 border-b border-slate-100">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Bölge / Takım Analizi</p>
-            <h4 class="mt-0.5 text-base font-bold text-slate-900">Satış Takımları Risk Özeti
+            <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Takım Analizi</p>
+            <h4 class="mt-0.5 text-base font-bold text-slate-900">Yazılım Takımları Risk Özeti
               <span class="ml-2 text-xs font-normal text-slate-400">— Satır seçerek detay görün</span>
             </h4>
           </div>
@@ -401,7 +422,7 @@
             <table class="min-w-full text-sm">
               <thead>
                 <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                  <th class="px-6 py-3 text-left">Bölge / Takım</th>
+                  <th class="px-6 py-3 text-left">Takım</th>
                   <th class="px-6 py-3 text-left">Risk Oranı</th>
                   <th class="px-6 py-3 text-left">Yüksek Risk</th>
                   <th class="px-6 py-3 text-left">Kişi</th>
@@ -414,11 +435,11 @@
                   :key="row.team"
                   @click="selectTeam(row.team)"
                   class="cursor-pointer transition-colors"
-                  :class="selectedTeamName === row.team ? 'bg-emerald-50' : 'hover:bg-slate-50/80'"
+                  :class="selectedTeamName === row.team ? 'bg-indigo-50' : 'hover:bg-slate-50/80'"
                 >
                   <td class="px-6 py-4 font-semibold text-slate-900">
                     <div class="flex items-center gap-2">
-                      <span class="h-2 w-2 rounded-full transition-all" :class="selectedTeamName === row.team ? 'bg-emerald-500' : 'bg-slate-200'"></span>
+                      <span class="h-2 w-2 rounded-full transition-all" :class="selectedTeamName === row.team ? 'bg-indigo-500' : 'bg-slate-200'"></span>
                       {{ row.team }}
                     </div>
                   </td>
@@ -427,7 +448,7 @@
                       <div class="w-24 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                         <div
                           class="h-full rounded-full transition-all"
-                          :class="row.avgRisk > 60 ? 'bg-rose-500' : row.avgRisk > 35 ? 'bg-amber-400' : 'bg-emerald-500'"
+                          :class="row.avgRisk > 60 ? 'bg-rose-500' : row.avgRisk > 35 ? 'bg-amber-400' : 'bg-indigo-500'"
                           :style="{ width: `${row.avgRisk}%` }"
                         />
                       </div>
@@ -439,7 +460,7 @@
                   <td class="px-6 py-4">
                     <span
                       class="rounded-full border px-2.5 py-1 text-xs font-semibold"
-                      :class="row.avgRisk > 60 ? 'bg-rose-50 text-rose-700 border-rose-200' : row.avgRisk > 35 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'"
+                      :class="row.avgRisk > 60 ? 'bg-rose-50 text-rose-700 border-rose-200' : row.avgRisk > 35 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'"
                     >
                       {{ row.avgRisk > 60 ? 'Kritik' : row.avgRisk > 35 ? 'İzleme' : 'Stabil' }}
                     </span>
@@ -452,11 +473,11 @@
 
         <!-- Selected team detail -->
         <div v-if="selectedTeamName" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="bg-gradient-to-r from-emerald-700 to-teal-600 px-6 py-5 flex items-center justify-between gap-4">
+          <div class="bg-gradient-to-r from-indigo-700 to-indigo-500 px-6 py-5 flex items-center justify-between gap-4">
             <div>
-              <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">Seçili Takım</p>
+              <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-200">Seçili Takım</p>
               <h4 class="mt-0.5 text-xl font-bold text-white">{{ selectedTeamName }}</h4>
-              <p class="mt-0.5 text-xs text-emerald-200">{{ selectedTeamPeople.length }} çalışan analizi</p>
+              <p class="mt-0.5 text-xs text-indigo-200">{{ selectedTeamPeople.length }} çalışan analizi</p>
             </div>
             <button
               @click="selectedTeamName = null"
@@ -473,7 +494,7 @@
             <article
               v-for="(person, idx) in selectedTeamPeople"
               :key="person.employee_id"
-              class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm hover:border-emerald-200 hover:shadow-md transition-all"
+              class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all"
             >
               <div class="flex items-center gap-3">
                 <span
@@ -482,13 +503,13 @@
                 >{{ empInitials(person) }}</span>
                 <div class="min-w-0 flex-1">
                   <p class="font-bold text-slate-900 truncate text-sm">{{ person.employee_name || person.external_employee_code || `#${person.employee_id}` }}</p>
-                  <p class="text-xs text-slate-400 truncate mt-0.5">{{ person.role || person.team || 'Satış' }}</p>
+                  <p class="text-xs text-slate-400 truncate mt-0.5">{{ person.role || person.team || 'Yazılım' }}</p>
                 </div>
                 <!-- Performans Düşüşü badge'i ana gösterge -->
                 <span class="shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold"
                   :class="person.perf_drop?.predicted_band === '1'
                     ? 'bg-rose-50 text-rose-700 border-rose-200'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'">
                   {{ person.perf_drop?.predicted_band === '1' ? 'Riskli' : 'Güvenli' }}
                 </span>
               </div>
@@ -538,7 +559,7 @@
                 v-model="tableSearch"
                 type="text"
                 placeholder="Çalışan ara…"
-                class="rounded-lg border border-slate-200 pl-9 pr-4 py-2 text-sm text-slate-700 shadow-sm w-52 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 transition"
+                class="rounded-lg border border-slate-200 pl-9 pr-4 py-2 text-sm text-slate-700 shadow-sm w-52 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition"
               />
             </div>
           </div>
@@ -547,7 +568,7 @@
               <thead>
                 <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                   <th class="px-6 py-3 text-left">Çalışan</th>
-                  <th class="px-4 py-3 text-left">Bölge / Rol</th>
+                  <th class="px-4 py-3 text-left">Takım / Rol</th>
                   <th class="px-4 py-3 text-center">
                     <div>Perf. Düşüşü</div>
                     <div class="text-[9px] font-normal text-slate-400 normal-case tracking-normal">Risk Olasılığı</div>
@@ -581,7 +602,7 @@
                     <p class="font-semibold text-slate-900 text-sm">{{ emp.employee_name || emp.external_employee_code || `#${emp.employee_id}` }}</p>
                     <p class="text-[10px] text-slate-400 mt-0.5">{{ emp.external_employee_code }}</p>
                   </td>
-                  <!-- Bölge / Rol -->
+                  <!-- Takım / Rol -->
                   <td class="px-4 py-3 text-slate-500 whitespace-nowrap">
                     <span class="text-xs">{{ emp.team || '—' }}</span>
                     <span v-if="emp.role" class="ml-1 text-[10px] text-slate-400">· {{ emp.role }}</span>
@@ -640,14 +661,14 @@
         v-if="!allTargetsResult && !bulkResult && !predResult && !loading"
         class="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-16 text-center"
       >
-        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50">
-          <svg class="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50">
+          <svg class="h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
           </svg>
         </div>
-        <h4 class="mt-5 text-lg font-bold text-slate-900">Satış ML Analizine Hoş Geldiniz</h4>
+        <h4 class="mt-5 text-lg font-bold text-slate-900">Yazılım ML Analizine Hoş Geldiniz</h4>
         <p class="mt-2 text-sm text-slate-500 max-w-sm mx-auto leading-6">
-          Dataset ve hedef değişkeni seçin, ardından <strong class="text-slate-700">Toplu Tara</strong> ile tüm satış ekibinin risk profilini tek tıkla çıkarın.
+          Dataset ve hedef değişkeni seçin, ardından <strong class="text-slate-700">Toplu Tara</strong> ile tüm yazılım ekibinin risk profilini tek tıkla çıkarın.
         </p>
         <div class="mt-6 flex flex-wrap justify-center gap-3 text-xs text-slate-400">
           <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
@@ -660,7 +681,7 @@
             <span class="h-1.5 w-1.5 rounded-full bg-violet-400"></span> İstifa riski
           </span>
           <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Yüksek risk skoru
+            <span class="h-1.5 w-1.5 rounded-full bg-indigo-400"></span> Yüksek risk skoru
           </span>
         </div>
       </div>
@@ -670,7 +691,7 @@
     <!-- ══════════════════ LOADING OVERLAY ══════════════════ -->
     <div v-if="loading" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/25 backdrop-blur-sm">
       <div class="rounded-2xl bg-white p-8 shadow-2xl border border-slate-200 text-center w-full max-w-xs mx-4">
-        <div class="mx-auto h-12 w-12 rounded-full border-4 border-slate-100 border-t-emerald-600 animate-spin"/>
+        <div class="mx-auto h-12 w-12 rounded-full border-4 border-slate-100 border-t-indigo-600 animate-spin"/>
         <p class="mt-5 text-base font-bold text-slate-900">
           {{ loading === 'train' ? 'Model eğitiliyor…'
            : loading === 'predict' ? 'Tahmin hesaplanıyor…'
@@ -713,6 +734,13 @@ const targetColumn = ref<SalesTargetColumn>('Performance_Drop_Target')
 const employeeId = ref<number | null>(null)
 const datasetEmployees = ref<SoftwareDatasetEmployeeResponse[]>([])
 const modelStates = ref<SalesModelStateResponse[]>([])
+const currentTrainingTarget = ref<string | null>(null)
+
+// Sadece yeni 4 binary hedef — eski performance_band/attrition_risk_band gösterme
+const SW_SHOW_TARGETS = new Set(['Performance_Drop_Target','Burnout_Target','Resignation_Target','High_Risk_Target'])
+const filteredModelStates = computed(() =>
+  modelStates.value.filter((s: any) => SW_SHOW_TARGETS.has(s.target_column))
+)  // hangi hedef şu an eğitiliyor
 const trainResult = ref<SalesModelTrainResponse | null>(null)
 const predResult = ref<SalesPredictionResponse | null>(null)
 const bulkResult = ref<SalesBulkPredictionResponse | null>(null)
@@ -728,53 +756,43 @@ const selectedTeamName = ref<string | null>(null)
 // ML sonuçlarından üst KPI kartları
 const mlOverviewMetrics = computed(() => {
   const emps = allTargetsResult.value?.employees ?? []
-  const total = emps.length || overview.value?.metrics?.find((m: any) => m.key === 'employee_count')?.value || 0
-  const highRisk  = emps.filter((e: SalesEmployeeAllTargets) => compositeRisk(e) >= 50).length
-  const medRisk   = emps.filter((e: SalesEmployeeAllTargets) => compositeRisk(e) >= 25 && compositeRisk(e) < 50).length
-  const avgRisk   = emps.length ? Math.round(emps.reduce((s: number, e: SalesEmployeeAllTargets) => s + compositeRisk(e), 0) / emps.length) : null
-  const modelState = modelStates.value?.length > 0
+  const modelState = modelStates.value?.some((s: any) => s.is_trained || (s.metrics?.weighted_f1 ?? 0) > 0)
 
   if (emps.length === 0) {
-    // ML sonucu yoksa eski overview verisini göster
-    return (overview.value?.metrics ?? []).map((m: any) => ({ ...m, color: '' }))
+    // Toplu Tara öncesi: overview verisi + ML hazırlık durumu (satışla aynı mantık)
+    const base = (overview.value?.metrics ?? []).map((m: any) => ({ ...m, color: '' }))
+    // readiness kartını ML durumuna göre güncelle
+    return base.map((m: any) => {
+      if (m.key === 'readiness') {
+        return {
+          ...m,
+          value: modelState ? 'Aktif' : (m.value || 'Eğitim Gerekli'),
+          color: modelState ? 'text-indigo-700' : 'text-amber-600',
+        }
+      }
+      return m
+    })
   }
 
+  // Toplu Tara sonrası: ML verisi
+  const highRisk = emps.filter((e: SalesEmployeeAllTargets) => compositeRisk(e) >= 50).length
+  const medRisk  = emps.filter((e: SalesEmployeeAllTargets) => compositeRisk(e) >= 25 && compositeRisk(e) < 50).length
+  const avgRisk  = Math.round(emps.reduce((s: number, e: SalesEmployeeAllTargets) => s + compositeRisk(e), 0) / emps.length)
+
   return [
-    {
-      key: 'total',
-      label: 'Kapsamdaki Çalışan',
-      value: total,
-      hint: 'Seçili datasetteki toplam çalışan sayısı.',
-      color: 'text-slate-900',
-    },
-    {
-      key: 'avg_risk',
-      label: 'Ort. Genel Risk',
-      value: avgRisk !== null ? `${avgRisk}%` : '—',
+    { key: 'scope',     label: 'Kapsamdaki Çalışan', value: emps.length,
+      hint: 'Seçili datasetteki toplam çalışan sayısı.', color: 'text-slate-900' },
+    { key: 'avg_risk',  label: 'Ort. Genel Risk',     value: `${avgRisk}%`,
       hint: '4 hedefin bileşik risk ortalaması (ML).',
-      color: avgRisk !== null && avgRisk >= 50 ? 'text-rose-700' : avgRisk !== null && avgRisk >= 25 ? 'text-amber-600' : 'text-emerald-700',
-    },
-    {
-      key: 'high_risk',
-      label: 'Yüksek Risk',
-      value: emps.length ? highRisk : '—',
+      color: avgRisk >= 50 ? 'text-rose-700' : avgRisk >= 25 ? 'text-amber-600' : 'text-indigo-700' },
+    { key: 'watchlist', label: 'Yüksek Risk',          value: highRisk,
       hint: 'Genel Risk ≥ %50 olan çalışan sayısı.',
-      color: highRisk > 0 ? 'text-rose-700' : 'text-slate-900',
-    },
-    {
-      key: 'monitoring',
-      label: 'İzleme Gereken',
-      value: emps.length ? (highRisk + medRisk) : '—',
+      color: highRisk > 0 ? 'text-rose-700' : 'text-slate-900' },
+    { key: 'monitoring',label: 'İzleme Gereken',       value: highRisk + medRisk,
       hint: 'Genel Risk ≥ %25 olan çalışan (yüksek + orta risk).',
-      color: (highRisk + medRisk) > 0 ? 'text-amber-600' : 'text-slate-900',
-    },
-    {
-      key: 'ml_status',
-      label: 'ML Hazırlık Durumu',
-      value: modelState ? 'Aktif' : 'Eğitim Gerekli',
-      hint: modelState ? 'Stacking Ensemble (LightGBM+XGB+RF→LR) modeli aktif.' : 'Modeli eğitmek için "Model Eğit" butonuna tıklayın.',
-      color: modelState ? 'text-emerald-700' : 'text-amber-600',
-    },
+      color: (highRisk + medRisk) > 0 ? 'text-amber-600' : 'text-slate-900' },
+    { key: 'readiness', label: 'ML Hazırlık Durumu',   value: 'Aktif',
+      hint: 'RF + HGB → LR pipeline modeli aktif.', color: 'text-indigo-700' },
   ]
 })
 
@@ -796,7 +814,7 @@ const teamRows = computed(() => {
   const employees = allTargetsResult.value?.employees
   if (!employees?.length) return []
 
-  // Bölge/takım bazında grupla
+  // Takım bazında grupla
   const teamMap = new Map<string, SalesEmployeeAllTargets[]>()
   for (const emp of employees) {
     const team = emp.team || 'Genel'
@@ -866,15 +884,15 @@ function stateLabel(s: SalesModelStateResponse) {
 }
 
 function stateCardClass(s: SalesModelStateResponse) {
-  if (!s.is_trained) return 'border-slate-100 bg-slate-50'
-  if (!s.is_current_dataset) return 'border-amber-100 bg-amber-50'
-  return 'border-emerald-100 bg-emerald-50'
+  if (!s.is_trained) return 'border-slate-200 bg-white'
+  if (!s.is_current_dataset) return 'border-amber-200 bg-amber-50'
+  return 'border-indigo-300 bg-indigo-100'
 }
 
 function stateBadgeClass(s: SalesModelStateResponse) {
-  if (!s.is_trained) return 'bg-slate-100 text-slate-600'
+  if (!s.is_trained) return 'bg-slate-100 text-slate-400'
   if (!s.is_current_dataset) return 'bg-amber-100 text-amber-700'
-  return 'bg-emerald-100 text-emerald-700'
+  return 'bg-indigo-600 text-white'
 }
 
 function bandLabel(band: string, _col?: string): string {
@@ -903,7 +921,7 @@ function bandClass(band: string, _col?: string) {
     return 'bg-amber-50 text-amber-700 border-amber-200'
   }
   if (b === '0' || b === 'false' || b.includes('low') || b.includes('düşük')) {
-    return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    return 'bg-indigo-50 text-indigo-700 border-indigo-200'
   }
   return 'bg-slate-100 text-slate-700 border-slate-200'
 }
@@ -923,7 +941,7 @@ function empInitials(item: SalesPredictionResponse | SalesEmployeeAllTargets) {
 
 const AVATAR_GRADIENTS = [
   'bg-gradient-to-br from-indigo-500 to-purple-600',
-  'bg-gradient-to-br from-emerald-500 to-teal-600',
+  'bg-gradient-to-br from-blue-500 to-indigo-600',
   'bg-gradient-to-br from-rose-500 to-pink-600',
   'bg-gradient-to-br from-amber-500 to-orange-600',
   'bg-gradient-to-br from-sky-500 to-blue-600',
@@ -939,18 +957,18 @@ function riskPct(t: { predicted_band: string; confidence: number } | null | unde
   return Math.round(t.predicted_band === '1' ? t.confidence * 100 : (1 - t.confidence) * 100)
 }
 
-/** ≥50 kırmızı | 25-50 sarı | <25 yeşil — badge arka planı */
+/** ≥50 kırmızı | 25-50 sarı | <25 mavi — badge arka planı */
 function riskColor(pct: number): string {
   if (pct >= 50) return 'bg-rose-100 text-rose-800'
   if (pct >= 25) return 'bg-amber-100 text-amber-800'
-  return 'bg-emerald-100 text-emerald-800'
+  return 'bg-indigo-100 text-indigo-800'
 }
 
-/** ≥50 kırmızı | 25-50 sarı | <25 yeşil — progress bar rengi */
+/** ≥50 kırmızı | 25-50 sarı | <25 mavi — progress bar rengi */
 function riskBar(pct: number): string {
   if (pct >= 50) return 'bg-rose-500'
   if (pct >= 25) return 'bg-amber-400'
-  return 'bg-emerald-500'
+  return 'bg-indigo-500'
 }
 
 /** 4 hedefin eşit ağırlıklı bileşik risk skoru (her biri %25) */
@@ -996,19 +1014,19 @@ function selectTeam(name: string) {
 
 async function loadDatasets() {
   try {
-    datasets.value = await analyticsApi.getSalesDatasets()
+    datasets.value = await analyticsApi.getSoftwareDatasets()
     if (datasets.value.length) {
       uploadId.value = datasets.value[0].id
       await onDatasetChange()
     }
   } catch (e: any) {
-    console.error('Satış dataset listesi alınamadı:', e)
+    console.error('Yazılım dataset listesi alınamadı:', e)
   }
 }
 
 async function loadOverview() {
   try {
-    overview.value = await analyticsApi.getDepartmentOverview('sales')
+    overview.value = await analyticsApi.getDepartmentOverview('software')
   } catch {
     // silently ignore — overview is supplementary
   }
@@ -1018,11 +1036,11 @@ async function onDatasetChange() {
   if (!uploadId.value) return
   try {
     const [employees, states] = await Promise.all([
-      analyticsApi.getSalesDatasetEmployees(uploadId.value),
-      analyticsApi.getSalesModelState(uploadId.value),
+      analyticsApi.getSoftwareDatasetEmployees(uploadId.value),
+      analyticsApi.getSoftwareModelState(uploadId.value),
     ])
     datasetEmployees.value = employees
-    modelStates.value = states
+    modelStates.value = states as unknown as SalesModelStateResponse[]
     if (employees.length) employeeId.value = employees[0].employee_id
     predResult.value = null
     bulkResult.value = null
@@ -1036,16 +1054,20 @@ async function trainModel() {
   if (!uploadId.value) return
   error.value = null
   loading.value = 'train'
+  currentTrainingTarget.value = targetColumn.value  // seçili hedef eğitiliyor
   try {
-    trainResult.value = await analyticsApi.trainSalesModel({
+    const result = await analyticsApi.trainSoftwareModel({
       upload_id: uploadId.value,
       target_column: targetColumn.value,
     })
-    modelStates.value = await analyticsApi.getSalesModelState(uploadId.value)
+    trainResult.value = result as unknown as SalesModelTrainResponse
+    const states = await analyticsApi.getSoftwareModelState(uploadId.value)
+    modelStates.value = states as unknown as SalesModelStateResponse[]
   } catch (e: any) {
     error.value = e.response?.data?.detail || 'Model eğitimi başarısız oldu.'
   } finally {
     loading.value = null
+    currentTrainingTarget.value = null
   }
 }
 
@@ -1054,11 +1076,12 @@ async function predict() {
   error.value = null
   loading.value = 'predict'
   try {
-    predResult.value = await analyticsApi.getLatestSalesPrediction({
+    const result = await analyticsApi.getLatestSoftwarePrediction({
       upload_id: uploadId.value,
       employee_id: employeeId.value,
       target_column: targetColumn.value,
     })
+    predResult.value = result as unknown as SalesPredictionResponse
   } catch (e: any) {
     error.value = e.response?.data?.detail || 'Tahmin alınamadı.'
   } finally {
@@ -1076,18 +1099,18 @@ async function bulkPredict(withNarrative: boolean) {
     loading.value = 'narrative'
     try {
       const [allTargets, bulk] = await Promise.all([
-        analyticsApi.getBulkSalesAllTargets({
+        analyticsApi.getBulkSoftwareAllTargets({
           upload_id: uploadId.value,
           use_llm_narrative: false,
         }),
-        analyticsApi.getBulkSalesPredictions({
+        analyticsApi.getBulkSoftwarePredictions({
           upload_id: uploadId.value,
           target_column: 'Performance_Drop_Target',
           use_llm_narrative: true,
         }),
       ])
       allTargetsResult.value = allTargets
-      bulkResult.value = bulk
+      bulkResult.value = bulk as unknown as SalesBulkPredictionResponse
     } catch (e: any) {
       error.value = e.response?.data?.detail || 'LLM yorumu başarısız oldu.'
     } finally {
@@ -1097,7 +1120,7 @@ async function bulkPredict(withNarrative: boolean) {
     // ── Toplu Tara: 4 hedef ML, LLM yok (hızlı) ──
     loading.value = 'bulk'
     try {
-      allTargetsResult.value = await analyticsApi.getBulkSalesAllTargets({
+      allTargetsResult.value = await analyticsApi.getBulkSoftwareAllTargets({
         upload_id: uploadId.value,
         use_llm_narrative: false,
       })
