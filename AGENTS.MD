@@ -1872,3 +1872,52 @@ docker restart propel_frontend
 ## Sonraki Adim
 
 - Sunumda bu rapor `heuristic fallback baseline` olarak gosterilmeli; ayrica `--mode live` ile Gemini/Ollama acikken ikinci rapor alinip LLM destekli asil sistemle fallback baseline karsilastirilabilir.
+
+## 2026-06-04 Yazilim KPI/ML Departman Analizi Dataset Izolasyonu
+
+- Yazilim yoneticisinin KPI & ML Analizi > Departman Analizi ekraninda satis dataseti gorunmesi ve `Son dataset: #8 - KUTUP_Sales_52Week_2024.xlsx` yazmasi canli API smoke ile dogrulandi.
+- Kök neden:
+  - Frontend `ManagerAnalyticsView.vue` ayni ekranda model durumu, departman analizi, takim analizi, calisan tahmini ve teknik cikti rollerini karistiriyordu.
+  - Backend dataset listesi sadece `raw_info.department_key` alanina guveniyordu; gecmisten yanlis etiketli satis dosyasi yazilim listesine sizabiliyordu.
+  - Analytics route seviyesinde departman yetki guard'i yoktu; frontend gizlese bile direkt API cagrilariyla baska departman endpointlerine erisim denenebiliyordu.
+- Backend duzeltmeleri:
+  - `analytics.py` route katmanina `_require_department_access` eklendi.
+  - `AnalyticsService.list_department_configs` yazilim/satis departman adlarini `yaz`/`sat` tokenlariyla scope eder hale getirildi; manager dropdown'i kendi departmaniyla sinirlandi.
+  - Yazilim ve satis dataset/model/prediction/dashboard/my-performance endpointleri kullanicinin departmanina gore guard edildi.
+  - Yazilim yoneticisi icin `GET /analytics/departments/sales/datasets` artik `403` donuyor.
+  - `SoftwareMLService` ve `SalesMLService` dataset kabulunu hem `department_key` hem de gercek dosya kolon semasiyla dogruluyor:
+    - Yazilim icin `performance_band` veya `attrition_risk_band` kolonlari gerekli.
+    - Satis icin `Performance_Drop_Target`, `Burnout_Target`, `Resignation_Target`, `High_Risk_Target` kolonlarindan biri gerekli.
+- Frontend duzeltmeleri:
+  - Departman Analizi sekmesi `GET /analytics/departments/software/dashboard` backend kontratina baglandi.
+  - Departman kartlari KPI/ML, haftalik nabiz ve 360 feedback kaynaklarini backend tarafinda birlesmis dashboard yanitindan gosteriyor.
+  - Calisan secimi ve `Tahmin Al` kontrolleri sadece `Calisan Analizi` ve `Teknik Detaylar` sekmelerinde gorunuyor.
+  - `Son dataset` rozeti `Secili dataset` olarak ayrildi; en son yazilim dataset'i farkliysa ayri uyari rozetiyle gosteriliyor.
+- Dogrulama:
+  - Lokal `python -m py_compile propel-backend/app/api/routers/analytics.py propel-backend/app/services/software_ml_service.py propel-backend/app/services/sales_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+  - Yazilim manager smoke:
+    - `GET /analytics/departments` sadece `software` config'i dondurdu.
+    - `GET /analytics/departments/software/datasets` sadece `#6 kutup_dataset_final_realistic_v8_fixed.csv` dondurdu.
+    - `GET /analytics/departments/software/dashboard?upload_id=6&target_column=performance_band&use_llm=false` `status=success`, `upload_id=6`, `department_health=40.7` dondurdu.
+    - `GET /analytics/departments/sales/datasets` `403` dondurdu.
+- Kalan nokta:
+  - Bu oturumda Playwright/browser smoke araci yoktu; gorsel kontrol icin tarayicida `/manager/kpi-ml-analysis?section=department` sayfasi hard refresh ile acilip dataset rozeti ve calisan tahmin kontrollerinin gorunmedigi teyit edilmeli.
+
+## 2026-06-04 Frontend Turkce Karakter Normalize Duzeltmesi
+
+- Kullanici sidebar'da `Hatice YÄ±ldÄ±rÄ±m` gibi mojibake metinlerin tekrar gorundugunu bildirdi.
+- Kontrol:
+  - Python ile `/api/v1/auth/me` ham JSON decode edilince `full_name=Hatice Yıldırım`, `department_name=Satış` dogru donuyor.
+  - Sorun frontend tarafinda eski runtime/cache veya onceki bozuk response objesinin ekrana basilmasi olarak degerlendirildi.
+- Duzeltme:
+  - `propel-frontend/src/stores/auth.ts` icine `repairMojibakeText` ve `normalizeUserText` eklendi.
+  - Backend `/auth/me` veya mock fallback'ten gelen `full_name` ve `department_name` degerleri store'a yazilmadan once normalize ediliyor.
+  - `YÄ±ldÄ±rÄ±m`, `SatÄ±ÅŸ`, `Ã¼`, `Ã¶`, `Ã§`, `ÅŸ`, `ÄŸ` gibi yaygin UTF-8/Windows-1252 mojibake dizileri ekranda duzeltiliyor.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - Backend degisen dosyalar icin `py_compile` basarili.
+  - `docker restart propel_frontend` calistirildi.
+- Kalan nokta:
+  - Acik tarayici sekmesinde eski JS runtime kalirsa hard refresh veya yeniden giris sonrasi isimlerin `Hatice Yıldırım` / `Satış` olarak gorunmesi beklenir.

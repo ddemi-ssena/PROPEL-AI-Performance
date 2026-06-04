@@ -196,7 +196,7 @@ class SalesMLService:
         sales_uploads = [
             upload
             for upload in uploads
-            if (upload.raw_info or {}).get("department_key") == "sales"
+            if SalesMLService._is_sales_upload(upload)
         ]
         return [
             SalesDatasetResponse(
@@ -290,8 +290,7 @@ class SalesMLService:
         if upload.status != "Success":
             raise HTTPException(status_code=400, detail="Sadece basarili yuklemeler ML egitiminde kullanilabilir.")
 
-        department_key = (upload.raw_info or {}).get("department_key")
-        if department_key and department_key != "sales":
+        if not SalesMLService._is_sales_upload(upload):
             raise HTTPException(status_code=400, detail="Bu endpoint yalnizca sales upload'lari icindir.")
 
         return upload
@@ -302,6 +301,40 @@ class SalesMLService:
         if not path.exists():
             raise HTTPException(status_code=404, detail=f"Yuklenen dosya bulunamadi: {path}")
         return path
+
+    @staticmethod
+    def _upload_headers(upload: DataUpload) -> set[str]:
+        path = SalesMLService._upload_path(upload)
+        ext = path.suffix.lower()
+        if ext == ".csv":
+            with path.open(encoding="utf-8-sig", newline="") as file:
+                return {str(header) for header in (csv.DictReader(file).fieldnames or [])}
+        if ext == ".json":
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+                return {str(header) for header in payload[0].keys()}
+            return set()
+        if ext in {".xlsx", ".xls"}:
+            try:
+                import pandas as pd
+            except ImportError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="XLSX okuma icin pandas backend ortaminda kurulu olmali.",
+                ) from exc
+            dataframe = pd.read_excel(path, nrows=0)
+            return {str(header) for header in dataframe.columns}
+        return set()
+
+    @staticmethod
+    def _is_sales_upload(upload: DataUpload) -> bool:
+        if (upload.raw_info or {}).get("department_key") != "sales":
+            return False
+        try:
+            headers = {header.lower() for header in SalesMLService._upload_headers(upload)}
+        except HTTPException:
+            return False
+        return bool(headers & {target.lower() for target in SUPPORTED_TARGETS})
 
     @staticmethod
     def _load_rows(path: Path) -> list[dict[str, Any]]:

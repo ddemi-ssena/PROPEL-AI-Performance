@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
+from app.db.models.employee import Employee
 from app.db.models.user import User
+from app.db.models.user import UserRole
 from app.db.session import get_db
 from app.schemas.analytics import (
     DepartmentAnalyticsConfigResponse,
@@ -35,6 +37,33 @@ from app.services.team_report_export_service import TeamReportExportService
 router = APIRouter()
 
 
+def _require_department_access(
+    db: Session,
+    current_user: User,
+    department_key: str,
+    *,
+    allow_employee: bool = False,
+) -> None:
+    if current_user.role == UserRole.admin:
+        return
+
+    if current_user.role == UserRole.employee and not allow_employee:
+        raise HTTPException(status_code=403, detail="Bu departman analizi icin yetkiniz yok.")
+
+    employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Kullanici icin departman kaydi bulunamadi.")
+
+    department_name = (employee.department_name or "").lower()
+    allowed_tokens = {
+        "software": ("yaz", "software"),
+        "sales": ("sat", "sales"),
+    }.get(department_key)
+
+    if not allowed_tokens or not any(token in department_name for token in allowed_tokens):
+        raise HTTPException(status_code=403, detail="Bu departman verisine erisim yetkiniz yok.")
+
+
 @router.get("/departments", response_model=list[DepartmentAnalyticsConfigResponse])
 def list_department_analytics_configs(
     current_user: User = Depends(get_current_user),
@@ -50,6 +79,7 @@ def get_department_analytics_overview(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_department_access(db, current_user, department_key, allow_employee=True)
     return AnalyticsService.get_department_overview(
         db=db,
         current_user=current_user,
@@ -66,6 +96,7 @@ def list_software_datasets(
 ):
     from app.services.software_ml_service import SoftwareMLService
 
+    _require_department_access(db, current_user, "software")
     return SoftwareMLService.list_datasets(db)
 
 
@@ -77,6 +108,7 @@ def list_software_dataset_employees(
 ):
     from app.services.software_ml_service import SoftwareMLService
 
+    _require_department_access(db, current_user, "software")
     return SoftwareMLService.list_dataset_employees(db, upload_id)
 
 
@@ -88,6 +120,7 @@ def list_software_model_states(
 ):
     from app.services.software_ml_service import SoftwareMLService
 
+    _require_department_access(db, current_user, "software")
     return SoftwareMLService.list_model_states(db, upload_id)
 
 
@@ -99,6 +132,7 @@ def train_software_model(
 ):
     from app.services.software_ml_service import SoftwareMLService
 
+    _require_department_access(db, current_user, "software")
     return SoftwareMLService.train_from_upload(
         db=db,
         upload_id=payload.upload_id,
@@ -119,6 +153,7 @@ def get_latest_software_prediction(
 ):
     from app.services.software_ml_service import SoftwareMLService
 
+    _require_department_access(db, current_user, "software")
     return SoftwareMLService.predict_latest_from_upload(
         db=db,
         upload_id=upload_id,
@@ -139,6 +174,7 @@ def get_bulk_software_predictions(
 ):
     from app.services.software_ml_service import SoftwareMLService
 
+    _require_department_access(db, current_user, "software")
     return SoftwareMLService.predict_all_from_upload(
         db=db,
         upload_id=upload_id,
@@ -155,6 +191,7 @@ def get_my_software_performance(
 ):
     from app.services.software_ml_service import SoftwareMLService
 
+    _require_department_access(db, current_user, "software", allow_employee=True)
     return SoftwareMLService.get_my_performance(db=db, current_user=current_user)
 
 
@@ -169,6 +206,7 @@ def get_software_department_insights(
 ):
     from app.services.software_ml_service import SoftwareMLService
 
+    _require_department_access(db, current_user, "software")
     return SoftwareMLService.generate_department_insights(
         db=db,
         upload_id=upload_id,
@@ -189,6 +227,7 @@ def get_software_department_dashboard(
 ):
     from app.services.software_ml_service import SoftwareMLService
 
+    _require_department_access(db, current_user, "software")
     return SoftwareMLService.generate_department_dashboard(
         db=db,
         current_user=current_user,
@@ -221,6 +260,7 @@ def list_sales_datasets(
 ):
     from app.services.sales_ml_service import SalesMLService
 
+    _require_department_access(db, current_user, "sales")
     return SalesMLService.list_datasets(db)
 
 
@@ -232,6 +272,7 @@ def list_sales_dataset_employees(
 ):
     from app.services.sales_ml_service import SalesMLService
 
+    _require_department_access(db, current_user, "sales")
     return SalesMLService.list_dataset_employees(db, upload_id)
 
 
@@ -243,6 +284,7 @@ def list_sales_model_states(
 ):
     from app.services.sales_ml_service import SalesMLService
 
+    _require_department_access(db, current_user, "sales")
     return SalesMLService.list_model_states(db, upload_id)
 
 
@@ -254,6 +296,7 @@ def train_sales_model(
 ):
     from app.services.sales_ml_service import SalesMLService
 
+    _require_department_access(db, current_user, "sales")
     return SalesMLService.train_from_upload(
         db=db,
         upload_id=payload.upload_id,
@@ -273,6 +316,7 @@ def get_latest_sales_prediction(
 ):
     from app.services.sales_ml_service import SalesMLService
 
+    _require_department_access(db, current_user, "sales")
     return SalesMLService.predict_latest_from_upload(
         db=db,
         upload_id=upload_id,
@@ -293,6 +337,7 @@ def get_bulk_sales_predictions(
 ):
     from app.services.sales_ml_service import SalesMLService
 
+    _require_department_access(db, current_user, "sales")
     return SalesMLService.predict_all_from_upload(
         db=db,
         upload_id=upload_id,
@@ -309,14 +354,17 @@ def get_my_sales_performance(
 ):
     from app.services.sales_ml_service import SalesMLService
 
+    _require_department_access(db, current_user, "sales", allow_employee=True)
     return SalesMLService.get_my_performance(db=db, current_user=current_user)
 
 
 @router.post("/departments/software/team-report/export")
 def export_software_team_report(
     payload: TeamReportExportRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_department_access(db, current_user, "software")
     stream = TeamReportExportService.build_workbook(payload)
     safe_team = "".join(char if char.isalnum() else "_" for char in payload.team).strip("_") or "Takim"
     safe_date = payload.report_date.replace(".", "_").replace("/", "_").replace(" ", "_")
