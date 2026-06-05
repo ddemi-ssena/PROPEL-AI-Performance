@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance } from 'axios'
+import { repairMojibakeDeep } from '@/utils/textEncoding'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
 
@@ -27,7 +28,10 @@ class ApiClient {
 
     // Response interceptor
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        response.data = repairMojibakeDeep(response.data)
+        return response
+      },
       (error) => {
         const isLoginRequest = error.config?.url?.includes('/auth/login')
         if (error.response?.status === 401 && !isLoginRequest) {

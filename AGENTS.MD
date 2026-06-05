@@ -2158,3 +2158,23 @@ Yazılım model F1 skorları (Random Forest, test_period_count=8):
 
 - PR #40 kaynak branch'i fork'taysa merge commit'inin o fork branch'ine pushlanmasi gerekir; bu repoda ayni isimli origin head'i gorunmedi.
 - Alternatif olarak local `pr-40` branch'i yeni bir origin branch olarak pushlanip yeni/updated PR akisi kullanilabilir.
+
+## 2026-06-05 Frontend Genel Mojibake Onarimi
+
+- Kullanici 360 Calisan Raporu ekraninda isim, departman ve takim etiketlerinin `Ahmet Ã–ztÃ¼rk`, `SatÄ±ÅŸ`, `YÄ±lmaz` gibi bozuk sembollerle gorundugunu bildirdi; arkadasinin ortaminda gorunmedigi icin kalici cozum istedi.
+- Kok neden: Daha onceki duzeltmeler sadece `auth.ts` veya belirli dashboard computed alanlarina uygulanmisti; `feedback`, `employee`, `analytics` gibi farkli API response'larindan gelen string'ler merkezi olarak normalize edilmiyordu.
+- `propel-frontend/src/utils/textEncoding.ts` eklendi:
+  - Kaynak dosya encoding'inden etkilenmemek icin Unicode escape tabanli hedefli mojibake replacement kullanir.
+  - `TextDecoder('utf-8')` ile Latin-1/Windows-1252 gibi okunmus UTF-8 byte dizilerini toparlamaya calisir.
+  - Array/object response'lari recursive gezer; Blob, ArrayBuffer ve Date objelerine dokunmaz.
+- `propel-frontend/src/services/api/client.ts` response interceptor'i artik `response.data` uzerindeki tum string'leri `repairMojibakeDeep` ile normalize ediyor.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - Backend ilgili dosyalar icin `py_compile` basarili.
+  - Node smoke orneklerinde `Ali Yilmaz`, `Satis`, `Yazilim Gelistirme`, `Irem Ozkan` turu mojibake girdiler Turkce karakterli hale geldi.
+  - `docker restart propel_frontend` calistirildi; `http://localhost:5173` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Tarayicida hard refresh veya yeniden login sonrasi 360 Calisan Raporu dahil API'den veri alan ekranlarda isim/departman/takim metinleri merkezi interceptor ile duzelmelidir.
+- Eger eski localStorage/session verisi bozuk kaldiysa cikis-giris yapmak auth store'u da yeni API cevabiyla tazeler.
