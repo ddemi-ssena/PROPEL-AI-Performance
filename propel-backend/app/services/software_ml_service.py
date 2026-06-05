@@ -115,6 +115,11 @@ class SoftwareMLService:
             employee_id=employee_id,
             target_column=prediction.target_column,
             predicted_band=prediction.predicted_band,
+            risk_score=SoftwareMLService._probability_risk_score(
+                prediction.target_column,
+                prediction.probabilities,
+                prediction.predicted_band,
+            ),
             confidence=prediction.confidence,
             probabilities=prediction.probabilities,
             top_features=prediction.top_features,

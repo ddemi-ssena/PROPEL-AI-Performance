@@ -2191,8 +2191,75 @@ Yazılım model F1 skorları (Random Forest, test_period_count=8):
   - Alt linkler `/manager/kpi-ml-analysis?section=...` query'leriyle mevcut bolumlere baglandi.
 - Dogrulama:
   - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/api/routers/analytics.py propel-backend/app/services/analytics_service.py propel-backend/app/services/software_ml_service.py` basarili.
   - `docker restart propel_frontend` calistirildi.
 
 ## Sonraki Adim
 
 - Yazilim yoneticisi ile yeniden giris veya hard refresh sonrasi KPI & ML Analizi grubunda alt sayfalar sidebar'da gorunmeli.
+
+## 2026-06-05 Yazilim Manager KPI/ML Egitim Kontrollerinin Kaldirilmasi
+
+- Kullanici KPI ML model egitimi ve dataset uzerinden ML analiz calistirma islerinin sadece admin ekranindan yapilacagini belirtti.
+- Tespit:
+  - Admin yazilim ML egitimi `/admin/software-analytics` ekraninda `SoftwareAnalyticsView.vue` ile duruyor.
+  - Yazilim manager KPI/ML ekranindaki `ManagerAnalyticsView.vue` ust bolumunde dataset secimi, hedef secimi, model secimi, `Model Egit` ve `Departmani Yenile` kontrolleri gereksiz gorunuyordu.
+- Frontend duzeltmeleri:
+  - `ManagerAnalyticsView.vue` icindeki ust ML egitim/dataset kontrol blogu kaldirildi.
+  - Manager KPI/ML ekraninin varsayilan bolumu `Model Durumu` yerine `Departman Analizi` yapildi.
+  - Kullanilmayan egitim state'i ve `trainModel()` fonksiyonu temizlendi; manager komponenti artik admin egitim API'sine referans tasimiyor.
+  - Yazilim manager sidebar'indan `Model Durumu` linki kaldirildi; grup `Departman Analizi`, `Takim Analizi`, `Calisan Analizi`, `Teknik Detaylar` linkleriyle kaldi.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/api/routers/analytics.py propel-backend/app/services/analytics_service.py propel-backend/app/services/software_ml_service.py` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Yazilim manager ekraninda KPI/ML grubu artik hazir admin ML ciktilarini tuketen analiz sayfalari olarak gorunmeli; model egitimi admin `/admin/software-analytics` ekraninda kalmali.
+
+## 2026-06-05 Yazilim Manager Takim Analizi Admin Model Kaynagi
+
+- Kullanici Takim Analizi sayfasindaki `Ortalama Risk Skoru`, `Yuksek Riskli Takimlar`, `Izleme Kapsami` gibi degerlerin nereden geldigini sordu ve manager KPI/ML sonuclarinin adminin yaptigi model egitiminden alinmasini istedi.
+- Tespit:
+  - Takim kartlari `bulkPredictionResult` uzerinden hesaplanir.
+  - `bulkPredictionResult`, `/analytics/departments/software/predictions/bulk` endpoint'inden gelir.
+  - Backend bu endpoint'te egitilmis `SoftwareArtifactStore` model artifact'ini yukleyip dataset satirlarina `predict_proba` calistirir; `team_analytics.risk_score` varsa takim risk skorunda bu kullanilir, yoksa kisi tahmin olasiliklarindan fallback risk ortalamasi hesaplanir.
+- Frontend duzeltmeleri:
+  - `ManagerAnalyticsView.vue` artik son upload'i korlemesine secmez; datasetler icinde `getSoftwareModelState(upload.id)` ile adminin egittigi ve `is_current_dataset=true` olan guncel modeli arar.
+  - Oncelik `performance_band` modelindedir; yoksa diger guncel egitimli software target'i secilir.
+  - Guncel admin modeli yoksa manager ekraninda analiz calistirilmaz ve acik hata mesaji gosterilir.
+  - Takim, Calisan ve Teknik bolumleri acildiginda toplu tahmin otomatik calisir; manager'in manuel `Analizi Calistir` aksiyonu beklenmez.
+  - Eski `section=model` query'si manager ekraninda artik kabul edilmez; admin model durumu/egitimi admin ekraninda kalir.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/api/routers/analytics.py propel-backend/app/services/analytics_service.py propel-backend/app/services/software_ml_service.py` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Yazilim manager Takim Analizi kartlari adminin egittigi guncel software model artifact'i ve onun upload_id'si uzerinden uretilen bulk prediction/team_analytics sonucunu gostermeli.
+
+## 2026-06-05 Yazilim Manager Takim Uyesi Risk Skoru Backend Kaynagi
+
+- Kullanici Takim Analizi icindeki `Takim Uyeleri - Detayli Risk Analizi` kartlarindaki kisi risk skorlarinin neyin sonucu oldugunu sordu ve bunlarin da adminin egittigi model sonuclarina gore duzenlenmesini istedi.
+- Tespit:
+  - Liste `selectedTeamPeople` computed alanindan gelir; bu alan secili takimin `/analytics/departments/software/predictions/bulk` sonucundaki item'larini, low risk olmayanlar olarak filtreler.
+  - Kisi adi/rol/kod `summary_payload` icinden, band/top driver/oneriler ise backend model prediction response'undan gelir.
+  - Karttaki `9/10` gibi risk skoru frontend tarafinda model olasiliklarindan tekrar turetiliyordu; statik sag-alt etiket de her zaman `Riskli` yaziyordu.
+- Backend duzeltmesi:
+  - `SoftwarePredictionResponse` icine `risk_score` eklendi.
+  - `SoftwareMLService._prediction_response()` artik merkezi `_probability_risk_score()` ile risk skorunu backend'de hesaplayip response'a koyuyor.
+- Frontend duzeltmesi:
+  - `SoftwarePredictionResponse` TypeScript tipine `risk_score` eklendi.
+  - `ManagerAnalyticsView.vue` takim uyesi kartlarindaki `x/10` ve bar genisligi backend `risk_score` alanini kullanacak sekilde duzenlendi.
+  - Eski frontend olasilik hesaplamasi sadece eski response/fallback icin kaldi.
+  - Karttaki statik `Riskli` etiketi model bandina gore `Yuksek Risk`, `Izleme`, `Dusuk Risk` olarak ayrildi.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/schemas/analytics.py propel-backend/app/services/software_ml_service.py propel-backend/app/api/routers/analytics.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Takim uyesi kartlarindaki risk skor ve etiketleri admin egitiminden gelen software bulk prediction response'undaki backend `risk_score`, `predicted_band`, `top_drivers` ve `recommended_actions` alanlarini yansitmali.

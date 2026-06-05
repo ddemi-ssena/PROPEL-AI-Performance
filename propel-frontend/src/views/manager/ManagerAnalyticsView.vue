@@ -56,127 +56,7 @@
       v-if="selectedDepartment === 'software'"
       class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
     >
-      <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">ML Model</p>
-          <h3 class="mt-1 text-lg font-bold text-slate-900">Software risk tahmini - LightGBM + XGB + RF -> LR</h3>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 w-full xl:max-w-6xl">
-          <select
-            v-model.number="mlUploadId"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-sm"
-          >
-            <option :value="null">Dataset sec</option>
-            <option
-              v-for="upload in softwareUploads"
-              :key="upload.id"
-              :value="upload.id"
-            >
-              #{{ upload.id }} - {{ upload.file_name }}
-            </option>
-          </select>
-
-          <select
-            v-model="mlTargetColumn"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-sm"
-          >
-            <option value="performance_band">Performans</option>
-            <option value="attrition_risk_band">Ayrilma Riski</option>
-          </select>
-
-          <select
-            v-model="mlModelName"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-sm"
-          >
-            <option value="stacking_lgbm_xgb_rf_lr">Stacking Ensemble</option>
-            <option value="random_forest">Random Forest</option>
-            <option value="hist_gradient_boosting">Hist Gradient Boosting</option>
-            <option value="logistic_regression">Logistic Regression</option>
-          </select>
-
-          <button
-            class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
-            :disabled="Boolean(mlLoading) || !mlUploadId"
-            @click="trainModel"
-          >
-            {{ mlLoading === 'train' ? 'Egitiliyor...' : 'Model Egit' }}
-          </button>
-
-          <select
-            v-if="showEmployeePredictionControls"
-            v-model.number="mlEmployeeId"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-sm"
-          >
-            <option
-              v-for="employee in datasetEmployees"
-              :key="employee.employee_id"
-              :value="employee.employee_id"
-            >
-              {{ employee.display_label || `${employee.team || 'Takim yok'} / ${employee.role || 'Rol yok'} - Dataset #${employee.employee_id}` }}
-            </option>
-          </select>
-
-          <button
-            v-if="showEmployeePredictionControls"
-            class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:text-slate-300"
-            :disabled="Boolean(mlLoading) || !mlUploadId || !mlEmployeeId"
-            @click="loadPrediction()"
-          >
-            {{ mlLoading === 'predict' ? 'Hesaplaniyor...' : 'Tahmin Al' }}
-          </button>
-
-          <button
-            v-if="activeAnalyticsSection !== 'department'"
-            class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-800 shadow-sm disabled:cursor-not-allowed disabled:text-indigo-300"
-            :disabled="Boolean(mlLoading) || !mlUploadId"
-            @click="loadBulkPredictions()"
-          >
-            {{ mlLoading === 'bulk' ? 'Taraniyor...' : 'Toplu Tara' }}
-          </button>
-
-          <button
-            v-if="activeAnalyticsSection !== 'department'"
-            class="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 shadow-sm disabled:cursor-not-allowed disabled:text-violet-300"
-            :disabled="Boolean(mlLoading) || !mlUploadId"
-            @click="loadBulkPredictions(true)"
-          >
-            {{ mlLoading === 'narrative' ? 'Yorumlaniyor...' : 'LLM Yorumla' }}
-          </button>
-
-          <button
-            v-if="activeAnalyticsSection === 'department'"
-            class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-800 shadow-sm disabled:cursor-not-allowed disabled:text-indigo-300"
-            :disabled="departmentDashboardLoading || !mlUploadId"
-            @click="loadDepartmentDashboard(false)"
-          >
-            {{ departmentDashboardLoading ? 'Yukleniyor...' : 'Departmani Yenile' }}
-          </button>
-        </div>
-      </div>
-
-      <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        <span
-          v-if="selectedSoftwareUpload"
-          class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-600"
-        >
-          Secili dataset: #{{ selectedSoftwareUpload.id }} - {{ selectedSoftwareUpload.file_name }}
-        </span>
-        <span
-          v-if="latestSoftwareUpload && latestSoftwareUpload.id !== selectedSoftwareUpload?.id"
-          class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-medium text-amber-700"
-        >
-          En son yazilim dataset'i: #{{ latestSoftwareUpload.id }} - {{ latestSoftwareUpload.file_name }}
-        </span>
-        <span
-          v-if="trainingResult"
-          class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700"
-        >
-          Model hazir: {{ targetLabel(trainingResult.target_column) }}
-        </span>
-      </div>
-
-      <div class="mt-5 min-w-0 space-y-5">
+      <div class="min-w-0 space-y-5">
       <div class="rounded-2xl border border-slate-200 bg-white p-5">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -1191,8 +1071,11 @@
                           >
                             Detaylar
                           </button>
-                          <span class="inline-flex items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-sm font-bold text-white">
-                            Riskli
+                          <span
+                            class="inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-bold"
+                            :class="memberRiskActionClass(person)"
+                          >
+                            {{ memberRiskActionLabel(person) }}
                           </span>
                         </div>
                       </article>
@@ -2371,7 +2254,6 @@ import {
   type SoftwareDatasetEmployeeResponse,
   type SoftwareDatasetResponse,
   type SoftwareModelStateResponse,
-  type SoftwareModelTrainResponse,
   type SoftwarePredictionResponse,
   type TeamReportExportPayload,
 } from '@/services/api/analytics.api'
@@ -2393,11 +2275,9 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const mlUploadId = ref<number | null>(null)
 const mlTargetColumn = ref('performance_band')
-const mlModelName = ref('stacking_lgbm_xgb_rf_lr')
 const mlEmployeeId = ref<number | null>(null)
 const mlLoading = ref<'train' | 'predict' | 'bulk' | 'narrative' | null>(null)
 const mlError = ref<string | null>(null)
-const trainingResult = ref<SoftwareModelTrainResponse | null>(null)
 const predictionResult = ref<SoftwarePredictionResponse | null>(null)
 const bulkPredictionResult = ref<SoftwareBulkPredictionResponse | null>(null)
 const departmentDashboard = ref<SoftwareDepartmentDashboardResponse | null>(null)
@@ -2439,8 +2319,8 @@ const customDateEnd = ref('')
 const teamFilterLoading = ref(false)
 let revealObserver: IntersectionObserver | null = null
 type AnalyticsSectionKey = 'model' | 'department' | 'teams' | 'watchlist' | 'technical'
-const analyticsSectionKeys: AnalyticsSectionKey[] = ['model', 'department', 'teams', 'watchlist', 'technical']
-const activeAnalyticsSection = ref<AnalyticsSectionKey>('model')
+const analyticsSectionKeys: AnalyticsSectionKey[] = ['department', 'teams', 'watchlist', 'technical']
+const activeAnalyticsSection = ref<AnalyticsSectionKey>('department')
 const bulkSections: AnalyticsSectionKey[] = ['teams', 'watchlist', 'technical']
 const teamTimeRanges = [
   { label: 'Son 1 Ay', value: '1m' },
@@ -2465,16 +2345,12 @@ const softwareUploads = computed(() =>
 
 const latestSoftwareUpload = computed(() => softwareUploads.value[0] || null)
 
-const selectedSoftwareUpload = computed(() =>
-  softwareUploads.value.find((upload) => upload.id === mlUploadId.value) || null
-)
-
-const showEmployeePredictionControls = computed(() =>
-  activeAnalyticsSection.value === 'watchlist' || activeAnalyticsSection.value === 'technical'
-)
-
 const selectedTargetState = computed(() =>
   modelStates.value.find((item) => item.target_column === mlTargetColumn.value) || null
+)
+
+const hasAdminTrainedModel = computed(() =>
+  Boolean(selectedTargetState.value?.is_trained && selectedTargetState.value?.is_current_dataset)
 )
 
 const sectionMeta: Record<AnalyticsSectionKey, { eyebrow: string; title: string; description: string; action: string }> = {
@@ -3411,7 +3287,21 @@ function employeeCodeLabel(item: SoftwarePredictionResponse | null) {
 }
 
 function employeeRiskOutOfTen(item: SoftwarePredictionResponse) {
-  return Math.max(1, Math.min(10, Math.round(employeeRiskScore(item) / 10)))
+  return Math.max(1, Math.min(10, Math.round(modelRiskScore(item) / 10)))
+}
+
+function memberRiskActionLabel(item: SoftwarePredictionResponse) {
+  const tone = predictionRiskTone(item.predicted_band, item.target_column)
+  if (tone === 'high') return 'Yuksek Risk'
+  if (tone === 'medium') return 'Izleme'
+  return 'Dusuk Risk'
+}
+
+function memberRiskActionClass(item: SoftwarePredictionResponse) {
+  const tone = predictionRiskTone(item.predicted_band, item.target_column)
+  if (tone === 'high') return 'bg-rose-600 text-white'
+  if (tone === 'medium') return 'bg-amber-100 text-amber-800'
+  return 'bg-emerald-100 text-emerald-800'
 }
 
 function memberAvatarGradientClass(index: number) {
@@ -4104,7 +3994,7 @@ function handleTeamDashboardEmptyAction() {
     loadBulkPredictions(false)
     return
   }
-  activeAnalyticsSection.value = 'model'
+  activeAnalyticsSection.value = 'department'
 }
 
 function flashTeamFilterLoading() {
@@ -4156,9 +4046,15 @@ function employeeRiskScore(item: SoftwarePredictionResponse) {
   )
 }
 
+function modelRiskScore(item: SoftwarePredictionResponse) {
+  const score = Number(item.risk_score)
+  if (Number.isFinite(score) && score > 0) return Math.round(Math.max(0, Math.min(100, score)))
+  return employeeRiskScore(item)
+}
+
 function averageRiskScore(items: SoftwarePredictionResponse[]) {
   if (!items.length) return 0
-  return Math.round(items.reduce((sum, item) => sum + employeeRiskScore(item), 0) / items.length)
+  return Math.round(items.reduce((sum, item) => sum + modelRiskScore(item), 0) / items.length)
 }
 
 function countBy<T>(items: T[], getKey: (item: T) => string) {
@@ -4227,6 +4123,12 @@ function syncAnalyticsSectionFromRoute(value: unknown) {
   }
 }
 
+function adminTrainedState(states: SoftwareModelStateResponse[]) {
+  return states.find((state) =>
+    state.target_column === 'performance_band' && state.is_trained && state.is_current_dataset
+  ) || states.find((state) => state.is_trained && state.is_current_dataset) || null
+}
+
 async function loadDepartmentConfigs() {
   departmentConfigs.value = await analyticsApi.getDepartmentConfigs()
   if (!departmentConfigs.value.find((item) => item.key === selectedDepartment.value) && departmentConfigs.value[0]) {
@@ -4237,11 +4139,28 @@ async function loadDepartmentConfigs() {
 async function loadUploadHistory() {
   try {
     softwareDatasets.value = await analyticsApi.getSoftwareDatasets()
-    if (!mlUploadId.value && latestSoftwareUpload.value) {
-      mlUploadId.value = latestSoftwareUpload.value.id
+    mlError.value = null
+
+    for (const upload of softwareDatasets.value) {
+      const states = await analyticsApi.getSoftwareModelState(upload.id)
+      const trainedState = adminTrainedState(states)
+      if (trainedState) {
+        mlUploadId.value = upload.id
+        mlTargetColumn.value = trainedState.target_column
+        modelStates.value = states
+        return
+      }
     }
+
+    if (latestSoftwareUpload.value) {
+      mlUploadId.value = latestSoftwareUpload.value.id
+      modelStates.value = await analyticsApi.getSoftwareModelState(latestSoftwareUpload.value.id).catch(() => [])
+    }
+    mlError.value = 'Admin tarafinda bu yazilim datasetleri icin guncel egitilmis model bulunamadi.'
   } catch {
     softwareDatasets.value = []
+    modelStates.value = []
+    mlError.value = 'Admin model kaynagi yuklenemedi.'
   }
 }
 
@@ -4295,6 +4214,11 @@ async function loadDepartmentDashboard(useLlm = false) {
     departmentDashboardError.value = null
     return
   }
+  if (!hasAdminTrainedModel.value) {
+    departmentDashboard.value = null
+    departmentDashboardError.value = 'Admin tarafinda bu dataset icin guncel egitilmis model bulunamadi.'
+    return
+  }
 
   departmentDashboardLoading.value = true
   departmentDashboardError.value = null
@@ -4313,30 +4237,12 @@ async function loadDepartmentDashboard(useLlm = false) {
   }
 }
 
-async function trainModel() {
-  if (!mlUploadId.value) return
-  mlLoading.value = 'train'
-  mlError.value = null
-  try {
-    trainingResult.value = await analyticsApi.trainSoftwareModel({
-      upload_id: mlUploadId.value,
-      target_column: mlTargetColumn.value,
-      model_name: mlModelName.value,
-    })
-    modelStates.value = await analyticsApi.getSoftwareModelState(mlUploadId.value)
-    activeAnalyticsSection.value = 'model'
-    predictionResult.value = null
-    bulkPredictionResult.value = null
-    departmentDashboard.value = null
-  } catch (err: any) {
-    mlError.value = err.response?.data?.detail || 'Model egitimi basarisiz oldu.'
-  } finally {
-    mlLoading.value = null
-  }
-}
-
 async function loadPrediction(useLlmNarrative = false) {
   if (!mlUploadId.value || !mlEmployeeId.value) return
+  if (!hasAdminTrainedModel.value) {
+    mlError.value = 'Admin tarafinda bu dataset icin guncel egitilmis model bulunamadi.'
+    return
+  }
   mlLoading.value = useLlmNarrative ? 'narrative' : 'predict'
   mlError.value = null
   try {
@@ -4404,6 +4310,10 @@ async function applyEmployeeDeepLinkFromRoute() {
 
 async function loadBulkPredictions(useLlmNarrative = false, llmTeam?: string) {
   if (!mlUploadId.value) return
+  if (!hasAdminTrainedModel.value) {
+    mlError.value = 'Admin tarafinda bu dataset icin guncel egitilmis model bulunamadi.'
+    return
+  }
   const requestedSection = activeAnalyticsSection.value
   mlLoading.value = useLlmNarrative ? 'narrative' : 'bulk'
   mlError.value = null
@@ -4424,7 +4334,6 @@ async function loadBulkPredictions(useLlmNarrative = false, llmTeam?: string) {
 
 watch(selectedDepartment, async () => {
   selectedTeam.value = 'all'
-  trainingResult.value = null
   predictionResult.value = null
   bulkPredictionResult.value = null
   await loadOverview()
@@ -4435,7 +4344,6 @@ watch(selectedTeam, async () => {
 })
 
 watch(mlTargetColumn, () => {
-  trainingResult.value = null
   predictionResult.value = null
   bulkPredictionResult.value = null
   departmentDashboard.value = null
@@ -4476,7 +4384,6 @@ watch([filteredTeamRiskSummaries, activeAnalyticsSection], async () => {
 })
 
 watch(mlUploadId, () => {
-  trainingResult.value = null
   predictionResult.value = null
   bulkPredictionResult.value = null
   departmentDashboard.value = null
@@ -4488,7 +4395,7 @@ watch(mlUploadId, () => {
 })
 
 watch([activeAnalyticsSection, mlUploadId], ([section, uploadId]) => {
-  if (section !== 'teams') return
+  if (!bulkSections.includes(section)) return
   if (!uploadId || bulkPredictionResult.value || mlLoading.value) return
   loadBulkPredictions(false)
 })
@@ -4526,6 +4433,8 @@ onMounted(async () => {
   await loadOverview()
   if (activeAnalyticsSection.value === 'department') {
     await loadDepartmentDashboard(false)
+  } else if (bulkSections.includes(activeAnalyticsSection.value)) {
+    await loadBulkPredictions(false)
   }
   await nextTick()
   setupRevealAnimations()
