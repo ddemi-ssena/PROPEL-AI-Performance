@@ -2178,3 +2178,21 @@ Yazılım model F1 skorları (Random Forest, test_period_count=8):
 
 - Tarayicida hard refresh veya yeniden login sonrasi 360 Calisan Raporu dahil API'den veri alan ekranlarda isim/departman/takim metinleri merkezi interceptor ile duzelmelidir.
 - Eger eski localStorage/session verisi bozuk kaldiysa cikis-giris yapmak auth store'u da yeni API cevabiyla tazeler.
+
+## 2026-06-05 Yazilim Manager KPI/ML Alt Sayfa Navigasyonu
+
+- Kullanici yazilim manager KPI/ML Analizi grubundaki Takim Analizi ve Calisan Analizi gibi alt sayfalarin sidebar'dan kayboldugunu bildirdi.
+- Tespit:
+  - Route'lar ve eski yazilim KPI/ML ekrani duruyordu: `/manager/kpi-ml-analysis`.
+  - `ManagerAnalyticsView.vue` zaten `section=department`, `section=teams`, `section=watchlist`, `section=technical` query degerlerini destekliyor.
+  - Sorun `AppLayout.vue` icinde yazilim KPI/ML sidebar grubunun tek linke dusmesiydi.
+- Frontend duzeltmesi:
+  - `propel-frontend/src/layouts/AppLayout.vue` yazilim KPI/ML grubuna `Model Durumu`, `Departman Analizi`, `Takim Analizi`, `Calisan Analizi`, `Teknik Detaylar` linkleri eklendi.
+  - Alt linkler `/manager/kpi-ml-analysis?section=...` query'leriyle mevcut bolumlere baglandi.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Yazilim yoneticisi ile yeniden giris veya hard refresh sonrasi KPI & ML Analizi grubunda alt sayfalar sidebar'da gorunmeli.
