@@ -2139,3 +2139,22 @@ Yazılım model F1 skorları (Random Forest, test_period_count=8):
 - Dogrulama:
   - `npm.cmd run type-check` basarili.
   - `docker restart propel_frontend` calistirildi.
+
+## 2026-06-05 PR #40 Merge Conflict Cozumu
+
+- Kullanici `feat: Yazilim ML analizi, satis 4-hedef tablosu...` baslikli PR #40 branch'ini merge etmek istedigini ve conflict oldugunu soyledi.
+- `refs/pull/40/head` yerel `pr-40` branch'i olarak cekildi; PR head commit'i `2e1ace0`.
+- `origin/master` guncellendi ve `pr-40` icine merge edildi.
+- Gercek conflict sadece `AGENTS.MD` dosyasindaydi. PR tarafinda dosya sonraki adimlarda bitiyor, `origin/master` tarafinda yeni gelistirme gunlugu devam ediyordu; conflict marker'lari kaldirildi ve master tarafindaki guncel gunluk kayitlari korundu.
+- Otomatik merge ile backend/frontend kod dosyalari birlesti; manuel kod conflict'i yoktu.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/api/routers/analytics.py propel-backend/app/services/analytics_service.py propel-backend/app/services/sales_ml_service.py propel-backend/app/services/software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+- Not:
+  - `gh` CLI yüklü degildi; GitHub PR metadata'si yerelden okunamadi.
+  - `origin` remote branch listesinde PR #40 head'i normal branch olarak gorunmuyor, bu nedenle local cozum `pr-40` uzerinde tamamlandi.
+
+## Sonraki Adim
+
+- PR #40 kaynak branch'i fork'taysa merge commit'inin o fork branch'ine pushlanmasi gerekir; bu repoda ayni isimli origin head'i gorunmedi.
+- Alternatif olarak local `pr-40` branch'i yeni bir origin branch olarak pushlanip yeni/updated PR akisi kullanilabilir.
