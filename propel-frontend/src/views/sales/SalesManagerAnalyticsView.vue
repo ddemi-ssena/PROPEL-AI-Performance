@@ -656,7 +656,7 @@ async function loadDatasets() {
   try {
     datasets.value = await analyticsApi.getSalesDatasets()
     if (datasets.value.length) {
-      uploadId.value = datasets.value[datasets.value.length - 1].id
+      uploadId.value = datasets.value[0].id
       await onDatasetChange()
     }
   } catch {}

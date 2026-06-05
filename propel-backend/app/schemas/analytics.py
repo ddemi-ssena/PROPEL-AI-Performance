@@ -488,6 +488,38 @@ class SalesBulkPredictionResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Sales All-Targets Bulk Response
+# ---------------------------------------------------------------------------
+
+class SalesTargetResult(BaseModel):
+    predicted_band: str
+    confidence: float
+
+
+class SalesEmployeeAllTargets(BaseModel):
+    employee_id: int
+    employee_name: Optional[str] = None
+    team: Optional[str] = None
+    role: Optional[str] = None
+    external_employee_code: Optional[str] = None
+    perf_drop: Optional[SalesTargetResult] = None
+    burnout: Optional[SalesTargetResult] = None
+    resignation: Optional[SalesTargetResult] = None
+    high_risk: Optional[SalesTargetResult] = None
+    top_drivers: list[dict] = []
+    recommended_actions: list[str] = []
+
+
+class SalesAllTargetsBulkResponse(BaseModel):
+    upload_id: int
+    employee_count: int
+    employees: list[SalesEmployeeAllTargets]
+    department_narrative: Optional[dict] = None
+    team_analytics: list[dict] = []
+    generated_at: str
+
+
+# ---------------------------------------------------------------------------
 # Sales Employee Personal Dashboard
 # ---------------------------------------------------------------------------
 

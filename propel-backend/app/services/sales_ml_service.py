@@ -618,6 +618,114 @@ class SalesMLService:
         )
 
     @staticmethod
+    def predict_all_targets(
+        db: Session,
+        upload_id: int,
+        use_llm_narrative: bool = True,
+    ):
+        """4 hedef için toplu tahmin — rows ve feature engineering tek seferde."""
+        from app.schemas.analytics import (
+            SalesAllTargetsBulkResponse,
+            SalesEmployeeAllTargets,
+            SalesTargetResult,
+        )
+        from app.analytics.features.sales import _parse_employee_id_raw
+
+        TARGET_MAP = {
+            "Performance_Drop_Target": "perf_drop",
+            "Burnout_Target": "burnout",
+            "Resignation_Target": "resignation",
+            "High_Risk_Target": "high_risk",
+        }
+
+        upload = SalesMLService._resolve_upload(db, upload_id)
+        rows = SalesMLService._load_rows(SalesMLService._upload_path(upload))
+
+        # Grupla — bir kez
+        grouped_rows: dict[int, list[dict[str, Any]]] = {}
+        for row in rows:
+            raw_id = _row_employee_id(row)
+            if raw_id in (None, ""):
+                continue
+            eid = _parse_employee_id_raw(raw_id)
+            if eid is None:
+                continue
+            grouped_rows.setdefault(eid, []).append(row)
+
+        if not grouped_rows:
+            raise HTTPException(status_code=404, detail="Upload icinde employee_id bulunamadi.")
+
+        # Her hedef için tahmin — artifact yükleme paylaşılmaz ama rows paylaşılır
+        target_items: dict[str, list[SalesPredictionResponse]] = {}
+        base_bulk = None
+        for target_col, field_name in TARGET_MAP.items():
+            try:
+                bulk = SalesMLService.predict_all_from_upload(
+                    db=db,
+                    upload_id=upload_id,
+                    target_column=target_col,
+                    use_llm_narrative=(use_llm_narrative and target_col == "Performance_Drop_Target"),
+                )
+                target_items[target_col] = bulk.items
+                if target_col == "Performance_Drop_Target":
+                    base_bulk = bulk
+            except Exception:
+                target_items[target_col] = []
+
+        # Çalışan bazında birleştir
+        emp_map: dict[int, dict[str, Any]] = {}
+        for target_col, items in target_items.items():
+            field_name = TARGET_MAP[target_col]
+            for item in items:
+                eid = item.employee_id
+                if eid not in emp_map:
+                    sp = item.summary_payload
+                    emp_map[eid] = {
+                        "employee_id": eid,
+                        "employee_name": sp.get("employee_name"),
+                        "team": sp.get("team"),
+                        "role": sp.get("role_level") or sp.get("role"),
+                        "external_employee_code": sp.get("external_employee_code"),
+                        "top_drivers": item.top_drivers or [],
+                        "recommended_actions": item.recommended_actions or [],
+                        "perf_drop": None,
+                        "burnout": None,
+                        "resignation": None,
+                        "high_risk": None,
+                    }
+                emp_map[eid][field_name] = SalesTargetResult(
+                    predicted_band=str(item.predicted_band),
+                    confidence=round(item.confidence, 4),
+                )
+
+        # Risk skoru ile sırala (perf_drop riski ağırlıklı) — emp_map dict'leri üzerinde çalış
+        def _risk_score(e: dict) -> float:
+            score = 0.0
+            weights = {"perf_drop": 0.35, "burnout": 0.20, "resignation": 0.25, "high_risk": 0.20}
+            for field, w in weights.items():
+                r = e.get(field)
+                if r is None:
+                    continue
+                band = r.predicted_band if hasattr(r, "predicted_band") else r.get("predicted_band")
+                conf = r.confidence if hasattr(r, "confidence") else r.get("confidence", 0)
+                if str(band) == "1":
+                    score += conf * w
+            return score
+
+        emp_list = list(emp_map.values())
+        emp_list.sort(key=_risk_score, reverse=True)
+        employees = [SalesEmployeeAllTargets(**e) for e in emp_list]
+
+        return SalesAllTargetsBulkResponse(
+            upload_id=upload_id,
+            employee_count=len(employees),
+            employees=employees,
+            department_narrative=base_bulk.department_narrative if base_bulk else None,
+            team_analytics=base_bulk.team_analytics if base_bulk else [],
+            generated_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+    @staticmethod
     def _top_driver_counts(items: list[SalesPredictionResponse], limit: int = 5) -> list[tuple[str, int]]:
         counts: dict[str, int] = {}
         for item in items:

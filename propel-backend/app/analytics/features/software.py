@@ -9,7 +9,14 @@ from typing import Any
 from app.analytics.kpi_registry import KPIDefinition, SOFTWARE_KPI_REGISTRY, software_kpi_feature_name
 
 
-SOFTWARE_TARGET_COLUMNS = ("performance_band", "attrition_risk_band")
+SOFTWARE_TARGET_COLUMNS = (
+    "performance_band",
+    "attrition_risk_band",
+    "Performance_Drop_Target",
+    "Burnout_Target",
+    "Resignation_Target",
+    "High_Risk_Target",
+)
 
 SOFTWARE_OPERATIONAL_COLUMNS = (
     "assigned_tasks",
@@ -168,7 +175,13 @@ class SoftwareFeatureBuilder:
         warnings: list[str] = []
 
         for row_number, row in enumerate(rows, start=1):
-            employee_id = SoftwareFeatureBuilder._parse_int(row.get("employee_id"))
+            # SE-001, MGR-SW, 1, "1" gibi formatları destekle
+            raw_eid = row.get("employee_id")
+            employee_id = SoftwareFeatureBuilder._parse_int(raw_eid)
+            if employee_id is None and raw_eid not in (None, ""):
+                import re as _re
+                digits = _re.sub(r"[^0-9]", "", str(raw_eid))
+                employee_id = int(digits) if digits else None
             year = SoftwareFeatureBuilder._parse_int(row.get("year"))
             week = SoftwareFeatureBuilder._parse_int(row.get("week"))
             if employee_id is None or year is None or week is None:

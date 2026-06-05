@@ -45,7 +45,12 @@ class SoftwareAnalyticsAdapter(DepartmentAnalyticsAdapter):
 
     @staticmethod
     def _resolve_department(db: Session) -> Optional[Department]:
-        return db.query(Department).filter(Department.name == "Yazilim").first()
+        # Hem "Yazılım Geliştirme" hem "Yazilim" eşleştir
+        return (
+            db.query(Department)
+            .filter(Department.name.ilike("%yazilim%").op("OR")(Department.name.ilike("%yazılım%")))
+            .first()
+        )
 
     @staticmethod
     def _metric_code(record: KPIRecord) -> str:

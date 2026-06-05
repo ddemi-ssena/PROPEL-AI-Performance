@@ -74,6 +74,12 @@ const router = createRouter({
           component: () => import('@/views/sales/SalesAnalyticsView.vue'),
           meta: { title: 'Satis KPI & ML Analizi' },
         },
+        {
+          path: 'software-analytics',
+          name: 'admin-software-analytics',
+          component: () => import('@/views/manager/SoftwareAnalyticsView.vue'),
+          meta: { title: 'Yazilim KPI & ML Analizi' },
+        },
       ],
     },
     {
@@ -104,6 +110,12 @@ const router = createRouter({
           name: 'manager-kpi-ml-analysis',
           component: () => import('@/views/manager/ManagerAnalyticsView.vue'),
           meta: { title: 'KPI & ML Analizi' },
+        },
+        {
+          path: 'software-analytics',
+          name: 'manager-software-analytics',
+          component: () => import('@/views/manager/SoftwareAnalyticsView.vue'),
+          meta: { title: 'Yazılım KPI & ML Analizi' },
         },
         {
           path: 'team',

@@ -49,6 +49,49 @@ class OnaResponse(BaseModel):
     data_source: str   # "feedback" | "inferred" | "mixed"
 
 
+# threshold_status → numeric score mapping (ML explain output değerleri)
+_THRESHOLD_SCORE: dict[str, int] = {
+    "Guclu seviyede":              92,
+    "Optimal aralikta":            85,
+    "Optimal araligin ustunde":    88,
+    "Normal seviyede":             72,
+    "Izleme seviyesinde":          55,
+    "Optimal araligin altinda":    42,
+    "Risk esiginin altinda":       25,
+    "Risk esiginin ustunde":       25,
+    "Veri yorumu icin sayisal deger yok": 60,
+}
+
+
+def _perf_from_drivers(top_drivers: list[dict], fallback_band: str, fallback_conf: float) -> int:
+    """ML top_drivers'dan KPI eşik durumlarına göre performans skoru hesapla."""
+    seen: set[str] = set()
+    total_w = 0.0
+    total_s = 0.0
+    for d in (top_drivers or []):
+        feat = d.get("feature", "")
+        # Türetilmiş zaman özelliklerini atla (sadece anlık değer kullan)
+        if any(feat.endswith(s) for s in ("_lag_1", "_rolling_4", "_trend_4")):
+            continue
+        key = d.get("metric_code") or feat
+        if key in seen:
+            continue
+        seen.add(key)
+        status = d.get("threshold_status", "Normal seviyede")
+        score = _THRESHOLD_SCORE.get(status, 60)
+        w = float(d.get("importance", 1.0))
+        total_s += score * w
+        total_w += w
+
+    if total_w == 0:
+        # Fallback: eski confidence formülü
+        if str(fallback_band) in ("0", "Iyi", "İyi", "high"):
+            return min(95, max(55, round(55 + fallback_conf * 40)))
+        return min(50, max(15, round(50 - fallback_conf * 35)))
+
+    return max(10, min(100, round(total_s / total_w)))
+
+
 class FlightRiskEmployee(BaseModel):
     employee_code: str
     employee_name: Optional[str] = None
@@ -196,12 +239,7 @@ def get_flight_risk(
                     risk_level = "Low"
                     risk_score = min(40, risk_pct)
 
-                # Performans skoru: band=0 (iyi) → 55-95, band=1 (riskli) → 15-50
-                conf = item.confidence
-                if band == "0":
-                    perf_score = min(95, max(55, round(55 + conf * 40)))
-                else:
-                    perf_score = min(50, max(15, round(50 - conf * 35)))
+                perf_score = _perf_from_drivers(item.top_drivers, band, item.confidence)
 
                 top_driver = None
                 if item.top_drivers:
@@ -242,11 +280,10 @@ def get_flight_risk(
                 if band == "Riskli":
                     risk_level = "High"
                     risk_score = max(60, risk_pct)
-                    perf_score = min(50, max(15, round(50 - item.confidence * 35)))
                 else:
                     risk_level = "Low"
                     risk_score = min(40, 100 - risk_pct)
-                    perf_score = min(95, max(55, round(55 + item.confidence * 40)))
+                perf_score = _perf_from_drivers(item.top_drivers, band, item.confidence)
 
                 top_driver = None
                 if item.top_drivers:
@@ -291,61 +328,61 @@ def get_ai_insights(
     current_user: User = Depends(get_current_active_admin),
 ):
     """
-    ML flight-risk verisini Gemini ile yorumlar; KPI özeti + narratif + çalışan tablosu döner.
+    Satış + Yazılım departmanı toplu tara (4 hedef) sonuçlarını grafikler + LLM narratifi ile döndürür.
     """
     from app.services.ai_service import AIService
 
-    # ── 1. ML verisini çek (flight-risk ile aynı mantık) ──────────────────
-    all_emps: list[FlightRiskEmployee] = []
+    # ── Risk hedef tanımları ──────────────────────────────────────────────
+    RISK_DEFINITIONS = [
+        {
+            "key": "perf_drop",
+            "target": "Performance_Drop_Target",
+            "label": "Performans Düşüşü",
+            "color": "rose",
+            "description": "Çalışanın son dönemlere göre performansında belirgin bir gerileme yaşanıp yaşanmadığını tahmin eder.",
+            "boundary": "Risk eşiği: Model %50+ olasılık tahmin ettiğinde 'riskli' kabul edilir. Beklenen oran: toplam çalışanın %15-35'i.",
+            "signals": ["Görev tamamlama oranı düşüşü", "Hedef gerçekleşme gerilemesi", "Motivasyon skoru azalması"],
+        },
+        {
+            "key": "burnout",
+            "target": "Burnout_Target",
+            "label": "Tükenmişlik",
+            "color": "amber",
+            "description": "Yüksek iş yükü, düşük motivasyon ve uzun süreli stres kombinasyonundan kaynaklanan tükenme riskini tahmin eder.",
+            "boundary": "Risk eşiği: İş yükü endeksi >1.2 ve motivasyon skoru <3.0 kombinasyonu kritik sinyaldir. Beklenen oran: %20-40.",
+            "signals": ["İş yükü endeksi yüksekliği", "Motivasyon düşüşü trendi", "Mesai saati artışı"],
+        },
+        {
+            "key": "resignation",
+            "target": "Resignation_Target",
+            "label": "İstifa Riski",
+            "color": "orange",
+            "description": "Çalışanın yakın vadede kurumu terk etme olasılığını tahmin eder. Motivasyon, performans ve çevre faktörlerini birleştirir.",
+            "boundary": "Risk eşiği: Model %50+ olasılık tahmin ettiğinde izleme listesine alınır. Beklenen oran: %15-30.",
+            "signals": ["Uzun süreli motivasyon düşüklüğü", "Hedef altı performans", "CRM/araç kullanım azalması"],
+        },
+        {
+            "key": "high_risk",
+            "target": "High_Risk_Target",
+            "label": "Yüksek Risk",
+            "color": "purple",
+            "description": "Performans düşüşü + tükenmişlik + istifa riskinin birleşik bileşik skoru. Birden fazla risk sinyali aynı anda aktif olan çalışanları tespit eder.",
+            "boundary": "Risk eşiği: En az 2 hedefte aynı anda yüksek risk → bileşik yüksek risk. Beklenen oran: %10-20.",
+            "signals": ["Çoklu risk sinyali kombinasyonu", "Uzun süreli düşük performans + yüksek iş yükü", "Ekip dinamiklerinde bozulma"],
+        },
+    ]
+
+    # ── 1. Her iki departman için predict_all_targets çağır ──────────────
+    sales_bulk = None
+    sw_bulk    = None
 
     try:
         from app.services.sales_ml_service import SalesMLService
         sales_datasets = SalesMLService.list_datasets(db)
         if sales_datasets:
-            upload_id = sales_datasets[0].id
-            sales_risk_map: dict[int, dict] = {}
-            for target_col, weight in [
-                ("Performance_Drop_Target", 1.0),
-                ("Resignation_Target", 1.2),
-                ("High_Risk_Target", 0.8),
-            ]:
-                try:
-                    b = SalesMLService.predict_all_from_upload(
-                        db=db, upload_id=upload_id,
-                        target_column=target_col, use_llm_narrative=False,
-                    )
-                    for item in b.items:
-                        eid = item.employee_id
-                        band = str(item.predicted_band)
-                        base_score = int(round(item.confidence * 100)) if band == "1" else int(round((1 - item.confidence) * 100))
-                        weighted = int(base_score * weight) if band == "1" else 0
-                        existing = sales_risk_map.get(eid, {})
-                        if weighted > existing.get("weighted", 0):
-                            sales_risk_map[eid] = {"item": item, "band": band, "weighted": weighted, "risk_score": base_score}
-                        elif eid not in sales_risk_map:
-                            sales_risk_map[eid] = {"item": item, "band": band, "weighted": 0, "risk_score": base_score}
-                except Exception:
-                    pass
-            for eid, data in sales_risk_map.items():
-                item = data["item"]
-                band = data["band"]
-                conf = item.confidence
-                risk_level = "High" if data["weighted"] >= 60 else "Low"
-                perf_score = min(50, max(15, round(50 - conf * 35))) if band == "1" else min(95, max(55, round(55 + conf * 40)))
-                top_driver = item.top_drivers[0].get("metric_name") if item.top_drivers else None
-                all_emps.append(FlightRiskEmployee(
-                    employee_code=item.summary_payload.get("external_employee_code") or f"SA-{eid:03d}",
-                    employee_name=item.summary_payload.get("employee_name"),
-                    department="Satış",
-                    position=item.summary_payload.get("position"),
-                    team=item.summary_payload.get("team"),
-                    risk_level=risk_level,
-                    risk_score=data["weighted"] if risk_level == "High" else int(conf * 40),
-                    performance_score=perf_score,
-                    confidence=conf,
-                    top_driver=top_driver,
-                    predicted_band=band,
-                ))
+            sales_bulk = SalesMLService.predict_all_targets(
+                db=db, upload_id=sales_datasets[0].id, use_llm_narrative=False
+            )
     except Exception:
         pass
 
@@ -353,73 +390,109 @@ def get_ai_insights(
         from app.services.software_ml_service import SoftwareMLService
         sw_datasets = SoftwareMLService.list_datasets(db)
         if sw_datasets:
-            bulk = SoftwareMLService.predict_all_from_upload(
-                db=db, upload_id=sw_datasets[0].id,
-                target_column="performance_band", use_llm_narrative=False,
+            sw_bulk = SoftwareMLService.predict_all_targets(
+                db=db, upload_id=sw_datasets[0].id, use_llm_narrative=False
             )
-            for item in bulk.items:
-                band = str(item.predicted_band)
-                conf = item.confidence
-                risk_pct = int(round(conf * 100))
-                if band == "Riskli":
-                    risk_level, risk_score = "High", max(60, risk_pct)
-                    perf_score = min(50, max(15, round(50 - conf * 35)))
-                else:
-                    risk_level, risk_score = "Low", min(40, 100 - risk_pct)
-                    perf_score = min(95, max(55, round(55 + conf * 40)))
-                sp = item.summary_payload
-                top_driver = item.top_drivers[0].get("metric_name") if item.top_drivers else None
-                all_emps.append(FlightRiskEmployee(
-                    employee_code=sp.get("external_employee_code") or f"SE-{item.employee_id:03d}",
-                    employee_name=sp.get("employee_name"),
-                    department="Yazılım",
-                    position=sp.get("position"),
-                    team=sp.get("team"),
-                    risk_level=risk_level,
-                    risk_score=risk_score,
-                    performance_score=perf_score,
-                    confidence=conf,
-                    top_driver=top_driver,
-                    predicted_band=band,
-                ))
     except Exception:
         pass
 
-    # ── 2. Özet istatistikler ──────────────────────────────────────────────
-    high = [e for e in all_emps if e.risk_level == "High"]
-    low  = [e for e in all_emps if e.risk_level == "Low"]
-    sales_emps = [e for e in all_emps if e.department == "Satış"]
-    sw_emps    = [e for e in all_emps if e.department == "Yazılım"]
+    # ── 2. Çalışan tablosu — 4 hedef bazlı ──────────────────────────────
+    def _risk_pct(t: Any) -> int:
+        if t is None:
+            return 0
+        band = t.predicted_band if hasattr(t, "predicted_band") else t.get("predicted_band", "0")
+        conf = t.confidence if hasattr(t, "confidence") else t.get("confidence", 0)
+        return round(float(conf if str(band) == "1" else 1 - conf) * 100)
 
-    avg_perf_all   = round(sum(e.performance_score for e in all_emps) / max(len(all_emps), 1), 1)
-    avg_perf_sales = round(sum(e.performance_score for e in sales_emps) / max(len(sales_emps), 1), 1)
-    avg_perf_sw    = round(sum(e.performance_score for e in sw_emps)    / max(len(sw_emps), 1),    1)
+    def _composite(emp: Any) -> int:
+        pd_ = _risk_pct(emp.perf_drop)   if hasattr(emp, "perf_drop")   else 0
+        bk_ = _risk_pct(emp.burnout)     if hasattr(emp, "burnout")     else 0
+        rs_ = _risk_pct(emp.resignation) if hasattr(emp, "resignation") else 0
+        hr_ = _risk_pct(emp.high_risk)   if hasattr(emp, "high_risk")   else 0
+        return round(pd_ * 0.35 + rs_ * 0.30 + hr_ * 0.25 + bk_ * 0.10)
 
-    # En riskli 10 çalışan (driver ile)
-    top_risk = sorted(high, key=lambda e: -e.risk_score)[:10]
+    sales_rows = [
+        {
+            "code":       e.external_employee_code or f"SA-{e.employee_id:03d}",
+            "name":       e.employee_name or e.external_employee_code or f"SA-{e.employee_id:03d}",
+            "department": "Satış",
+            "team":       e.team or "—",
+            "perf_drop":  _risk_pct(e.perf_drop),
+            "burnout":    _risk_pct(e.burnout),
+            "resignation":_risk_pct(e.resignation),
+            "high_risk":  _risk_pct(e.high_risk),
+            "composite":  _composite(e),
+        }
+        for e in (sales_bulk.employees if sales_bulk else [])
+    ]
+
+    sw_rows = [
+        {
+            "code":       e.external_employee_code or f"SE-{e.employee_id:03d}",
+            "name":       e.employee_name or e.external_employee_code or f"SE-{e.employee_id:03d}",
+            "department": "Yazılım",
+            "team":       e.team or "—",
+            "perf_drop":  _risk_pct(e.perf_drop),
+            "burnout":    _risk_pct(e.burnout),
+            "resignation":_risk_pct(e.resignation),
+            "high_risk":  _risk_pct(e.high_risk),
+            "composite":  _composite(e),
+        }
+        for e in (sw_bulk.employees if sw_bulk else [])
+    ]
+
+    all_rows = sorted(sales_rows + sw_rows, key=lambda r: -r["composite"])
+
+    # ── 3. Grafik verileri — hedef bazlı risk dağılımı ───────────────────
+    def _dist(rows: list[dict], key: str, thr: int = 50) -> dict:
+        risky = sum(1 for r in rows if r.get(key, 0) >= thr)
+        safe  = len(rows) - risky
+        return {"risky": risky, "safe": safe, "total": len(rows),
+                "risky_pct": round(risky / max(len(rows), 1) * 100)}
+
+    chart_data = {
+        "sales": {
+            "total": len(sales_rows),
+            "perf_drop":   _dist(sales_rows, "perf_drop"),
+            "burnout":     _dist(sales_rows, "burnout"),
+            "resignation": _dist(sales_rows, "resignation"),
+            "high_risk":   _dist(sales_rows, "high_risk"),
+        },
+        "software": {
+            "total": len(sw_rows),
+            "perf_drop":   _dist(sw_rows, "perf_drop"),
+            "burnout":     _dist(sw_rows, "burnout"),
+            "resignation": _dist(sw_rows, "resignation"),
+            "high_risk":   _dist(sw_rows, "high_risk"),
+        },
+    }
+
+    # ── 4. Özet KPI kartları ─────────────────────────────────────────────
+    all_emps_count = len(all_rows)
+    high_composite = sum(1 for r in all_rows if r["composite"] >= 50)
+    avg_composite  = round(sum(r["composite"] for r in all_rows) / max(all_emps_count, 1), 1)
 
     kpis = [
-        {"title": "Toplam Çalışan", "value": str(len(all_emps)), "trend": "ML Analizi", "trendColor": "text-blue-500", "comparison": "Her iki departman"},
-        {"title": "Yüksek Riskli", "value": str(len(high)), "trend": "Dikkat", "trendColor": "text-red-500", "comparison": "Acil müdahale gerekli"},
-        {"title": "Ort. Performans", "value": f"{avg_perf_all}/100", "trend": "Stabil" if avg_perf_all >= 60 else "Düşük", "trendColor": "text-emerald-600" if avg_perf_all >= 60 else "text-amber-500", "comparison": "ML tahmin skoru"},
-        {"title": "Güvenli Çalışan", "value": str(len(low)), "trend": "İyi", "trendColor": "text-emerald-600", "comparison": "Düşük uçuş riski"},
+        {"title": "Toplam Çalışan",   "value": str(all_emps_count), "trend": "ML Analizi",     "trendColor": "text-blue-500",    "comparison": "Her iki departman"},
+        {"title": "Yüksek Risk",       "value": str(high_composite), "trend": "Dikkat",          "trendColor": "text-red-500",     "comparison": "Bileşik risk ≥ %50"},
+        {"title": "Ort. Genel Risk",   "value": f"%{avg_composite}", "trend": "Bileşik Skor",    "trendColor": "text-amber-600",   "comparison": "4 hedef ağırlıklı ort."},
+        {"title": "Güvenli Çalışan",   "value": str(all_emps_count - high_composite), "trend": "İyi", "trendColor": "text-emerald-600", "comparison": "Bileşik risk < %50"},
     ]
 
-    risk_data = [len(low), 0, len(high)]   # [düşük, orta, yüksek]
+    risk_data = [all_emps_count - high_composite, 0, high_composite]
 
-    employee_table = [
-        {
-            "code": e.employee_code,
-            "name": e.employee_name or e.employee_code,
-            "department": e.department,
-            "team": e.team or "—",
-            "position": e.position or "—",
-            "risk_level": e.risk_level,
-            "performance_score": e.performance_score,
-            "top_driver": e.top_driver or "—",
-        }
-        for e in sorted(all_emps, key=lambda x: (-x.risk_score, -x.performance_score))
-    ]
+    # En riskli 10 çalışan
+    top_risk = all_rows[:10]
+
+    # Eski all_emps (flight-risk uyumlu) — diğer kod için
+    all_emps: list[FlightRiskEmployee] = []
+    sales_emps = sales_rows
+    sw_emps    = sw_rows
+    avg_perf_all   = avg_composite
+    avg_perf_sales = round(sum(r["composite"] for r in sales_rows) / max(len(sales_rows), 1), 1)
+    avg_perf_sw    = round(sum(r["composite"] for r in sw_rows)    / max(len(sw_rows), 1),    1)
+
+    employee_table = all_rows
 
     # ── 3. Gemini yorum üret ───────────────────────────────────────────────
     narrative = None
@@ -427,34 +500,33 @@ def get_ai_insights(
 
     if AIService.GEMINI_API_KEY:
         high_list = "\n".join(
-            f"- {e.employee_name or e.employee_code} ({e.department}, {e.team or '?'}, perf={e.performance_score}/100, driver: {e.top_driver or '?'})"
-            for e in top_risk
+            f"- {r['name']} ({r['department']}/{r['team']}) → PD:{r['perf_drop']}% TK:{r['burnout']}% İR:{r['resignation']}% YR:{r['high_risk']}% | Bileşik:{r['composite']}%"
+            for r in top_risk
         )
+        s = chart_data["sales"]
+        w = chart_data["software"]
         prompt = f"""
-Sen bir kurumsal performans analisti yapay zekasısın. Aşağıdaki ML tabanlı çalışan risk analizi sonuçlarını incele ve Türkçe, profesyonel bir yönetim raporu hazırla.
+Sen bir kurumsal performans analisti yapay zekasısın. 4 ayrı ML modeli (Performans Düşüşü, Tükenmişlik, İstifa Riski, Yüksek Risk) sonuçlarını Türkçe profesyonel bir rapor olarak yorumla.
 
-## Genel Tablo
-- Toplam çalışan: {len(all_emps)} (Satış: {len(sales_emps)}, Yazılım: {len(sw_emps)})
-- Yüksek riskli: {len(high)} çalışan (%{round(len(high)/max(len(all_emps),1)*100)})
-- Güvenli: {len(low)} çalışan
-- Ort. performans: {avg_perf_all}/100 (Satış: {avg_perf_sales}, Yazılım: {avg_perf_sw})
+## Departman Özeti
+Satış ({s['total']} kişi): PD:{s['perf_drop']['risky_pct']}% | TK:{s['burnout']['risky_pct']}% | İR:{s['resignation']['risky_pct']}% | YR:{s['high_risk']['risky_pct']}%
+Yazılım ({w['total']} kişi): PD:{w['perf_drop']['risky_pct']}% | TK:{w['burnout']['risky_pct']}% | İR:{w['resignation']['risky_pct']}% | YR:{w['high_risk']['risky_pct']}%
+Toplam: {all_emps_count} çalışan | Bileşik yüksek risk: {high_composite} kişi (%{round(high_composite/max(all_emps_count,1)*100)}) | Ort. bileşik risk: %{avg_composite}
 
-## En Riskli Çalışanlar (ML Tarafından Tespit)
-{high_list if high_list else "Yüksek riskli çalışan tespit edilmedi."}
+## En Riskli 10 Çalışan
+{high_list or "Yüksek riskli çalışan tespit edilmedi."}
 
-## Görev
-Aşağıdaki 3 bölümü yaz:
+## Görev — 3 bölüm yaz:
+### 1. GENEL DURUM DEĞERLENDİRMESİ
+Hangi departmanda hangi risk tipi öne çıkıyor? Organizasyonun genel sağlığını yorumla.
 
-### 1. GENEL DURUM DEĞERLENDİRMESİ (2-3 paragraf)
-Organizasyonun genel sağlığını, risk dağılımını ve departman karşılaştırmasını yorumla.
+### 2. KRİTİK BULGULAR (en fazla 5 madde)
+4 risk hedefi açısından en önemli örüntüler neler?
 
-### 2. KRİTİK BULGULAR (madde madde, en fazla 5 madde)
-En önemli risk sinyallerini ve dikkat gerektiren örüntüleri listele.
+### 3. AKSİYON ÖNERİLERİ (5 öneri, somut ve kısa)
+Risk tipine özgü, departman yöneticisine eyleme geçirilebilir adımlar.
 
-### 3. YÖNETİCİYE AKSİYON ÖNERİLERİ (5 öneri, her biri kısa ve eyleme geçirilebilir)
-Departman yöneticilerine somut, ölçülebilir adımlar öner.
-
-Yanıtı bu 3 başlık altında yaz. Başlıkları ### ile işaretle. Türkçe, profesyonel ve özlü ol.
+Türkçe, profesyonel, özlü ol. ### başlıkları kullan.
 """
         raw = AIService._generate_with_gemini(prompt, timeout_seconds=30)
         if raw:
@@ -473,14 +545,16 @@ Yanıtı bu 3 başlık altında yaz. Başlıkları ### ile işaretle. Türkçe, 
 
     # Fallback öneriler (Gemini yoksa veya hata varsa)
     if not recommendations:
-        if len(high) > 0:
-            recommendations.append({"title": "Yüksek Riskli Çalışanlarla Görüşme", "description": f"{len(high)} çalışan ML modeli tarafından yüksek risk olarak işaretlendi. Bu hafta bire-bir görüşme planlayın.", "icon": "ExclamationCircleIcon"})
-        if avg_perf_sw < 60:
-            recommendations.append({"title": "Yazılım Ekibi Performans Desteği", "description": f"Yazılım departmanı ort. performansı {avg_perf_sw}/100. Teknik blokajları ve iş yükünü gözden geçirin.", "icon": "ArrowTrendingDownIcon"})
-        if avg_perf_sales < 60:
-            recommendations.append({"title": "Satış Ekibi Koçluk Programı", "description": f"Satış departmanı ort. performansı {avg_perf_sales}/100. Pipeline kalitesini ve takip disiplinini iyileştirin.", "icon": "ArrowTrendingDownIcon"})
+        if high_composite > 0:
+            recommendations.append({"title": "Yüksek Riskli Çalışanlarla Görüşme", "description": f"{high_composite} çalışan bileşik risk skoru ≥%50. Bu hafta bire-bir görüşme planlayın.", "icon": "ExclamationCircleIcon"})
+        s_burn = chart_data["sales"]["burnout"]["risky_pct"]
+        w_burn = chart_data["software"]["burnout"]["risky_pct"]
+        if s_burn > 30:
+            recommendations.append({"title": "Satış Ekibi Tükenmişlik Önlemi", "description": f"Satış ekibinin %{s_burn}'i tükenmişlik riskinde. İş yükü dengelemesi yapın.", "icon": "ArrowTrendingDownIcon"})
+        if w_burn > 30:
+            recommendations.append({"title": "Yazılım Ekibi İş Yükü Denetimi", "description": f"Yazılım ekibinin %{w_burn}'i tükenmişlik riskinde. Sprint kapasitesini gözden geçirin.", "icon": "ArrowTrendingDownIcon"})
         if not recommendations:
-            recommendations.append({"title": "Genel Durum Stabil", "description": "Organizasyon genelinde dengeli bir performans seyri gözlemleniyor.", "icon": "LightBulbIcon"})
+            recommendations.append({"title": "Genel Durum Stabil", "description": "Organizasyon genelinde dengeli bir risk seyri gözlemleniyor.", "icon": "LightBulbIcon"})
 
     return {
         "kpis": kpis,
@@ -488,13 +562,17 @@ Yanıtı bu 3 başlık altında yaz. Başlıkları ### ile işaretle. Türkçe, 
         "recommendations": recommendations,
         "narrative": narrative,
         "employee_table": employee_table,
+        "chart_data": chart_data,
+        "risk_definitions": RISK_DEFINITIONS,
         "stats": {
-            "total": len(all_emps),
-            "high_risk": len(high),
-            "low_risk": len(low),
-            "avg_perf_all": avg_perf_all,
-            "avg_perf_sales": avg_perf_sales,
-            "avg_perf_sw": avg_perf_sw,
+            "total": all_emps_count,
+            "high_risk": high_composite,
+            "low_risk": all_emps_count - high_composite,
+            "avg_composite": avg_composite,
+            "avg_sales": avg_perf_sales,
+            "avg_sw": avg_perf_sw,
+            "sales_total": len(sales_rows),
+            "sw_total": len(sw_rows),
         },
         "gemini_used": narrative is not None,
     }

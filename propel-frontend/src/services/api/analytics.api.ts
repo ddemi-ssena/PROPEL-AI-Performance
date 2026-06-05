@@ -477,6 +477,34 @@ export interface SalesBulkPredictionResponse {
   items: SalesPredictionResponse[]
 }
 
+export interface SalesTargetResult {
+  predicted_band: string
+  confidence: number
+}
+
+export interface SalesEmployeeAllTargets {
+  employee_id: number
+  employee_name?: string | null
+  team?: string | null
+  role?: string | null
+  external_employee_code?: string | null
+  perf_drop?: SalesTargetResult | null
+  burnout?: SalesTargetResult | null
+  resignation?: SalesTargetResult | null
+  high_risk?: SalesTargetResult | null
+  top_drivers: Array<Record<string, any>>
+  recommended_actions: string[]
+}
+
+export interface SalesAllTargetsBulkResponse {
+  upload_id: number
+  employee_count: number
+  employees: SalesEmployeeAllTargets[]
+  department_narrative?: Record<string, any> | null
+  team_analytics: Array<Record<string, any>>
+  generated_at: string
+}
+
 export interface SalesKPIMetric {
   code: string
   name: string
@@ -555,8 +583,8 @@ export const analyticsApi = {
     const { data } = await apiClient.post<SoftwareModelTrainResponse>(
       '/analytics/departments/software/models/train',
       {
-        model_name: 'stacking_lgbm_xgb_rf_lr',
-        test_period_count: 12,
+        model_name: 'random_forest',
+        test_period_count: 8,
         ...payload,
       }
     )
@@ -681,6 +709,28 @@ export const analyticsApi = {
   }): Promise<SalesBulkPredictionResponse> {
     const { data } = await apiClient.get<SalesBulkPredictionResponse>(
       '/analytics/departments/sales/predictions/bulk',
+      { params }
+    )
+    return data
+  },
+
+  async getBulkSalesAllTargets(params: {
+    upload_id: number
+    use_llm_narrative?: boolean
+  }): Promise<SalesAllTargetsBulkResponse> {
+    const { data } = await apiClient.get<SalesAllTargetsBulkResponse>(
+      '/analytics/departments/sales/predictions/bulk-all-targets',
+      { params }
+    )
+    return data
+  },
+
+  async getBulkSoftwareAllTargets(params: {
+    upload_id: number
+    use_llm_narrative?: boolean
+  }): Promise<SalesAllTargetsBulkResponse> {
+    const { data } = await apiClient.get<SalesAllTargetsBulkResponse>(
+      '/analytics/departments/software/predictions/bulk-all-targets',
       { params }
     )
     return data

@@ -815,11 +815,105 @@ docker restart propel_frontend
 
 ---
 
+---
+
+### 2026-06-04/05 Satış + Yazılım ML Analizi Tam Yenileme ★ BÜYÜK
+
+#### Gerçekçi Dataset Üretimi
+- `scripts/generate_sales_dataset.py` → `scripts/sales_dataset_v3.xlsx`
+  - 31 çalışan (SA-001..SA-031) × 52 hafta = 1612 satır
+  - Her çalışan bireysel KPI profili: farklı güçlü/zayıf yönler
+  - **Stokastik risk etiketleri** (Bernoulli çekimi) → model anlamlı olasılık öğrenir
+  - PD=%32, Burnout=%40, Resignation=%30, HighRisk=%35 dağılımı
+  - Aktif upload: #11
+- `scripts/generate_software_dataset.py` → `scripts/software_dataset_v2.csv`
+  - 31 çalışan (SE-001..SE-030 + MGR-SW) × 52 hafta = 1612 satır
+  - 4 yeni binary hedef: `Performance_Drop_Target`, `Burnout_Target`, `Resignation_Target`, `High_Risk_Target`
+  - Aktif upload: #12
+
+#### Backend Değişiklikleri
+- `analytics/features/software.py`
+  - `SOFTWARE_TARGET_COLUMNS`'a 4 yeni binary hedef eklendi
+  - SE-xxx, MGR-SW formatında employee_id parse desteği eklendi
+- `services/software_ml_service.py`
+  - `predict_all_targets()` metodu eklendi (satışla aynı yapı)
+  - `list_dataset_employees()` ve `predict_all_from_upload()` SE-xxx parse düzeltmesi
+- `services/sales_ml_service.py`
+  - `_risk_score()` dict/object uyumlu hale getirildi
+- `schemas/analytics.py`
+  - `SalesTargetResult`, `SalesEmployeeAllTargets`, `SalesAllTargetsBulkResponse` eklendi
+- `api/routers/analytics.py`
+  - `GET /departments/software/predictions/bulk-all-targets` eklendi
+  - `GET /departments/sales/predictions/bulk-all-targets` eklendi
+- `analytics/departments/software.py`
+  - `_resolve_department()` → `ilike("%yazılım%")` ile düzeltildi (DB'de "Yazılım Geliştirme")
+- `api/routers/admin_uploads.py`
+  - `_perf_from_drivers()`: confidence formülü yerine `threshold_status` eşik skorları (Güçlü=92, İzleme=55, Risk=25)
+  - `GET /admin/uploads/ai-insights` tamamen yenilendi:
+    - Her iki dept için `predict_all_targets()` çağrısı
+    - `risk_definitions`: 4 hedef açıklaması + sinyaller + sınırlar
+    - `chart_data`: departman × hedef bazlı risk dağılımı
+    - `employee_table`: 4 hedef risk %'si + bileşik skor per çalışan
+    - Gemini prompt: 4 hedef bazlı zengin bağlam
+- `.env`
+  - `GEMINI_MODEL=gemini-2.5-flash` (gemini-1.5-flash → 404 veriyordu, güncellendi)
+  - `GEMINI_API_KEY` yeniden set edildi
+
+#### Frontend Değişiklikleri
+- `SalesAnalyticsView.vue` tam yenileme:
+  - 4 hedef kolon tablosu: Risk Olasılığı % + progress bar (≥50 kırmızı, 25-49 sarı, <25 yeşil)
+  - `compositeRisk()`: 4 hedefin ağırlıklı bileşik skoru
+  - `riskPct()`, `riskColor()`, `riskBar()` helper'lar
+  - `riskCounts`: bileşik skora göre yüksek/orta/düşük sayımı
+  - `teamRows`: `allTargetsResult.employees`'dan bölge bazlı hesaplama
+  - **Toplu Tara**: `getBulkSalesAllTargets()` (LLM yok, hızlı)
+  - **LLM Yorumla**: `getBulkSalesAllTargets()` + `getBulkSalesPredictions(llm=true)` paralel
+  - `mlOverviewMetrics`: Toplu Tara öncesi → overview verisi, sonrası → ML verisi
+  - Dataset dropdown: her zaman en yeni dataset otomatik seçilir (`datasets[0].id`)
+- `SoftwareAnalyticsView.vue` ★ YENİ (`views/manager/`)
+  - Satış sayfasıyla birebir aynı yapı, indigo renk teması
+  - Yazılım API'leri: `getSoftwareDatasets`, `getBulkSoftwareAllTargets`, vb.
+  - **Model Eğit**: tek hedef eğitimi (dropdown seçimi), eğitilen kart anında mora döner
+  - `filteredModelStates`: sadece 4 yeni hedef gösterilir (eski performance_band gizlenir)
+  - `currentTrainingTarget`: hangi kart eğitiliyor göstergesi (spinner + animasyonlu progress bar)
+- `AppLayout.vue`
+  - Yazılım müdürü sidebar "KPI & ML Analizi" → `/manager/software-analytics`
+- `router/index.ts`
+  - `/manager/software-analytics` ve `/admin/software-analytics` rotaları eklendi
+- `AdminDashboard.vue`
+  - "ML Analize Git" → yazılım için `/manager/software-analytics`
+- `DataManagement.vue`
+  - Dosya adından otomatik departman tespiti: "sales/satis" → Satış, "software/yazilim" → Yazılım
+- `AIInsights.vue` tamamen yeniden yazıldı:
+  - **Bölüm 1**: 4 KPI kartı (bileşik risk bazlı)
+  - **Bölüm 2**: 4 risk hedef tanım kartı (açıklama + sınırlar + sinyaller)
+  - **Bölüm 3**: Departman risk dağılımı — her hedef için Satış vs Yazılım progress bar
+  - **Bölüm 4**: Tüm çalışan tablosu — 4 hedef % + bileşik skor, arama + filtre
+  - **Bölüm 5**: Gemini LLM yorumu — 3 bölümlü rapor, aksiyon kartları
+
+#### Aktif Dataset ve Model Durumu
+| Dept | Upload | Dataset | Çalışan | Hedefler |
+|---|---|---|---|---|
+| Satış | #11 | sales_dataset_v3.xlsx | 31 | PD/BK/RS/YR stokastik |
+| Yazılım | #12 | software_dataset_v2.csv | 31 | PD/BK/RS/YR binary |
+
+Yazılım model F1 skorları (Random Forest, test_period_count=8):
+- Performance_Drop: 81.0%, Burnout: 76.3%, Resignation: 79.2%, High_Risk: 81.3%
+
+#### Önemli Teknik Notlar
+- **SE-xxx parse**: `software_ml_service.py` ve `features/software.py`'de `re.sub(r"[^0-9]", "")` ile parse edilir
+- **MGR-SW**: sayısal karakter olmadığı için dataset'te atlanır (tahmin yapılamaz — beklenen)
+- **Gemini model**: `gemini-2.5-flash` — `gemini-1.5-flash` API'den kaldırıldı
+- **Toplu Tara vs LLM Yorumla ayrımı**: Toplu Tara hızlı (ML only), LLM Yorumla yavaş (+Gemini)
+- **Model kartları**: Satışta hepsi birlikte eğitilir, yazılımda dropdown'dan tek tek
+
+---
+
 ## Sonraki Adımlar / Roadmap
 
 - [x] Satış departmanı frontend dashboard'u (Vue 3) — employee/manager/admin görünümleri
 - [x] Satış çalışanı dashboard KPI kartlarını backend'e bağla
-- [x] Tüm 4 ML hedefi eğitilebilir hale getirildi
+- [x] Tüm 4 ML hedefi eğitilebilir hale getirildi (satış + yazılım)
 - [x] Türkçe karakter düzeltmesi (tüm isimler)
 - [x] Hatice Yıldırım — tek satış müdürü (SA-031, dataset'e eklendi)
 - [x] Satış çalışanı login redirect düzeltmesi (router guard async + user restore)
@@ -830,9 +924,14 @@ docker restart propel_frontend
 - [x] Şablon indirme endpoint'i eklendi (GET /admin/uploads/template)
 - [x] Personel Yönetimi: ML performans skoru + risk seviyesi (flight-risk endpoint'e bağlandı)
 - [x] Yapay Zeka İçgörüleri: ML + Gemini AI entegrasyonu (AIInsights.vue tamamen yeniden yazıldı)
-- [x] Gemini API anahtarı entegre edildi (gemini-1.5-flash)
+- [x] Gemini API anahtarı entegre edildi (gemini-2.5-flash)
 - [x] Anket Sonuçları: departman filtresi + Gemini yorum paneli (gerçek q4/q5/q6 yanıtları)
 - [x] Admin menüden "Satış ML Analizi" kaldırıldı
+- [x] Satış ML analizi — 4 hedef tablosu, risk olasılığı, bileşik skor, LLM ayrımı
+- [x] Yazılım ML analizi sayfası eklendi (SoftwareAnalyticsView.vue) — satışla aynı yapı
+- [x] Gerçekçi dataset üretici scriptler (v3 satış, v2 yazılım) — bireysel profil + stokastik etiket
+- [x] bulk-all-targets endpoint'leri (satış + yazılım) — 4 hedef tek çağrıda
+- [x] AIInsights.vue yeniden tasarlandı — risk açıklamaları + grafikler + 4 hedef tablo
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri
 - [ ] LLM/Gemini endpoint'lerini async/background job olarak ayır (şu an bloklayıcı)
@@ -2040,3 +2139,42 @@ docker restart propel_frontend
 - Dogrulama:
   - `npm.cmd run type-check` basarili.
   - `docker restart propel_frontend` calistirildi.
+
+## 2026-06-05 PR #40 Merge Conflict Cozumu
+
+- Kullanici `feat: Yazilim ML analizi, satis 4-hedef tablosu...` baslikli PR #40 branch'ini merge etmek istedigini ve conflict oldugunu soyledi.
+- `refs/pull/40/head` yerel `pr-40` branch'i olarak cekildi; PR head commit'i `2e1ace0`.
+- `origin/master` guncellendi ve `pr-40` icine merge edildi.
+- Gercek conflict sadece `AGENTS.MD` dosyasindaydi. PR tarafinda dosya sonraki adimlarda bitiyor, `origin/master` tarafinda yeni gelistirme gunlugu devam ediyordu; conflict marker'lari kaldirildi ve master tarafindaki guncel gunluk kayitlari korundu.
+- Otomatik merge ile backend/frontend kod dosyalari birlesti; manuel kod conflict'i yoktu.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/api/routers/analytics.py propel-backend/app/services/analytics_service.py propel-backend/app/services/sales_ml_service.py propel-backend/app/services/software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+- Not:
+  - `gh` CLI yüklü degildi; GitHub PR metadata'si yerelden okunamadi.
+  - `origin` remote branch listesinde PR #40 head'i normal branch olarak gorunmuyor, bu nedenle local cozum `pr-40` uzerinde tamamlandi.
+
+## Sonraki Adim
+
+- PR #40 kaynak branch'i fork'taysa merge commit'inin o fork branch'ine pushlanmasi gerekir; bu repoda ayni isimli origin head'i gorunmedi.
+- Alternatif olarak local `pr-40` branch'i yeni bir origin branch olarak pushlanip yeni/updated PR akisi kullanilabilir.
+
+## 2026-06-05 Frontend Genel Mojibake Onarimi
+
+- Kullanici 360 Calisan Raporu ekraninda isim, departman ve takim etiketlerinin `Ahmet Ã–ztÃ¼rk`, `SatÄ±ÅŸ`, `YÄ±lmaz` gibi bozuk sembollerle gorundugunu bildirdi; arkadasinin ortaminda gorunmedigi icin kalici cozum istedi.
+- Kok neden: Daha onceki duzeltmeler sadece `auth.ts` veya belirli dashboard computed alanlarina uygulanmisti; `feedback`, `employee`, `analytics` gibi farkli API response'larindan gelen string'ler merkezi olarak normalize edilmiyordu.
+- `propel-frontend/src/utils/textEncoding.ts` eklendi:
+  - Kaynak dosya encoding'inden etkilenmemek icin Unicode escape tabanli hedefli mojibake replacement kullanir.
+  - `TextDecoder('utf-8')` ile Latin-1/Windows-1252 gibi okunmus UTF-8 byte dizilerini toparlamaya calisir.
+  - Array/object response'lari recursive gezer; Blob, ArrayBuffer ve Date objelerine dokunmaz.
+- `propel-frontend/src/services/api/client.ts` response interceptor'i artik `response.data` uzerindeki tum string'leri `repairMojibakeDeep` ile normalize ediyor.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - Backend ilgili dosyalar icin `py_compile` basarili.
+  - Node smoke orneklerinde `Ali Yilmaz`, `Satis`, `Yazilim Gelistirme`, `Irem Ozkan` turu mojibake girdiler Turkce karakterli hale geldi.
+  - `docker restart propel_frontend` calistirildi; `http://localhost:5173` HTTP 200 dondu.
+
+## Sonraki Adim
+
+- Tarayicida hard refresh veya yeniden login sonrasi 360 Calisan Raporu dahil API'den veri alan ekranlarda isim/departman/takim metinleri merkezi interceptor ile duzelmelidir.
+- Eger eski localStorage/session verisi bozuk kaldiysa cikis-giris yapmak auth store'u da yeni API cevabiyla tazeler.
