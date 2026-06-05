@@ -104,6 +104,7 @@
           </button>
 
           <select
+            v-if="showEmployeePredictionControls"
             v-model.number="mlEmployeeId"
             class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-sm"
           >
@@ -117,6 +118,7 @@
           </select>
 
           <button
+            v-if="showEmployeePredictionControls"
             class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:text-slate-300"
             :disabled="Boolean(mlLoading) || !mlUploadId || !mlEmployeeId"
             @click="loadPrediction()"
@@ -125,6 +127,7 @@
           </button>
 
           <button
+            v-if="activeAnalyticsSection !== 'department'"
             class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-800 shadow-sm disabled:cursor-not-allowed disabled:text-indigo-300"
             :disabled="Boolean(mlLoading) || !mlUploadId"
             @click="loadBulkPredictions()"
@@ -133,21 +136,37 @@
           </button>
 
           <button
+            v-if="activeAnalyticsSection !== 'department'"
             class="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 shadow-sm disabled:cursor-not-allowed disabled:text-violet-300"
             :disabled="Boolean(mlLoading) || !mlUploadId"
             @click="loadBulkPredictions(true)"
           >
             {{ mlLoading === 'narrative' ? 'Yorumlaniyor...' : 'LLM Yorumla' }}
           </button>
+
+          <button
+            v-if="activeAnalyticsSection === 'department'"
+            class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-800 shadow-sm disabled:cursor-not-allowed disabled:text-indigo-300"
+            :disabled="departmentDashboardLoading || !mlUploadId"
+            @click="loadDepartmentDashboard(false)"
+          >
+            {{ departmentDashboardLoading ? 'Yukleniyor...' : 'Departmani Yenile' }}
+          </button>
         </div>
       </div>
 
       <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
         <span
-          v-if="latestSoftwareUpload"
+          v-if="selectedSoftwareUpload"
           class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-600"
         >
-          Son dataset: #{{ latestSoftwareUpload.id }} - {{ latestSoftwareUpload.file_name }}
+          Secili dataset: #{{ selectedSoftwareUpload.id }} - {{ selectedSoftwareUpload.file_name }}
+        </span>
+        <span
+          v-if="latestSoftwareUpload && latestSoftwareUpload.id !== selectedSoftwareUpload?.id"
+          class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-medium text-amber-700"
+        >
+          En son yazilim dataset'i: #{{ latestSoftwareUpload.id }} - {{ latestSoftwareUpload.file_name }}
         </span>
         <span
           v-if="trainingResult"
@@ -1674,6 +1693,135 @@
       class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_360px] gap-6"
     >
       <div class="xl:col-span-2 space-y-5">
+        <div
+          v-if="departmentDashboardError"
+          class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm leading-6 text-rose-700"
+        >
+          {{ departmentDashboardError }}
+        </div>
+
+        <div
+          v-if="departmentDashboardLoading && !departmentDashboard"
+          class="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm font-semibold text-slate-500 shadow-sm"
+        >
+          Departman ML dashboard'u yukleniyor...
+        </div>
+
+        <template v-if="departmentDashboard">
+          <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Birlesik Departman ML Analizi</p>
+                <h3 class="mt-1 text-xl font-bold text-slate-900">{{ departmentDashboard.department.name }} departmaninin genel resmi</h3>
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  KPI/ML, haftalik nabiz ve 360 feedback sinyalleri backend tarafinda birlestirilerek hesaplandi.
+                </p>
+              </div>
+              <span class="w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                Dataset #{{ departmentDashboard.upload_id }} / {{ departmentDashboard.period }}
+              </span>
+            </div>
+
+            <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <article
+                v-for="card in departmentDashboardCards"
+                :key="card.label"
+                class="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+              >
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ card.label }}</p>
+                <p
+                  class="mt-3 text-3xl font-black"
+                  :class="{
+                    'text-slate-900': card.tone === 'slate',
+                    'text-emerald-600': card.tone === 'emerald',
+                    'text-amber-500': card.tone === 'amber',
+                    'text-rose-600': card.tone === 'rose',
+                  }"
+                >
+                  {{ card.value }}
+                </p>
+                <p class="mt-2 text-sm font-medium text-slate-500">{{ card.hint }}</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+            <div class="rounded-2xl border border-violet-100 bg-violet-50/70 p-6 shadow-sm">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">Yonetici Ozeti</p>
+                  <h3 class="mt-1 text-lg font-bold text-slate-900">{{ departmentDashboard.ai_summary.summary }}</h3>
+                </div>
+                <span class="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-semibold text-violet-700">
+                  {{ narrativeSourceLabel(departmentDashboard.ai_summary.source) }}
+                </span>
+              </div>
+
+              <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div class="rounded-xl border border-white/70 bg-white p-4">
+                  <p class="text-xs font-semibold text-slate-500">Guclu Sinyaller</p>
+                  <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                    <li v-for="item in departmentDashboard.ai_summary.strengths" :key="item">- {{ item }}</li>
+                  </ul>
+                </div>
+                <div class="rounded-xl border border-white/70 bg-white p-4">
+                  <p class="text-xs font-semibold text-slate-500">Riskler</p>
+                  <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                    <li v-for="item in departmentDashboard.ai_summary.risks" :key="item">- {{ item }}</li>
+                  </ul>
+                </div>
+                <div class="rounded-xl border border-white/70 bg-white p-4">
+                  <p class="text-xs font-semibold text-slate-500">Oneriler</p>
+                  <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                    <li v-for="item in departmentDashboard.ai_summary.recommendations" :key="item">- {{ item }}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <aside class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Aksiyonlar</p>
+              <div class="mt-4 space-y-3">
+                <div
+                  v-for="action in departmentDashboardActions"
+                  :key="`${action.priority}-${action.title}`"
+                  class="rounded-xl border border-slate-100 bg-slate-50 p-4"
+                >
+                  <p class="text-sm font-bold text-slate-900">{{ action.title }}</p>
+                  <p class="mt-1 text-xs leading-5 text-slate-600">{{ action.description }}</p>
+                  <p class="mt-2 text-xs font-semibold text-indigo-700">{{ action.owner }} / {{ action.due_date }}</p>
+                </div>
+              </div>
+            </aside>
+          </section>
+
+          <section class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <article
+              v-for="source in departmentDashboardSources"
+              :key="source.key"
+              class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-bold text-slate-900">{{ source.label }}</p>
+                  <p class="mt-1 text-xs font-semibold text-slate-500">{{ source.status }}</p>
+                </div>
+                <span class="text-xl font-black text-slate-900">{{ Math.round(source.score) }}/100</span>
+              </div>
+              <dl class="mt-4 space-y-2 text-xs text-slate-600">
+                <div
+                  v-for="(value, key) in source.metrics"
+                  :key="String(key)"
+                  class="flex items-center justify-between gap-3"
+                >
+                  <dt class="font-medium">{{ key }}</dt>
+                  <dd class="font-bold text-slate-900">{{ value }}</dd>
+                </div>
+              </dl>
+            </article>
+          </section>
+        </template>
+
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <article
             v-for="card in kpiDepartmentCards"
@@ -2219,6 +2367,7 @@ import {
   type DepartmentAnalyticsOverviewResponse,
   type DepartmentPerformanceSummaryResponse,
   type SoftwareBulkPredictionResponse,
+  type SoftwareDepartmentDashboardResponse,
   type SoftwareDatasetEmployeeResponse,
   type SoftwareDatasetResponse,
   type SoftwareModelStateResponse,
@@ -2251,6 +2400,9 @@ const mlError = ref<string | null>(null)
 const trainingResult = ref<SoftwareModelTrainResponse | null>(null)
 const predictionResult = ref<SoftwarePredictionResponse | null>(null)
 const bulkPredictionResult = ref<SoftwareBulkPredictionResponse | null>(null)
+const departmentDashboard = ref<SoftwareDepartmentDashboardResponse | null>(null)
+const departmentDashboardLoading = ref(false)
+const departmentDashboardError = ref<string | null>(null)
 const softwareDatasets = ref<SoftwareDatasetResponse[]>([])
 const datasetEmployees = ref<SoftwareDatasetEmployeeResponse[]>([])
 const modelStates = ref<SoftwareModelStateResponse[]>([])
@@ -2289,7 +2441,7 @@ let revealObserver: IntersectionObserver | null = null
 type AnalyticsSectionKey = 'model' | 'department' | 'teams' | 'watchlist' | 'technical'
 const analyticsSectionKeys: AnalyticsSectionKey[] = ['model', 'department', 'teams', 'watchlist', 'technical']
 const activeAnalyticsSection = ref<AnalyticsSectionKey>('model')
-const bulkSections: AnalyticsSectionKey[] = ['department', 'teams', 'watchlist', 'technical']
+const bulkSections: AnalyticsSectionKey[] = ['teams', 'watchlist', 'technical']
 const teamTimeRanges = [
   { label: 'Son 1 Ay', value: '1m' },
   { label: 'Son 3 Ay', value: '3m' },
@@ -2312,6 +2464,14 @@ const softwareUploads = computed(() =>
 )
 
 const latestSoftwareUpload = computed(() => softwareUploads.value[0] || null)
+
+const selectedSoftwareUpload = computed(() =>
+  softwareUploads.value.find((upload) => upload.id === mlUploadId.value) || null
+)
+
+const showEmployeePredictionControls = computed(() =>
+  activeAnalyticsSection.value === 'watchlist' || activeAnalyticsSection.value === 'technical'
+)
 
 const selectedTargetState = computed(() =>
   modelStates.value.find((item) => item.target_column === mlTargetColumn.value) || null
@@ -2441,6 +2601,46 @@ const kpiRoleChartOptions = computed<ChartOptions<'bar'>>(() => ({
 }))
 
 const departmentNarrative = computed(() => bulkPredictionResult.value?.department_narrative || null)
+
+const departmentDashboardCards = computed(() => {
+  const dashboard = departmentDashboard.value
+  return [
+    {
+      label: 'Departman Sagligi',
+      value: dashboard ? `${Math.round(dashboard.scores.department_health)}/100` : '-',
+      hint: dashboard ? `Guven ${Math.round(dashboard.scores.confidence_score)} / Risk ${Math.round(dashboard.scores.risk_score)}` : 'ML dashboard bekleniyor',
+      tone: 'emerald',
+    },
+    {
+      label: 'KPI/ML Skoru',
+      value: dashboard ? `${Math.round(dashboard.sources.kpiMl?.score ?? 0)}/100` : '-',
+      hint: dashboard ? `${dashboard.coverage.kpi_employee_count} calisan ML kapsaminda` : 'Dataset secilmeli',
+      tone: 'slate',
+    },
+    {
+      label: 'Nabiz Kapsami',
+      value: dashboard ? `%${Math.round(dashboard.coverage.pulse_percentage)}` : '-',
+      hint: dashboard ? `${dashboard.coverage.pulse_response_count} yanit` : 'Anket verisi bekleniyor',
+      tone: 'amber',
+    },
+    {
+      label: '360 Kapsami',
+      value: dashboard ? `%${Math.round(dashboard.coverage.feedback_percentage)}` : '-',
+      hint: dashboard ? `${dashboard.coverage.feedback_response_count} feedback` : 'Feedback verisi bekleniyor',
+      tone: 'rose',
+    },
+  ]
+})
+
+const departmentDashboardSources = computed(() =>
+  Object.entries(departmentDashboard.value?.sources || {}).map(([key, source]) => ({ key, ...source }))
+)
+
+const departmentDashboardActions = computed(() => {
+  const actions = departmentDashboard.value?.actions
+  if (!actions) return []
+  return [...actions.urgent, ...actions.this_week, ...actions.monitoring].slice(0, 5)
+})
 
 const teamDashboardLoading = computed(() =>
   activeAnalyticsSection.value === 'teams'
@@ -4089,6 +4289,30 @@ async function loadOverview() {
   }
 }
 
+async function loadDepartmentDashboard(useLlm = false) {
+  if (selectedDepartment.value !== 'software' || !mlUploadId.value) {
+    departmentDashboard.value = null
+    departmentDashboardError.value = null
+    return
+  }
+
+  departmentDashboardLoading.value = true
+  departmentDashboardError.value = null
+  try {
+    departmentDashboard.value = await analyticsApi.getSoftwareDepartmentDashboard({
+      upload_id: mlUploadId.value,
+      target_column: mlTargetColumn.value,
+      period: 'week',
+      use_llm: useLlm,
+    })
+  } catch (err: any) {
+    departmentDashboard.value = null
+    departmentDashboardError.value = err.response?.data?.detail || 'Departman ML dashboard yuklenemedi.'
+  } finally {
+    departmentDashboardLoading.value = false
+  }
+}
+
 async function trainModel() {
   if (!mlUploadId.value) return
   mlLoading.value = 'train'
@@ -4103,6 +4327,7 @@ async function trainModel() {
     activeAnalyticsSection.value = 'model'
     predictionResult.value = null
     bulkPredictionResult.value = null
+    departmentDashboard.value = null
   } catch (err: any) {
     mlError.value = err.response?.data?.detail || 'Model egitimi basarisiz oldu.'
   } finally {
@@ -4213,8 +4438,12 @@ watch(mlTargetColumn, () => {
   trainingResult.value = null
   predictionResult.value = null
   bulkPredictionResult.value = null
+  departmentDashboard.value = null
   selectedTeamAnalysisName.value = ''
   selectedTeamDetailVisible.value = false
+  if (activeAnalyticsSection.value === 'department') {
+    loadDepartmentDashboard(false)
+  }
 })
 
 watch(filteredTeamRiskSummaries, (teams) => {
@@ -4250,14 +4479,24 @@ watch(mlUploadId, () => {
   trainingResult.value = null
   predictionResult.value = null
   bulkPredictionResult.value = null
+  departmentDashboard.value = null
   selectedTeamDetailVisible.value = false
   loadDatasetEmployees()
+  if (activeAnalyticsSection.value === 'department') {
+    loadDepartmentDashboard(false)
+  }
 })
 
 watch([activeAnalyticsSection, mlUploadId], ([section, uploadId]) => {
   if (section !== 'teams') return
   if (!uploadId || bulkPredictionResult.value || mlLoading.value) return
   loadBulkPredictions(false)
+})
+
+watch([activeAnalyticsSection, mlUploadId], ([section, uploadId]) => {
+  if (section !== 'department') return
+  if (!uploadId || departmentDashboard.value || departmentDashboardLoading.value) return
+  loadDepartmentDashboard(false)
 })
 
 watch(
@@ -4285,6 +4524,9 @@ onMounted(async () => {
   await loadUploadHistory()
   await loadDatasetEmployees()
   await loadOverview()
+  if (activeAnalyticsSection.value === 'department') {
+    await loadDepartmentDashboard(false)
+  }
   await nextTick()
   setupRevealAnimations()
 })

@@ -39,14 +39,18 @@
 
     <div class="grid grid-cols-2 gap-2 text-xs">
       <div class="rounded-lg bg-white/70 px-3 py-2">
-        <p class="text-slate-400">Target</p>
+        <p class="text-slate-400">Hedef</p>
         <p class="mt-1 font-bold text-slate-700">{{ card.target }}</p>
       </div>
       <div class="rounded-lg bg-white/70 px-3 py-2">
-        <p class="text-slate-400">vs Ort</p>
+        <p class="text-slate-400">Kaynak</p>
         <p class="mt-1 font-bold text-slate-700">{{ card.benchmark }}</p>
       </div>
     </div>
+
+    <p v-if="card.sourceNote" class="mt-3 rounded-lg bg-white/60 px-3 py-2 text-xs leading-5 text-slate-600">
+      {{ card.sourceNote }}
+    </p>
   </div>
 </template>
 
@@ -70,6 +74,7 @@ defineProps<{
     statusLabel: string
     statusSurfaceClass: string
     statusBadgeClass: string
+    sourceNote?: string
   }
 }>()
 </script>

@@ -3,6 +3,50 @@ import { ref, computed } from 'vue'
 import { authApi } from '@/services/api/auth.api'
 import type { LoginCredentials, User } from '@/services/types/auth.types'
 
+const mojibakeReplacements: Array<[RegExp, string]> = [
+  [/Ä±/g, 'ı'],
+  [/Ä°/g, 'İ'],
+  [/ÄŸ/g, 'ğ'],
+  [/Äž/g, 'Ğ'],
+  [/ÅŸ/g, 'ş'],
+  [/Åž/g, 'Ş'],
+  [/Ã¼/g, 'ü'],
+  [/Ãœ/g, 'Ü'],
+  [/Ã¶/g, 'ö'],
+  [/Ã–/g, 'Ö'],
+  [/Ã§/g, 'ç'],
+  [/Ã‡/g, 'Ç'],
+]
+
+function repairMojibakeText(value?: string | null) {
+  if (!value) return value
+
+  let repaired = value
+  for (let index = 0; index < 2; index += 1) {
+    try {
+      const decoded = decodeURIComponent(escape(repaired))
+      if (decoded === repaired) break
+      repaired = decoded
+    } catch {
+      break
+    }
+  }
+
+  for (const [pattern, replacement] of mojibakeReplacements) {
+    repaired = repaired.replace(pattern, replacement)
+  }
+  return repaired
+}
+
+function normalizeUserText(nextUser: User | null) {
+  if (!nextUser) return nextUser
+  return {
+    ...nextUser,
+    full_name: repairMojibakeText(nextUser.full_name) || nextUser.full_name,
+    department_name: repairMojibakeText(nextUser.department_name) || nextUser.department_name,
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const token = ref<string | null>(localStorage.getItem('token'))
@@ -76,7 +120,7 @@ export const useAuthStore = defineStore('auth', () => {
       'manager.satis@propel.com': {
         id: 155,
         email: 'manager.satis@propel.com',
-        full_name: 'Mehmet Satis',
+        full_name: 'Hatice Yildirim',
         role: 'department_manager',
         is_active: true,
         department_id: 18,
@@ -119,7 +163,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (mockUser) {
       token.value = 'mock-token-' + credentials.username
-      user.value = mockUser
+      user.value = normalizeUserText(mockUser)
       localStorage.setItem('token', token.value)
       localStorage.setItem('role', mockUser.role)
       localStorage.setItem('userEmail', mockUser.email)
@@ -159,7 +203,7 @@ export const useAuthStore = defineStore('auth', () => {
             'manager.satis@propel.com': {
               id: 155,
               email: 'manager.satis@propel.com',
-              full_name: 'Mehmet Satis',
+              full_name: 'Hatice Yildirim',
               role: 'department_manager',
               is_active: true,
               department_id: 18,
@@ -197,12 +241,12 @@ export const useAuthStore = defineStore('auth', () => {
               created_at: new Date().toISOString()
             }
           }
-          user.value = mockUsers[email] || null
+          user.value = normalizeUserText(mockUsers[email] || null)
         }
         return
       }
 
-      user.value = await authApi.getCurrentUser()
+      user.value = normalizeUserText(await authApi.getCurrentUser())
     } catch (err) {
       console.error('Kullanıcı bilgileri alınamadı:', err)
       logout()

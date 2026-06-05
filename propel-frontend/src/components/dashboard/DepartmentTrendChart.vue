@@ -4,6 +4,7 @@
       <div>
         <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{{ eyebrow }}</p>
         <h3 class="mt-1 text-lg font-bold text-slate-900">{{ title }}</h3>
+        <p v-if="description" class="mt-2 max-w-4xl text-sm leading-6 text-slate-600">{{ description }}</p>
       </div>
       <div class="flex flex-wrap gap-2 text-xs font-semibold">
         <span class="rounded-full bg-blue-50 px-3 py-1 text-blue-700">Performans</span>
@@ -14,6 +15,21 @@
 
     <div class="mt-6 h-[400px]">
       <Line :data="chartData" :options="chartOptions" />
+    </div>
+
+    <div v-if="showGuide" class="mt-5 grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 md:grid-cols-3">
+      <div class="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+        <p class="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">Performans</p>
+        <p class="mt-1 text-xs leading-5 text-slate-700">KPI/ML modelinden gelen takım performans skorudur. Düşük değer, modelin o takımda daha yüksek performans riski gördüğünü anlatır.</p>
+      </div>
+      <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+        <p class="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Kapasite</p>
+        <p class="mt-1 text-xs leading-5 text-slate-700">Haftalık nabız yanıtlarından okunan motivasyon/bağlılık sinyalidir. Takımın sürdürülebilir çalışma kapasitesini yorumlamak için kullanılır.</p>
+      </div>
+      <div class="rounded-xl border border-rose-100 bg-rose-50/60 p-3">
+        <p class="text-xs font-bold uppercase tracking-[0.12em] text-rose-700">Risk Skoru</p>
+        <p class="mt-1 text-xs leading-5 text-slate-700">KPI/ML, nabız ve 360 risklerinin birleşik özetidir. Yüksek değer daha fazla yönetici müdahalesi ihtiyacı demektir.</p>
+      </div>
     </div>
   </div>
 </template>
@@ -54,11 +70,16 @@ export type DepartmentTrendPoint = {
 const props = withDefaults(defineProps<{
   title: string
   eyebrow?: string
+  description?: string
   data: DepartmentTrendPoint[]
   target?: number
+  xLabelPrefix?: string
+  showGuide?: boolean
 }>(), {
   eyebrow: 'Trend Chart',
   target: 85,
+  xLabelPrefix: 'Ay',
+  showGuide: false,
 })
 
 const chartData = computed(() => {
@@ -155,7 +176,7 @@ const chartOptions = computed(() => ({
           return `${context.dataset.label}: ${value}`
         },
         title(items: any[]) {
-          return items.length ? `Ay: ${items[0].label}` : ''
+          return items.length ? `${props.xLabelPrefix}: ${items[0].label}` : ''
         },
       },
     },
@@ -174,7 +195,7 @@ const chartOptions = computed(() => ({
       },
       title: {
         display: true,
-        text: 'Score / Value',
+        text: 'Skor (0-100)',
         color: '#64748b',
       },
     },
