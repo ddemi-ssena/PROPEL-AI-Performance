@@ -212,6 +212,7 @@ export interface SoftwarePredictionResponse {
   employee_id: number
   target_column: string
   predicted_band: string
+  risk_score?: number
   confidence: number
   probabilities: Record<string, number>
   top_features: Array<Record<string, any>>

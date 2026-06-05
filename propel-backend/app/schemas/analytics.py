@@ -220,6 +220,7 @@ class SoftwarePredictionResponse(BaseModel):
     employee_id: int
     target_column: str
     predicted_band: str
+    risk_score: int = 0
     confidence: float
     probabilities: dict[str, float]
     top_features: list[dict]
