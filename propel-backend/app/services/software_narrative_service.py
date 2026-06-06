@@ -201,8 +201,23 @@ class SoftwareNarrativeService:
         enriched = dict(fallback)
         enriched["llm_attempted"] = bool(provider)
         enriched["requested_source"] = provider
-        enriched["fallback_reason"] = reason
+        enriched["fallback_reason"] = SoftwareNarrativeService._friendly_llm_error(reason)
         return enriched
+
+    @staticmethod
+    def _friendly_llm_error(reason: str) -> str:
+        normalized = str(reason or "")
+        lowered = normalized.lower()
+        if "429" in lowered or "quota" in lowered or "too many requests" in lowered:
+            return (
+                "Gemini kotasi doldugu icin bu yorum LLM ile uretilemedi; "
+                "asagidaki analiz admin ML sonucu ve KPI driver kurallariyla hazirlandi."
+            )
+        if "provider ayarli degil" in lowered:
+            return "LLM provider ayarli degil; asagidaki analiz admin ML sonucu ve KPI driver kurallariyla hazirlandi."
+        if "json" in lowered:
+            return "LLM yaniti beklenen formatta gelmedigi icin deterministik KPI analizi kullanildi."
+        return "LLM yaniti alinamadigi icin deterministik KPI analizi kullanildi."
 
     @staticmethod
     def _generate_llm_json(
@@ -391,6 +406,9 @@ class SoftwareNarrativeService:
         risk_score = int(prediction.risk_score or 0)
         driver_phrase = SoftwareNarrativeService._driver_phrase(prediction.top_drivers[:3])
         support_lens = SoftwareNarrativeService._support_lens(prediction)
+        impact_text = SoftwareNarrativeService._driver_manager_impact(metric_name)
+        trend_text = SoftwareNarrativeService._human_trend_text(trend_signal)
+        status_text = SoftwareNarrativeService._human_status_text(threshold_status)
 
         return {
             "source": "deterministic",
@@ -400,13 +418,14 @@ class SoftwareNarrativeService:
             "manager_summary": (
                 f"{employee_label} icin admin ensemble modeli {prediction.predicted_band} sonucunu "
                 f"%{round(prediction.confidence * 100, 1)} guvenle uretti; model risk skoru {risk_score}/100. "
-                f"Kisi {team} takimi icinde takip ediliyor. "
-                f"En belirgin sinyal {metric_name}; {support_lens}"
+                f"{team} takimi icinde ana sinyal {metric_name}. "
+                f"{impact_text} Yonetici karari, bu kisiyi etiketlemekten cok bu haftaki blokaj/destek ihtiyacini netlestirmeye odaklanmali; {support_lens}"
             ),
             "risk_interpretation": (
-                f"{metric_name} su anda {threshold_status.lower()} ve {trend_signal.lower()}. "
-                f"Ilk uc driver okumasinda {driver_phrase}. "
-                "Bu yorum dataset satirlarindan uretilen son donem feature degeri, KPI Registry esikleri ve 4 haftalik trend sinyaliyle hesaplandi."
+                f"{metric_name} icin okuma: {status_text}; {trend_text}. "
+                f"Ilk uc driverin manager diliyle ozeti: {driver_phrase}. "
+                "Bu yorum son donem dataset feature degeri, KPI Registry esigi ve 4 haftalik trend sinyalinden uretildi; "
+                "kisiyi etiketlemek icin degil, gorusme onceligini ve destek planini netlestirmek icin kullanilmali."
             ),
             "next_best_actions": [item["title"] for item in action_plan] or [primary_action],
             "action_plan": action_plan,
@@ -427,6 +446,7 @@ class SoftwareNarrativeService:
         risk_score = int(prediction.risk_score or 0)
         stress_driver = SoftwareNarrativeService._find_driver(prediction, ("is yuku", "asiri", "toplanti", "stres"))
         motivation_driver = SoftwareNarrativeService._find_driver(prediction, ("motivasyon", "gelisim"))
+        seen_plan_keys: set[str] = set()
         for index, driver in enumerate(prediction.top_drivers[:3]):
             metric_name = str(driver.get("metric_name") or "KPI sinyali")
             category = str(driver.get("category") or "Genel")
@@ -437,6 +457,10 @@ class SoftwareNarrativeService:
                 if index < len(prediction.recommended_actions)
                 else "Ilgili KPI kirilimi ekip lideriyle birlikte incelenmeli."
             )
+            plan_key = SoftwareNarrativeService._plan_group_key(metric_name, category)
+            if plan_key in seen_plan_keys:
+                continue
+            seen_plan_keys.add(plan_key)
 
             plans.append(
                 {
@@ -553,12 +577,69 @@ class SoftwareNarrativeService:
         if motivation_driver and motivation_driver is not driver:
             secondary.append(f"motivasyon: {motivation_driver.get('threshold_status', 'izleme')} - {motivation_driver.get('trend_signal', 'trend yok')}")
         secondary_text = f" Ek sinyal: {'; '.join(secondary)}." if secondary else ""
+        status_text = SoftwareNarrativeService._human_status_text(threshold_status)
+        trend_text = SoftwareNarrativeService._human_trend_text(trend_signal)
+        impact_text = SoftwareNarrativeService._driver_manager_impact(metric_name)
         return (
-            f"{context} baglaminda {metric_name} {threshold_status.lower()} ve {trend_signal.lower()}; "
-            f"model risk skoru {risk_score}/100. {value} "
-            f"Bu nedenle {category.lower()} basliginda genel takip degil, calisanin rol kapsami ve haftalik teslim ritmine bagli hedefli aksiyon oneriliyor."
+            f"{context} icin {metric_name}: {status_text}; {trend_text}. "
+            f"Model risk skoru {risk_score}/100. {value} {impact_text} "
+            f"Bu nedenle {category.lower()} basliginda genel takip degil, bu haftaki is akisi ve destek ihtiyacina bagli net aksiyon oneriliyor."
             f"{secondary_text}"
         )
+
+    @staticmethod
+    def _human_status_text(threshold_status: str) -> str:
+        normalized = str(threshold_status or "").lower()
+        if "risk" in normalized or "altinda" in normalized or "ustunde" in normalized:
+            return "KPI esigi risk bolgesinde"
+        if "izleme" in normalized:
+            return "KPI henuz kritik degil ama izleme bandinda"
+        if "guclu" in normalized or "iyi" in normalized:
+            return "KPI su an guclu bandda"
+        return threshold_status or "KPI durumu sinirli"
+
+    @staticmethod
+    def _human_trend_text(trend_signal: str) -> str:
+        normalized = str(trend_signal or "").lower()
+        if "olumsuz" in normalized or "dus" in normalized or "negatif" in normalized:
+            return "son 4 haftada yon kotulesiyor"
+        if "iyiles" in normalized or "pozitif" in normalized or "art" in normalized:
+            return "son 4 haftada toparlanma sinyali var"
+        if "stabil" in normalized or "yatay" in normalized:
+            return "son 4 haftada belirgin kirilim yok"
+        return trend_signal or "trend verisi sinirli"
+
+    @staticmethod
+    def _driver_manager_impact(metric_name: str) -> str:
+        normalized = metric_name.lower()
+        if "gorev tamamlama" in normalized:
+            return "Bu sinyal genelde task kapsam belirsizligi, bagimlilik veya hafta ici oncelik degisimiyle iliskilidir."
+        if "zamaninda teslim" in normalized or "teslim" in normalized:
+            return "Bu sinyal teslim ritmi, blokaj gorunurlugu ve planlama gercekligiyle birlikte okunmalidir."
+        if "bug" in normalized or "hata" in normalized:
+            return "Bu sinyal kalite kontrol noktasi, test kapsami veya review derinligiyle iliskili olabilir."
+        if "motivasyon" in normalized:
+            return "Bu sinyal enerji, aidiyet ve gelisim beklentisiyle birlikte konusulmalidir."
+        if "katki" in normalized:
+            return "Bu sinyal is dagilimi, gorunurluk ve rol beklentisiyle birlikte degerlendirilmelidir."
+        if "is yuku" in normalized or "toplanti" in normalized:
+            return "Bu sinyal kapasite, odak zamani ve surdurulebilir tempo acisindan okunmalidir."
+        return "Bu sinyal tek basina karar degil, yonetici gorusmesi icin onceliklendirme isaretidir."
+
+    @staticmethod
+    def _plan_group_key(metric_name: str, category: str) -> str:
+        normalized = f"{metric_name} {category}".lower()
+        if "gorev tamamlama" in normalized or "zamaninda teslim" in normalized or "teslim" in normalized:
+            return "delivery"
+        if "bug" in normalized or "review" in normalized or "kalite" in normalized:
+            return "quality"
+        if "motivasyon" in normalized or "gelisim" in normalized:
+            return "motivation"
+        if "is yuku" in normalized or "toplanti" in normalized or "stres" in normalized:
+            return "capacity"
+        if "katki" in normalized:
+            return "contribution"
+        return normalized[:40]
 
     @staticmethod
     def _owner_for_category(category: str) -> str:
@@ -652,8 +733,8 @@ class SoftwareNarrativeService:
         phrases = []
         for driver in drivers:
             name = driver.get("metric_name") or "KPI sinyali"
-            status = str(driver.get("threshold_status") or "izleme").lower()
-            trend = str(driver.get("trend_signal") or "trend yok").lower()
+            status = SoftwareNarrativeService._human_status_text(str(driver.get("threshold_status") or "izleme"))
+            trend = SoftwareNarrativeService._human_trend_text(str(driver.get("trend_signal") or "trend yok"))
             phrases.append(f"{name}: {status}, {trend}")
         return "; ".join(phrases) if phrases else "aciklanabilir surucu listesi sinirli"
 

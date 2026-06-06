@@ -465,6 +465,7 @@ class SalesPredictionResponse(BaseModel):
     predicted_band: str
     confidence: float
     probabilities: dict[str, float]
+    risk_score: int | None = None
     top_features: list[dict]
     risk_summary: str
     top_drivers: list[dict]

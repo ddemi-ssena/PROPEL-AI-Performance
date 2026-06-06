@@ -397,6 +397,37 @@ class FeedbackService:
         }
 
     @staticmethod
+    def _feedback_type_label_tr(feedback_type: FeedbackType) -> str:
+        labels = {
+            FeedbackType.manager_to_employee: "Yoneticiden Calisana",
+            FeedbackType.employee_to_manager: "Calisandan Yoneticiye",
+            FeedbackType.peer_to_peer: "Es Degerlendirme",
+            FeedbackType.self_assessment: "Oz Degerlendirme",
+        }
+        return labels.get(feedback_type, "360 Derece Geri Bildirim")
+
+    @staticmethod
+    def _classic_feedback_question_text(feedback: Feedback) -> str:
+        answered = []
+        if feedback.strength_text:
+            answered.append(f"Guclu yonleri nelerdir? {feedback.strength_text.strip()}")
+        if feedback.improvement_text:
+            answered.append(f"Gelistirmesi gereken alanlar nelerdir? {feedback.improvement_text.strip()}")
+        if feedback.general_comment:
+            answered.append(f"Genel 360 derece feedback yorumu nedir? {feedback.general_comment.strip()}")
+        return "\n".join(answered) or "Klasik 360 derece feedback yorumu"
+
+    @staticmethod
+    def _classic_feedback_response_text(feedback: Feedback) -> str:
+        return " ".join(
+            [
+                feedback.strength_text or "",
+                feedback.improvement_text or "",
+                feedback.general_comment or "",
+            ]
+        ).strip()
+
+    @staticmethod
     def _current_slot_for_sender(
         db: Session,
         *,
@@ -1194,5 +1225,101 @@ class FeedbackService:
         except Exception:
             db.rollback()
             logger.exception("weekly_feedback_analysis_background_failed feedback_response_id=%s", feedback_response_id)
+        finally:
+            db.close()
+
+    @staticmethod
+    def process_classic_feedback_analysis(db: Session, feedback_id: int) -> None:
+        feedback = db.query(Feedback).filter(Feedback.id == feedback_id).first()
+        if not feedback:
+            logger.warning("classic_feedback_analysis_skipped_missing_row feedback_id=%s", feedback_id)
+            return
+        if feedback.nlp_record:
+            return
+
+        reviewee = feedback.reviewee
+        if not reviewee or not reviewee.user:
+            logger.warning("classic_feedback_analysis_skipped_missing_context feedback_id=%s", feedback_id)
+            return
+
+        response_text = FeedbackService._classic_feedback_response_text(feedback)
+        if not response_text:
+            logger.warning("classic_feedback_analysis_skipped_empty_text feedback_id=%s", feedback_id)
+            return
+
+        quality_payload = FeedbackService._detect_low_quality_feedback(response_text)
+        dept_name = reviewee.department.name if reviewee.department else "Genel"
+        analysis_payload, model_provider, model_name = AIService.analyze_weekly_feedback(
+            dept_name=dept_name,
+            target_role=reviewee.user.role,
+            week_theme="Klasik 360 Derece Feedback",
+            direction_label_tr=FeedbackService._feedback_type_label_tr(feedback.feedback_type),
+            question_text=FeedbackService._classic_feedback_question_text(feedback),
+            response_text=response_text,
+            score_communication=float(feedback.score_communication or 0),
+            score_teamwork=float(feedback.score_teamwork or 0),
+            score_leadership=float(feedback.score_leadership or 0),
+            score_technical=float(feedback.score_technical or feedback.score_problem_solving or 0),
+        )
+
+        quality_flags: list[str] = []
+        if quality_payload["is_low_quality"]:
+            quality_flags.append("dusuk_veri_kalitesi")
+
+        existing_risk_flags = [
+            str(item).strip()
+            for item in (analysis_payload.get("risk_flags") or [])
+            if str(item).strip()
+        ]
+        analysis_payload["risk_flags"] = list(dict.fromkeys(existing_risk_flags + quality_flags))
+        analysis_payload["quality_signal"] = quality_payload
+        analysis_payload["source_context"] = {
+            "source_type": "classic_feedback",
+            "feedback_type": feedback.feedback_type.value if feedback.feedback_type else None,
+            "period_date": feedback.period_date.isoformat() if feedback.period_date else None,
+            "is_anonymous": bool(feedback.is_anonymous),
+            "is_voice_input": bool(feedback.is_voice_input),
+        }
+
+        NLPService.save_classic_feedback_analysis(
+            db,
+            feedback=feedback,
+            analysis_payload=analysis_payload,
+            analysis_version="v1",
+            model_provider=model_provider,
+            model_name=model_name,
+        )
+
+        period_date = feedback.period_date or datetime.utcnow().date()
+        period_week = FeedbackService.get_week_of_month(period_date)
+        NLPService.rebuild_employee_profile(
+            db,
+            employee_id=reviewee.id,
+            period_type=NLPPeriodType.weekly,
+            period_year=period_date.year,
+            period_month=period_date.month,
+            period_week=period_week,
+        )
+        NLPService.refresh_employee_monthly_badges(
+            db,
+            employee_id=reviewee.id,
+            period_year=period_date.year,
+            period_month=period_date.month,
+        )
+        RAGService.upsert_classic_feedback_memory(
+            db,
+            feedback=feedback,
+            analysis_payload=analysis_payload,
+        )
+        db.commit()
+
+    @staticmethod
+    def process_classic_feedback_analysis_in_background(feedback_id: int) -> None:
+        db = SessionLocal()
+        try:
+            FeedbackService.process_classic_feedback_analysis(db, feedback_id)
+        except Exception:
+            db.rollback()
+            logger.exception("classic_feedback_analysis_background_failed feedback_id=%s", feedback_id)
         finally:
             db.close()

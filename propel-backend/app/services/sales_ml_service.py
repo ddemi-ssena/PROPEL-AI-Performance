@@ -111,6 +111,7 @@ class SalesMLService:
             predicted_band=prediction.predicted_band,
             confidence=prediction.confidence,
             probabilities=prediction.probabilities,
+            risk_score=SalesMLService._probability_risk_score(prediction.probabilities, prediction.predicted_band),
             top_features=prediction.top_features,
             risk_summary=prediction.risk_summary,
             top_drivers=prediction.top_drivers,
@@ -388,6 +389,27 @@ class SalesMLService:
         return candidate_ids | normalized_ids
 
     @staticmethod
+    def _load_current_artifact_for_upload(upload_id: int, target_column: str):
+        try:
+            artifact = SalesArtifactStore().load(target_column)
+        except FileNotFoundError as exc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{target_column} icin egitilmis sales model artifact'i bulunamadi.",
+            ) from exc
+
+        artifact_upload_id = artifact.metadata.get("upload_id") if artifact.metadata else None
+        if artifact_upload_id != upload_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Bu satis dataset'i icin admin tarafinda current egitilmis model bulunamadi. "
+                    f"Secili upload_id={upload_id}, current artifact upload_id={artifact_upload_id}."
+                ),
+            )
+        return artifact
+
+    @staticmethod
     def train_from_upload(
         db: Session,
         upload_id: int,
@@ -465,13 +487,8 @@ class SalesMLService:
             )
 
         try:
-            artifact = SalesArtifactStore().load(target_column)
+            artifact = SalesMLService._load_current_artifact_for_upload(upload_id, target_column)
             prediction = SalesPredictionService.predict_latest(artifact, employee_rows)
-        except FileNotFoundError as exc:
-            raise HTTPException(
-                status_code=404,
-                detail=f"{target_column} icin egitilmis sales model artifact'i bulunamadi.",
-            ) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -519,13 +536,7 @@ class SalesMLService:
             raise HTTPException(status_code=404, detail="Upload icinde tahmin icin employee_id bulunamadi.")
 
         stage_start = time.perf_counter()
-        try:
-            artifact = SalesArtifactStore().load(target_column)
-        except FileNotFoundError as exc:
-            raise HTTPException(
-                status_code=404,
-                detail=f"{target_column} icin egitilmis sales model artifact'i bulunamadi.",
-            ) from exc
+        artifact = SalesMLService._load_current_artifact_for_upload(upload_id, target_column)
         timings_ms["load_artifact_ms"] = round((time.perf_counter() - stage_start) * 1000)
 
         stage_start = time.perf_counter()
@@ -669,6 +680,10 @@ class SalesMLService:
                 target_items[target_col] = bulk.items
                 if target_col == "Performance_Drop_Target":
                     base_bulk = bulk
+            except HTTPException as exc:
+                if exc.status_code != status.HTTP_404_NOT_FOUND:
+                    raise
+                target_items[target_col] = []
             except Exception:
                 target_items[target_col] = []
 
@@ -1055,7 +1070,7 @@ class SalesMLService:
         prediction: SalesPredictionResponse | None = None
         has_model = False
         try:
-            artifact = SalesArtifactStore().load("Performance_Drop_Target")
+            artifact = SalesMLService._load_current_artifact_for_upload(upload.id, "Performance_Drop_Target")
             pred = SalesPredictionService.predict_latest(artifact, employee_rows)
             prediction = SalesMLService._prediction_response(
                 upload_id=upload.id,
@@ -1065,7 +1080,7 @@ class SalesMLService:
                 allow_llm_narrative=False,
             )
             has_model = True
-        except (FileNotFoundError, ValueError):
+        except (HTTPException, ValueError):
             pass
 
         return SalesEmployeePerformanceResponse(

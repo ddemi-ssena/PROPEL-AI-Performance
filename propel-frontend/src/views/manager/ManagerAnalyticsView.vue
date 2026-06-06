@@ -1298,7 +1298,163 @@
           </div>
         </div>
 
+        <div v-show="activeAnalyticsSection === 'technical'" class="space-y-5">
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <section class="rounded-2xl border border-slate-200 bg-white p-6">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Aktif Model Ozeti</p>
+              <h4 class="mt-2 text-lg font-bold text-slate-900">{{ targetLabel(mlTargetColumn) }}</h4>
+              <p class="mt-2 text-sm leading-6 text-slate-500">
+                Bu sayfa kisi risk listesinden cok, tahminlerin hangi admin modeli ve dataset ile uretildigini denetlemek icin kullanilir.
+              </p>
+              <div class="mt-5 grid grid-cols-2 gap-3 text-sm">
+                <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p class="text-xs font-semibold text-slate-400">Durum</p>
+                  <p class="mt-1 font-bold" :class="hasAdminTrainedModel ? 'text-emerald-700' : 'text-rose-700'">
+                    {{ hasAdminTrainedModel ? 'Current model hazir' : 'Current model yok' }}
+                  </p>
+                </div>
+                <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p class="text-xs font-semibold text-slate-400">Model</p>
+                  <p class="mt-1 font-bold text-slate-900">{{ selectedTargetState?.model_name || '-' }}</p>
+                </div>
+                <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p class="text-xs font-semibold text-slate-400">Son Egitim</p>
+                  <p class="mt-1 font-bold text-slate-900">{{ formatDateTime(selectedTargetState?.trained_at) }}</p>
+                </div>
+                <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p class="text-xs font-semibold text-slate-400">Prediction</p>
+                  <p class="mt-1 font-bold text-slate-900">{{ bulkPredictionResult?.prediction_count || 0 }} calisan</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="rounded-2xl border border-slate-200 bg-white p-6">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Dataset ve Artifact Eslesmesi</p>
+              <h4 class="mt-2 text-lg font-bold text-slate-900">Admin modeli bu dataset icin mi?</h4>
+              <div class="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div v-for="item in softwareTechnicalAuditCards" :key="item.label" class="rounded-xl border p-4" :class="item.toneClass">
+                  <p class="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">{{ item.label }}</p>
+                  <p class="mt-2 text-xl font-black">{{ item.value }}</p>
+                  <p class="mt-2 text-xs leading-5">{{ item.hint }}</p>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Target Bazli Model Performansi</p>
+                <h4 class="mt-2 text-lg font-bold text-slate-900">Yazilim hedeflerinin egitim ve kalite durumu</h4>
+              </div>
+              <span class="w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                {{ softwareCurrentTargetCount }}/{{ modelStates.length }} current target
+              </span>
+            </div>
+            <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div
+                v-for="state in modelStates"
+                :key="state.target_column"
+                class="rounded-2xl border p-5"
+                :class="isAdminEnsembleState(state) ? 'border-emerald-200 bg-emerald-50' : state.is_trained ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <p class="text-sm font-bold leading-5 text-slate-900">{{ targetLabel(state.target_column) }}</p>
+                  <span
+                    class="rounded-full border bg-white px-2.5 py-1 text-xs font-semibold"
+                    :class="isAdminEnsembleState(state) ? 'border-emerald-200 text-emerald-700' : state.is_trained ? 'border-amber-200 text-amber-700' : 'border-slate-200 text-slate-500'"
+                  >
+                    {{ isAdminEnsembleState(state) ? 'Current' : state.is_trained ? 'Eski' : 'Yok' }}
+                  </span>
+                </div>
+                <div class="mt-4 space-y-2 text-xs">
+                  <div class="flex justify-between gap-3"><span class="text-slate-500">Model</span><span class="font-semibold text-slate-800">{{ state.model_name || '-' }}</span></div>
+                  <div class="flex justify-between gap-3"><span class="text-slate-500">Weighted F1</span><span class="font-bold text-slate-900">{{ formatPercent(state.metrics?.weighted_f1) }}</span></div>
+                  <div class="flex justify-between gap-3"><span class="text-slate-500">Accuracy</span><span class="font-semibold text-slate-800">{{ formatPercent(state.metrics?.accuracy) }}</span></div>
+                  <div class="flex justify-between gap-3"><span class="text-slate-500">Train / Test</span><span class="font-semibold text-slate-800">{{ state.train_count || '-' }} / {{ state.test_count || '-' }}</span></div>
+                  <div class="flex justify-between gap-3"><span class="text-slate-500">Son egitim</span><span class="font-semibold text-slate-800">{{ formatDateTime(state.trained_at) }}</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <div class="rounded-2xl border border-slate-200 bg-white p-6">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">KPI Driver Ozeti</p>
+              <h4 class="mt-2 text-lg font-bold text-slate-900">Tahminleri en cok tasiyan sinyaller</h4>
+              <div v-if="softwareTechnicalDriverRows.length" class="mt-5 space-y-4">
+                <div v-for="row in softwareTechnicalDriverRows" :key="row.name">
+                  <div class="mb-1 flex items-center justify-between gap-3 text-sm">
+                    <span class="font-semibold text-slate-800">{{ row.name }}</span>
+                    <span class="text-xs font-bold text-slate-500">{{ row.count }} calisan</span>
+                  </div>
+                  <div class="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div class="h-full rounded-full bg-indigo-500" :style="{ width: `${row.width}%` }"></div>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                Driver dagilimi icin once Teknik Ciktiyi Getir veya Calisanlari Tara calistirilmali.
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-6">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Model Uyarilari</p>
+              <h4 class="mt-2 text-lg font-bold text-slate-900">Guven ve veri kalitesi kontrolu</h4>
+              <div class="mt-5 space-y-3">
+                <div v-for="warning in softwareTechnicalWarnings" :key="warning.title" class="rounded-xl border p-4" :class="warning.toneClass">
+                  <p class="text-sm font-bold">{{ warning.title }}</p>
+                  <p class="mt-1 text-xs leading-5">{{ warning.body }}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <details class="rounded-2xl border border-slate-200 bg-white p-4">
+            <summary class="cursor-pointer text-sm font-semibold text-slate-700">
+              Ham prediction denetim tablosunu goster
+            </summary>
+            <div v-if="bulkPredictionResult" class="mt-5 overflow-x-auto">
+              <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead>
+                  <tr class="text-left text-slate-500">
+                    <th class="pb-3 font-medium">Calisan</th>
+                    <th class="pb-3 font-medium">Takim / Rol</th>
+                    <th class="pb-3 font-medium">Sonuc</th>
+                    <th class="pb-3 font-medium">Guven</th>
+                    <th class="pb-3 font-medium">Risk Skoru</th>
+                    <th class="pb-3 font-medium">Ana Sinyal</th>
+                    <th class="pb-3 font-medium">Neden</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="item in bulkPredictionResult.items" :key="item.employee_id" class="align-top">
+                    <td class="py-3 pr-4 font-semibold text-slate-900">
+                      {{ displayEmployeeName(item) }}
+                      <div class="text-xs text-slate-500">{{ employeeSubtitle(item) }}</div>
+                    </td>
+                    <td class="py-3 pr-4 text-slate-600">{{ item.summary_payload?.team || '-' }} / {{ item.summary_payload?.position || item.summary_payload?.role || '-' }}</td>
+                    <td class="py-3 pr-4">
+                      <span class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="predictionBandClass(item.predicted_band, item.target_column)">
+                        {{ item.predicted_band }}
+                      </span>
+                    </td>
+                    <td class="py-3 pr-4 font-semibold text-slate-900">{{ formatPercent(item.confidence) }}</td>
+                    <td class="py-3 pr-4 font-semibold text-slate-900">{{ modelRiskScore(item) }}/100</td>
+                    <td class="py-3 pr-4 text-slate-600">{{ item.top_drivers?.[0]?.metric_name || formatFeatureName(item.top_features?.[0]?.feature) }}</td>
+                    <td class="py-3 text-slate-600">{{ item.top_drivers?.[0]?.threshold_status || '-' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+              Ham prediction tablosu icin once teknik cikti veya toplu tarama calistirilmali.
+            </p>
+          </details>
+        </div>
+
         <details
+          v-if="false"
           v-show="activeAnalyticsSection === 'technical'"
           open
           class="rounded-2xl border border-slate-200 bg-white p-4"
@@ -2380,6 +2536,127 @@ const hasAdminTrainedModel = computed(() =>
   Boolean(selectedTargetState.value && isAdminEnsembleState(selectedTargetState.value))
 )
 
+const selectedSoftwareUpload = computed(() =>
+  softwareDatasets.value.find((dataset) => dataset.id === mlUploadId.value) || latestSoftwareUpload.value || null
+)
+
+const softwareCurrentTargetCount = computed(() =>
+  modelStates.value.filter((state) => isAdminEnsembleState(state)).length
+)
+
+const softwareTechnicalAuditCards = computed(() => {
+  const predictionCount = bulkPredictionResult.value?.prediction_count || 0
+  const datasetCount = datasetEmployees.value.length
+  const countsMatch = predictionCount > 0 && datasetCount > 0 && predictionCount === datasetCount
+
+  return [
+    {
+      label: 'Dataset',
+      value: selectedSoftwareUpload.value ? `#${selectedSoftwareUpload.value.id}` : '-',
+      hint: selectedSoftwareUpload.value?.file_name || 'Secili yazilim dataset kaydi bulunamadi.',
+      toneClass: selectedSoftwareUpload.value
+        ? 'border-slate-200 bg-slate-50 text-slate-800'
+        : 'border-rose-200 bg-rose-50 text-rose-800',
+    },
+    {
+      label: 'Artifact',
+      value: hasAdminTrainedModel.value ? 'Hazir' : 'Eksik',
+      hint: hasAdminTrainedModel.value
+        ? 'Bu target icin admin tarafinda egitilmis current software artifact okunuyor.'
+        : 'Bu target icin current admin modeli yok veya secili dataset ile uyumlu degil.',
+      toneClass: hasAdminTrainedModel.value
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+        : 'border-rose-200 bg-rose-50 text-rose-800',
+    },
+    {
+      label: 'Kapsam',
+      value: predictionCount ? `${predictionCount}/${datasetCount || '?'}` : 'Bekliyor',
+      hint: countsMatch
+        ? 'Prediction sayisi dataset calisan sayisiyla eslesiyor.'
+        : 'Kapsam kontrolu icin bulk prediction sonucu dataset calisan sayisiyla karsilastirilir.',
+      toneClass: countsMatch
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+        : 'border-amber-200 bg-amber-50 text-amber-800',
+    },
+  ]
+})
+
+const softwareTechnicalDriverRows = computed(() => {
+  const counts: Record<string, number> = {}
+  ;(bulkPredictionResult.value?.items || []).forEach((item) => {
+    const driver = String(item.top_drivers?.[0]?.metric_name || formatFeatureName(item.top_features?.[0]?.feature) || 'KPI sinyali')
+    counts[driver] = (counts[driver] || 0) + 1
+  })
+  const max = Math.max(...Object.values(counts), 1)
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([name, count]) => ({
+      name,
+      count,
+      width: Math.max(8, Math.round((count / max) * 100)),
+    }))
+})
+
+const softwareTechnicalWarnings = computed(() => {
+  const warnings: Array<{ title: string; body: string; toneClass: string }> = []
+  const predictionCount = bulkPredictionResult.value?.prediction_count || 0
+  const datasetCount = datasetEmployees.value.length
+  const lowConfidenceCount = (bulkPredictionResult.value?.items || []).filter((item) => item.confidence < 0.65).length
+  const staleTargets = modelStates.value.filter((state) => state.is_trained && !isAdminEnsembleState(state))
+  const untrainedTargets = modelStates.value.filter((state) => !state.is_trained)
+
+  warnings.push(hasAdminTrainedModel.value
+    ? {
+      title: 'Current model hazir',
+      body: 'Teknik cikti admin tarafinda egitilen software artifact ve secili dataset satirlariyla uretilir.',
+      toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    }
+    : {
+      title: 'Current model eksik',
+      body: 'Secili target icin current model yoksa teknik cikti ve calisan analizi guncel admin sonucunu temsil etmez.',
+      toneClass: 'border-rose-200 bg-rose-50 text-rose-800',
+    })
+
+  if (!predictionCount) {
+    warnings.push({
+      title: 'Bulk prediction bekleniyor',
+      body: 'Driver dagilimi, risk skoru kapsami ve ham denetim tablosu icin Teknik Ciktiyi Getir calistirilmali.',
+      toneClass: 'border-amber-200 bg-amber-50 text-amber-800',
+    })
+  } else if (datasetCount && predictionCount !== datasetCount) {
+    warnings.push({
+      title: 'Kapsam farki var',
+      body: `Dataset ${datasetCount} calisan iceriyor, bulk prediction ${predictionCount} calisan dondu. Employee id eslesmeleri kontrol edilmeli.`,
+      toneClass: 'border-amber-200 bg-amber-50 text-amber-800',
+    })
+  } else {
+    warnings.push({
+      title: 'Prediction kapsami tutarli',
+      body: `${predictionCount} calisan icin admin modelinden bulk prediction uretildi.`,
+      toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    })
+  }
+
+  if (lowConfidenceCount > 0) {
+    warnings.push({
+      title: 'Dusuk guvenli tahminler',
+      body: `${lowConfidenceCount} calisanin confidence degeri %65 altinda. Bu kisiler icin ek KPI/manager gorusmesiyle kontrol onerilir.`,
+      toneClass: 'border-amber-200 bg-amber-50 text-amber-800',
+    })
+  }
+
+  if (staleTargets.length || untrainedTargets.length) {
+    warnings.push({
+      title: 'Tum hedefler esit hazir degil',
+      body: `${staleTargets.length} hedef eski model durumunda, ${untrainedTargets.length} hedef egitimsiz gorunuyor.`,
+      toneClass: 'border-amber-200 bg-amber-50 text-amber-800',
+    })
+  }
+
+  return warnings
+})
+
 const sectionMeta: Record<AnalyticsSectionKey, { eyebrow: string; title: string; description: string; action: string }> = {
   model: {
     eyebrow: 'Model Durumu',
@@ -2407,8 +2684,8 @@ const sectionMeta: Record<AnalyticsSectionKey, { eyebrow: string; title: string;
   },
   technical: {
     eyebrow: 'Teknik Detaylar',
-    title: 'Model ciktilari ve kisi bazli ham prediction tablosu',
-    description: 'Yonetici ekranindan ayrilmasi gereken teknik model ciktisi, confidence ve driver tablosu burada tutulur.',
+    title: 'Model denetimi ve veri kaynagi kontrolu',
+    description: 'Aktif artifact, dataset eslesmesi, target metrikleri, driver dagilimi ve veri kalitesi uyarilari burada denetlenir.',
     action: 'Teknik Ciktiyi Getir',
   },
 }

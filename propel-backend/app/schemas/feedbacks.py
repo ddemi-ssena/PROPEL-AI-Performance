@@ -241,7 +241,7 @@ class EmployeeMonthlyRAGReportResponse(BaseModel):
     period_month: int
     report_summary: str
     trend_summary: str
-    flight_risk_score: Optional[int] = None
+    flight_risk_score: Optional[float] = None
     retention_risk_level: Optional[str] = None
     top_complaint_topics: List[str] = Field(default_factory=list)
     top_praise_topics: List[str] = Field(default_factory=list)
@@ -263,7 +263,7 @@ class DepartmentMonthlyRAGReportResponse(BaseModel):
     period_month: int
     report_summary: str
     trend_summary: str
-    flight_risk_score: Optional[int] = None
+    flight_risk_score: Optional[float] = None
     retention_risk_level: Optional[str] = None
     top_complaint_topics: List[str] = Field(default_factory=list)
     top_praise_topics: List[str] = Field(default_factory=list)

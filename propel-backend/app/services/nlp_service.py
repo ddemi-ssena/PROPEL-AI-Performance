@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import date, datetime
 from math import ceil
+import re
 from typing import Any, Dict, Iterable, Optional
 
 from sqlalchemy.orm import Session
@@ -189,12 +190,9 @@ class NLPService:
         positive_steps = sum(1 for item in deltas if item > 0.12)
         negative_steps = sum(1 for item in deltas if item < -0.12)
 
-        if positive_steps and negative_steps:
-            return "stabil"
-
-        if delta > 0.35 and average_delta > 0.18:
+        if delta > 0.35 and average_delta > 0.08 and positive_steps >= negative_steps:
             return "yukselis"
-        if delta < -0.35 and average_delta < -0.18:
+        if delta < -0.35 and average_delta < -0.08 and negative_steps >= positive_steps:
             return "dusus"
         return "stabil"
 
@@ -214,6 +212,21 @@ class NLPService:
         return round(total / weight_total, 1)
 
     @staticmethod
+    def _weekly_average_series(analyses: list[FeedbackNLPAnalysis], field_name: str) -> list[float]:
+        grouped: dict[int, list[float]] = {}
+        for analysis in analyses:
+            value = getattr(analysis, field_name)
+            if value is None:
+                continue
+            week = NLPService._week_of_month_from_datetime(analysis.created_at)
+            grouped.setdefault(week, []).append(float(value))
+        return [
+            round(sum(values) / len(values), 2)
+            for week, values in sorted(grouped.items())
+            if values
+        ]
+
+    @staticmethod
     def _badge_level_for_unique_reviewers(unique_reviewer_count: int) -> Optional[BadgeLevel]:
         if unique_reviewer_count >= 4:
             return BadgeLevel.gold
@@ -228,11 +241,23 @@ class NLPService:
         parts: list[str] = []
         parts.extend([str(item) for item in (analysis.key_strengths or [])])
         parts.extend([str(item) for item in (analysis.keywords or [])])
+        if analysis.weekly_feedback and analysis.weekly_feedback.response_text:
+            parts.append(str(analysis.weekly_feedback.response_text))
+        if analysis.classic_feedback:
+            parts.extend(
+                [
+                    str(analysis.classic_feedback.strength_text or ""),
+                    str(analysis.classic_feedback.improvement_text or ""),
+                    str(analysis.classic_feedback.general_comment or ""),
+                ]
+            )
 
         raw = analysis.raw_analysis or {}
         if isinstance(raw, dict):
             for key in [
                 "praise_topics",
+                "complaint_topics",
+                "flight_risk_reasons",
                 "theme_labels",
                 "entity_mentions",
                 "dominant_emotions",
@@ -247,6 +272,186 @@ class NLPService:
                     parts.append(value)
 
         return " ".join(" ".join(parts).lower().split())
+
+    @staticmethod
+    def _distinctive_feedback_phrases(
+        analyses: list[FeedbackNLPAnalysis],
+        *,
+        kind: str,
+        limit: int = 3,
+    ) -> list[str]:
+        positive_patterns = [
+            "code review sahiplenmesi",
+            "test otomasyonu disiplini",
+            "api entegrasyon takibi",
+            "deploy sorumlulugu",
+            "arayuz detay kalitesi",
+            "bilgi paylasimi",
+            "musteri takip disiplini",
+            "crm kayit kalitesi",
+            "pipeline onceliklendirme",
+            "sikayet kapatma hizi",
+            "mentorluk katkisi",
+            "net durum guncellemesi",
+            "sorumluluk alma",
+            "psikolojik guven",
+        ]
+        negative_patterns = [
+            "blokaj eskalasyonu gecikmesi",
+            "test kapsaminda acik",
+            "dokumantasyon eksigi",
+            "deploy sonrasi takip eksigi",
+            "arayuz kabul kriteri belirsizligi",
+            "api bagimliligi gec bildirme",
+            "crm guncelleme gecikmesi",
+            "pipeline yaslanmasi",
+            "quota baskisi",
+            "musteri itirazlarini gec kapatma",
+            "destek talebini gec acma",
+            "oncelik degisikliklerinde zorlanma",
+            "toplanti yogunlugu",
+            "motivasyon dususu",
+        ]
+        theme_patterns = [
+            "code review",
+            "test otomasyonu",
+            "api entegrasyonu",
+            "deploy stabilitesi",
+            "arayuz teslimi",
+            "sprint planlama",
+            "musteri takip",
+            "crm disiplini",
+            "pipeline sagligi",
+            "quota yonetimi",
+            "sikayet yonetimi",
+            "mentorluk",
+            "ekip koordinasyonu",
+            "psikolojik guven",
+        ]
+        patterns = {
+            "positive": positive_patterns,
+            "negative": negative_patterns,
+            "theme": theme_patterns,
+        }[kind]
+        generic = {
+            "backend",
+            "frontend",
+            "qa",
+            "devops",
+            "junior",
+            "mid",
+            "senior",
+            "engineer",
+            "rol",
+            "genel",
+            "delivery",
+            "quality",
+            "growth",
+            "risk",
+            "leadership",
+            "collaboration",
+        }
+
+        counter: Counter[str] = Counter()
+        for analysis in analyses:
+            blob = NLPService._analysis_text_blob(analysis)
+            raw = analysis.raw_analysis or {}
+            if kind == "negative":
+                for key in ("complaint_topics", "flight_risk_reasons", "support_needs"):
+                    for item in raw.get(key) or []:
+                        normalized = " ".join(str(item).strip().lower().split())
+                        if normalized:
+                            counter[normalized] += 3
+            if kind == "positive":
+                for item in list(raw.get("praise_topics") or []) + list(analysis.key_strengths or []):
+                    normalized = " ".join(str(item).strip().lower().split())
+                    if normalized:
+                        counter[normalized] += 3
+            if kind == "theme":
+                for item in raw.get("entity_mentions") or []:
+                    normalized = " ".join(str(item).strip().lower().split())
+                    if len(normalized) < 4 or normalized in generic:
+                        continue
+                    if re.fullmatch(r"[a-z]+", normalized) and normalized in generic:
+                        continue
+                    counter[normalized] += 3
+
+            for pattern in patterns:
+                if pattern in blob:
+                    counter[pattern] += 1
+
+        return [item for item, _ in counter.most_common(limit)]
+
+    @staticmethod
+    def _filter_topic_items(items: list[str], employee: Optional[Employee] = None, limit: int = 5) -> list[str]:
+        generic = {
+            "backend",
+            "frontend",
+            "qa",
+            "devops",
+            "junior",
+            "mid",
+            "senior",
+            "engineer",
+            "developer",
+            "rol",
+            "genel",
+            "delivery",
+            "quality",
+            "growth",
+            "risk",
+            "leadership",
+            "collaboration",
+        }
+        blocked: set[str] = set(generic)
+        if employee:
+            blocked.add(" ".join((employee.team or "").strip().lower().split()))
+            blocked.add(" ".join((employee.position or "").strip().lower().split()))
+            if employee.user:
+                blocked.add(" ".join((employee.user.full_name or "").strip().lower().split()))
+
+        filtered: list[str] = []
+        for item in items:
+            normalized = " ".join(str(item).strip().lower().split())
+            if not normalized or normalized in blocked:
+                continue
+            if any(token in generic for token in normalized.split()) and len(normalized.split()) <= 3:
+                continue
+            if normalized not in filtered:
+                filtered.append(normalized)
+            if len(filtered) >= limit:
+                break
+        return filtered
+
+    @staticmethod
+    def _filter_generic_items(items: list[str], generic_items: set[str], limit: int = 5) -> list[str]:
+        specific: list[str] = []
+        generic: list[str] = []
+        for item in items:
+            normalized = " ".join(str(item).strip().lower().split())
+            if not normalized:
+                continue
+            target = generic if normalized in generic_items else specific
+            if normalized not in target:
+                target.append(normalized)
+        return (specific + generic)[:limit]
+
+    @staticmethod
+    def _raw_dominant_items(
+        analyses: list[FeedbackNLPAnalysis],
+        keys: list[str],
+        *,
+        limit: int = 3,
+    ) -> list[str]:
+        counter: Counter[str] = Counter()
+        for analysis in analyses:
+            raw = analysis.raw_analysis or {}
+            for key in keys:
+                for item in raw.get(key) or []:
+                    normalized = " ".join(str(item).strip().lower().split())
+                    if normalized:
+                        counter[normalized] += 1
+        return [item for item, _ in counter.most_common(limit)]
 
     @staticmethod
     def _matching_badge_analyses(
@@ -587,6 +792,17 @@ class NLPService:
         )
 
     @staticmethod
+    def get_recent_360_analyses(
+        db: Session,
+        *,
+        employee_id: int,
+        limit: int = 10,
+    ) -> list[FeedbackNLPAnalysis]:
+        return db.query(FeedbackNLPAnalysis).filter(
+            FeedbackNLPAnalysis.employee_id == employee_id,
+        ).order_by(FeedbackNLPAnalysis.created_at.desc()).limit(limit).all()
+
+    @staticmethod
     def get_recent_weekly_analyses(
         db: Session,
         *,
@@ -724,7 +940,7 @@ class NLPService:
             period_month=period_month,
             period_week=period_week,
         )
-        recent_analyses = NLPService.get_recent_weekly_analyses(db, employee_id=employee_id, limit=8)
+        recent_analyses = NLPService.get_recent_360_analyses(db, employee_id=employee_id, limit=8)
 
         quality_items = []
         bias_items = []
@@ -887,7 +1103,6 @@ class NLPService:
         }
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         analyses = [
             item for item in analyses
@@ -1057,7 +1272,6 @@ class NLPService:
 
         risk_analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         risk_analyses = [
             analysis for analysis in risk_analyses
@@ -1108,7 +1322,6 @@ class NLPService:
 
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.employee_id == employee_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         analyses = [
             item for item in analyses
@@ -1117,14 +1330,47 @@ class NLPService:
         analyses.sort(key=lambda item: item.created_at)
         trusted_analyses = NLPService._trusted_analyses(analyses)
 
-        motivation_trend = [item.motivation_score for item in trusted_analyses]
-        sentiment_trend = [item.sentiment_score for item in trusted_analyses]
+        motivation_trend = NLPService._weekly_average_series(trusted_analyses, "motivation_score")
+        sentiment_trend = NLPService._weekly_average_series(trusted_analyses, "sentiment_score")
         top_complaints = NLPService._dominant_items(
             NLPService._raw_list_item(item, "complaint_topics") for item in trusted_analyses
         )
+        distinctive_complaints = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="negative",
+            limit=3,
+        )
+        top_complaints = list(dict.fromkeys(distinctive_complaints + top_complaints))[:5]
+        raw_complaints = NLPService._raw_dominant_items(
+            trusted_analyses,
+            ["complaint_topics", "flight_risk_reasons"],
+            limit=4,
+        )
+        top_complaints = list(dict.fromkeys(raw_complaints + top_complaints))[:5]
         top_praises = NLPService._dominant_items(
             NLPService._raw_list_item(item, "praise_topics") + list(item.key_strengths or [])
             for item in trusted_analyses
+        )
+        distinctive_praises = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="positive",
+            limit=3,
+        )
+        top_praises = list(dict.fromkeys(distinctive_praises + top_praises))[:5]
+        top_praises = NLPService._filter_generic_items(
+            top_praises,
+            {"psikolojik guven", "sorumluluk alma", "is birligi", "gelisime aciklik", "liderlik destegi"},
+            limit=5,
+        )
+        raw_praises = NLPService._raw_dominant_items(
+            trusted_analyses,
+            ["praise_topics", "key_strengths"],
+            limit=4,
+        )
+        top_praises = NLPService._filter_generic_items(
+            list(dict.fromkeys(raw_praises + top_praises)),
+            {"psikolojik guven", "sorumluluk alma", "is birligi", "gelisime aciklik", "liderlik destegi"},
+            limit=5,
         )
         top_themes = NLPService._dominant_items(
             ((
@@ -1134,6 +1380,19 @@ class NLPService:
             for item in trusted_analyses),
             limit=5,
         )
+        distinctive_themes = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="theme",
+            limit=4,
+        )
+        top_themes = list(dict.fromkeys(distinctive_themes + top_themes))[:6]
+        raw_themes = NLPService._raw_dominant_items(
+            trusted_analyses,
+            ["theme_labels", "entity_mentions"],
+            limit=5,
+        )
+        top_themes = list(dict.fromkeys(raw_themes + top_themes))[:8]
+        top_themes = NLPService._filter_topic_items(top_themes, employee, limit=6)
         avg_flight_score = NLPService._weighted_numeric_average(
             (
                 NLPService._extract_float(item.raw_analysis or {}, "flight_risk_score") if isinstance(item.raw_analysis, dict) else None,
@@ -1190,7 +1449,6 @@ class NLPService:
         }
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         analyses = [
             item for item in analyses
@@ -1200,14 +1458,31 @@ class NLPService:
         analyses.sort(key=lambda item: item.created_at)
         trusted_analyses = NLPService._trusted_analyses(analyses)
 
-        motivation_trend = [item.motivation_score for item in trusted_analyses]
-        sentiment_trend = [item.sentiment_score for item in trusted_analyses]
+        motivation_trend = NLPService._weekly_average_series(trusted_analyses, "motivation_score")
+        sentiment_trend = NLPService._weekly_average_series(trusted_analyses, "sentiment_score")
         top_complaints = NLPService._dominant_items(
             NLPService._raw_list_item(item, "complaint_topics") for item in trusted_analyses
         )
+        distinctive_complaints = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="negative",
+            limit=4,
+        )
+        top_complaints = list(dict.fromkeys(distinctive_complaints + top_complaints))[:6]
         top_praises = NLPService._dominant_items(
             NLPService._raw_list_item(item, "praise_topics") + list(item.key_strengths or [])
             for item in trusted_analyses
+        )
+        distinctive_praises = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="positive",
+            limit=4,
+        )
+        top_praises = list(dict.fromkeys(distinctive_praises + top_praises))[:6]
+        top_praises = NLPService._filter_generic_items(
+            top_praises,
+            {"psikolojik guven", "sorumluluk alma", "is birligi", "gelisime aciklik", "liderlik destegi"},
+            limit=6,
         )
         top_themes = NLPService._dominant_items(
             ((
@@ -1217,6 +1492,12 @@ class NLPService:
             for item in trusted_analyses),
             limit=6,
         )
+        distinctive_themes = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="theme",
+            limit=5,
+        )
+        top_themes = list(dict.fromkeys(distinctive_themes + top_themes))[:7]
         top_flight_risk_reasons = NLPService._dominant_items(
             NLPService._raw_list_item(item, "flight_risk_reasons") for item in trusted_analyses
         )
@@ -1276,7 +1557,6 @@ class NLPService:
         )
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.employee_id == employee_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         analyses = [
             item for item in analyses
@@ -1298,6 +1578,101 @@ class NLPService:
             employee_id=employee_id,
             limit=5,
         )
+        if not retrieved_memories:
+            retrieved_memories = RAGService.retrieve_similar_memories(
+                db,
+                query_text=query_text,
+                employee_id=employee_id,
+                limit=5,
+                min_score=0.0,
+            )
+
+        if not retrieved_memories:
+            top_complaints = deep_analysis.get("top_complaint_topics") or []
+            top_praises = deep_analysis.get("top_praise_topics") or []
+            key_takeaways = deep_analysis.get("top_themes") or []
+            risk_score = deep_analysis.get("flight_risk_score")
+            if risk_score is None:
+                retention_level = "unknown"
+            elif risk_score >= 7:
+                retention_level = "high"
+            elif risk_score >= 4:
+                retention_level = "medium"
+            else:
+                retention_level = "low"
+
+            if deep_analysis.get("feedback_count", 0) <= 1:
+                report_summary = (
+                    f"{employee.user.full_name} icin bu ay kisiyi ayirt edecek kadar zengin 360 NLP hafizasi olusmadi. "
+                    "Ekrandaki sinyaller yalnizca mevcut tekil feedback analizinden uretilmistir."
+                )
+                trend_summary = (
+                    "Benzer gecmis kayit bulunmadigi icin RAG karsilastirmasi yapilmadi; trend yorumu sinirli guvenle okunmalidir."
+                )
+            else:
+                report_summary = (
+                    f"{employee.user.full_name} icin bu ay RAG belleğinde benzer kayit bulunmadi; "
+                    "ozet mevcut 360 NLP analizlerinin toplu sinyallerinden olusturuldu."
+                )
+                trend_summary = (
+                    f"Motivasyon trendi {deep_analysis.get('motivation_trend_direction')}, "
+                    f"duygu trendi {deep_analysis.get('sentiment_trend_direction')} gorunuyor."
+                )
+
+            return {
+                "employee_id": employee.id,
+                "employee_name": employee.user.full_name,
+                "department_id": employee.department_id,
+                "department_name": employee.department.name if employee.department else None,
+                "team": employee.team,
+                "period_year": period_year,
+                "period_month": period_month,
+                "report_summary": report_summary,
+                "trend_summary": trend_summary,
+                "flight_risk_score": risk_score,
+                "retention_risk_level": retention_level,
+                "top_complaint_topics": top_complaints,
+                "top_praise_topics": top_praises,
+                "key_takeaways": key_takeaways,
+                "action_recommendation": deep_analysis.get("action_recommendation") or "Daha guvenilir analiz icin bu calisan hakkinda ek 360 feedback toplayin.",
+                "retrieved_memory_count": 0,
+                "retrieved_memory_summaries": [],
+                "model_provider": "deterministic",
+                "model_name": "no-rag-memory-v1",
+                "confidence": 0.35 if deep_analysis.get("feedback_count", 0) <= 1 else 0.55,
+            }
+
+        if any(item.model_provider == "synthetic_seed_360_history" for item in analyses):
+            rag_payload = AIService._fallback_monthly_rag_report(
+                subject_label=employee.user.full_name,
+                deep_analysis=deep_analysis,
+                retrieved_memories=retrieved_memories,
+            )
+            return {
+                "employee_id": employee.id,
+                "employee_name": employee.user.full_name,
+                "department_id": employee.department_id,
+                "department_name": employee.department.name if employee.department else None,
+                "team": employee.team,
+                "period_year": period_year,
+                "period_month": period_month,
+                "report_summary": rag_payload.get("report_summary"),
+                "trend_summary": rag_payload.get("trend_summary"),
+                "flight_risk_score": rag_payload.get("flight_risk_score"),
+                "retention_risk_level": rag_payload.get("retention_risk_level"),
+                "top_complaint_topics": rag_payload.get("top_complaint_topics") or deep_analysis.get("top_complaint_topics") or [],
+                "top_praise_topics": rag_payload.get("top_praise_topics") or deep_analysis.get("top_praise_topics") or [],
+                "key_takeaways": rag_payload.get("key_takeaways") or deep_analysis.get("top_themes") or [],
+                "action_recommendation": rag_payload.get("action_recommendation") or deep_analysis.get("action_recommendation"),
+                "retrieved_memory_count": len(retrieved_memories),
+                "retrieved_memory_summaries": [
+                    item.get("content_summary") or item.get("content_text", "")[:180]
+                    for item in retrieved_memories
+                ],
+                "model_provider": "heuristic",
+                "model_name": "synthetic-history-rag-fallback-v1",
+                "confidence": rag_payload.get("confidence"),
+            }
 
         rag_payload, provider, model_name = AIService.analyze_monthly_rag_report(
             subject_label=employee.user.full_name,
@@ -1362,7 +1737,6 @@ class NLPService:
         }
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         analyses = [
             item for item in analyses

@@ -466,6 +466,8 @@ const selectedEmployeeReport = ref<Employee360SummaryReportResponse | null>(null
 const monthlyDeepAnalysis = ref<EmployeeMonthlyDeepAnalysisResponse | null>(null)
 const monthlyRagReport = ref<EmployeeMonthlyRAGReportResponse | null>(null)
 const employeeReports = ref<Record<number, Employee360SummaryReportResponse>>({})
+let employeeReportRequestId = 0
+let monthlyAnalysisRequestId = 0
 const today = new Date()
 const selectedMonth = ref<number>(today.getMonth() + 1)
 const selectedYear = ref<number>(today.getFullYear())
@@ -635,25 +637,34 @@ async function loadData() {
 }
 
 async function loadEmployeeReport(employeeId: number) {
+  const requestId = ++employeeReportRequestId
+  selectedEmployeeReport.value = null
   try {
     const report = await feedbackApi.getEmployee360SummaryReport(employeeId)
+    if (requestId !== employeeReportRequestId || selectedEmployeeId.value !== employeeId) return
     employeeReports.value = { ...employeeReports.value, [employeeId]: report }
     selectedEmployeeReport.value = report
   } catch (error) {
+    if (requestId !== employeeReportRequestId || selectedEmployeeId.value !== employeeId) return
     console.error('Rapor yüklenemedi:', error)
     selectedEmployeeReport.value = null
   }
 }
 
 async function loadMonthlyDeepAnalysis(employeeId: number) {
+  const requestId = ++monthlyAnalysisRequestId
+  monthlyDeepAnalysis.value = null
+  monthlyRagReport.value = null
   try {
     const [deepAnalysis, ragReport] = await Promise.all([
       feedbackApi.getEmployeeMonthlyDeepAnalysis(employeeId, { year: selectedYear.value, month: selectedMonth.value }),
       feedbackApi.getEmployeeMonthlyRagReport(employeeId, { year: selectedYear.value, month: selectedMonth.value })
     ])
+    if (requestId !== monthlyAnalysisRequestId || selectedEmployeeId.value !== employeeId) return
     monthlyDeepAnalysis.value = deepAnalysis
     monthlyRagReport.value = ragReport
   } catch (error) {
+    if (requestId !== monthlyAnalysisRequestId || selectedEmployeeId.value !== employeeId) return
     console.error('Aylık analizler yüklenemedi:', error)
     monthlyDeepAnalysis.value = null
     monthlyRagReport.value = null
