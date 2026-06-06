@@ -822,9 +822,9 @@
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">Risk Trendi</p>
-                        <h5 class="mt-1 text-lg font-bold text-slate-900">12 Haftalik Risk Trendi</h5>
+                        <h5 class="mt-1 text-lg font-bold text-slate-900">6 Aylik Risk Trendi</h5>
                         <p class="mt-2 text-sm leading-6 text-slate-500">
-                          Y ekseni 0-10 risk skoru; grafik secili takimin haftalik model risk sinyalini gosterir.
+                          Y ekseni 0-10 risk skoru; grafik admin ensemble modelinin ay bazli takim risk sinyalini gosterir.
                         </p>
                       </div>
                       <span class="w-fit rounded-full bg-rose-50 px-3 py-1 text-sm font-bold text-rose-700">
@@ -1138,6 +1138,9 @@
           <div class="mb-4 border-b border-slate-100 pb-4">
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Calisan Analizi</p>
             <h4 class="mt-1 text-lg font-bold text-slate-900">Calisan listesi ve bireysel analiz girisi</h4>
+            <p class="mt-2 text-sm leading-6 text-slate-500">
+              Kaynak: admin tarafinda egitilen guncel software modelinin bulk prediction sonucu.
+            </p>
           </div>
           <div class="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
             <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white p-4">
@@ -1147,6 +1150,8 @@
                   <th class="pb-3 font-medium">Calisan</th>
                   <th class="pb-3 font-medium">Takim / Pozisyon</th>
                   <th class="pb-3 font-medium">Risk Durumu</th>
+                  <th class="pb-3 font-medium">Risk Skoru</th>
+                  <th class="pb-3 font-medium">KPI Trend</th>
                   <th class="pb-3 font-medium">Ana Sinyal</th>
                   <th class="pb-3 font-medium">Haftalik Odak</th>
                 </tr>
@@ -1171,6 +1176,19 @@
                       {{ person.predicted_band }}
                     </span>
                   </td>
+                  <td class="py-3 pr-4">
+                    <div class="flex min-w-[120px] items-center gap-2">
+                      <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          class="h-full rounded-full"
+                          :class="modelRiskScore(person) >= 67 ? 'bg-rose-500' : modelRiskScore(person) >= 34 ? 'bg-amber-400' : 'bg-emerald-500'"
+                          :style="{ width: `${modelRiskScore(person)}%` }"
+                        ></div>
+                      </div>
+                      <span class="w-12 text-right font-bold text-slate-900">{{ modelRiskScore(person) }}/100</span>
+                    </div>
+                  </td>
+                  <td class="py-3 pr-4 text-slate-600">{{ employeeKpiTrendLabel(person) }}</td>
                   <td class="py-3 pr-4 text-slate-600">{{ person.top_drivers?.[0]?.metric_name || 'KPI sinyali' }}</td>
                   <td class="py-3 text-slate-600">{{ person.recommended_actions?.[0] || 'KPI kirilimi incelenmeli.' }}</td>
                 </tr>
@@ -1220,6 +1238,15 @@
                   >
                     <p class="text-sm font-bold leading-5 text-emerald-950">{{ action.title }}</p>
                     <p class="mt-1 text-xs leading-5 text-emerald-900">{{ action.reason }}</p>
+                    <p v-if="action.conversation_goal" class="mt-2 text-xs leading-5 text-emerald-950">
+                      <span class="font-semibold">Gorusme hedefi:</span> {{ action.conversation_goal }}
+                    </p>
+                    <ul v-if="action.manager_talking_points?.length" class="mt-2 space-y-1 text-xs leading-5 text-emerald-900">
+                      <li v-for="point in action.manager_talking_points.slice(0, 2)" :key="point">- {{ point }}</li>
+                    </ul>
+                    <p v-if="action.success_signal" class="mt-2 text-xs leading-5 text-emerald-800">
+                      <span class="font-semibold">Basari sinyali:</span> {{ action.success_signal }}
+                    </p>
                     <p class="mt-2 text-xs font-semibold text-emerald-800">{{ action.owner }} / {{ action.timeframe }}</p>
                   </div>
                 </div>
@@ -1830,7 +1857,7 @@
     </div>
 
     <div
-      v-if="overview?.team_summaries.length && activeAnalyticsSection === 'watchlist'"
+      v-if="false"
       class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
     >
       <div class="flex items-center justify-between gap-3">
@@ -1839,13 +1866,13 @@
           <h3 class="mt-1 text-lg font-bold text-slate-900">Canli KPI kapsam ozeti</h3>
         </div>
         <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-          Son donem: {{ formatPeriod(overview.latest_period) }}
+          Son donem: {{ formatPeriod(overview?.latest_period) }}
         </span>
       </div>
 
       <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div
-          v-for="teamSummary in overview.team_summaries"
+          v-for="teamSummary in overview?.team_summaries || []"
           :key="teamSummary.team"
           class="rounded-2xl border border-slate-200 bg-slate-50 p-5"
         >
@@ -1863,7 +1890,7 @@
     </div>
 
     <div
-      v-if="overview && activeAnalyticsSection === 'watchlist'"
+      v-if="false"
       class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_360px] gap-6"
     >
       <section class="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1937,7 +1964,7 @@
             <h3 class="mt-1 text-lg font-bold text-slate-900">KPI performans ve risk gorunumu</h3>
           </div>
           <span class="text-xs font-semibold text-slate-500">
-            {{ overview.employee_summaries.length }} kisi
+            {{ overview?.employee_summaries.length || 0 }} kisi
           </span>
         </div>
 
@@ -1955,7 +1982,7 @@
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr
-                v-for="employee in overview.employee_summaries"
+                v-for="employee in overview?.employee_summaries || []"
                 :key="employee.employee_id"
                 class="align-top"
               >
@@ -1989,7 +2016,7 @@
         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Mimari Notlar</p>
         <h3 class="mt-2 text-lg font-bold text-slate-900">Departman adapter mantigi</h3>
         <ul class="mt-5 space-y-3 text-sm leading-6 text-slate-600">
-          <li v-for="note in overview.notes" :key="note">
+          <li v-for="note in overview?.notes || []" :key="note">
             • {{ note }}
           </li>
         </ul>
@@ -2350,7 +2377,7 @@ const selectedTargetState = computed(() =>
 )
 
 const hasAdminTrainedModel = computed(() =>
-  Boolean(selectedTargetState.value?.is_trained && selectedTargetState.value?.is_current_dataset)
+  Boolean(selectedTargetState.value && isAdminEnsembleState(selectedTargetState.value))
 )
 
 const sectionMeta: Record<AnalyticsSectionKey, { eyebrow: string; title: string; description: string; action: string }> = {
@@ -2635,6 +2662,8 @@ const teamRiskSummaries = computed(() => {
       const tone = high > 0 ? 'high' : medium > 0 ? 'medium' : 'low'
       const analytics = analyticsByTeam.get(team)
       const riskScore = Number(analytics?.risk_score ?? averageRiskScore(teamItems))
+      const capacityOverage = Number(analytics?.capacity_overage)
+      const capacityScore = Number(analytics?.capacity_score)
       return {
         team,
         total: teamItems.length,
@@ -2644,6 +2673,9 @@ const teamRiskSummaries = computed(() => {
         topReason,
         action: buildBulkActions([topReason], team)[0],
         riskScore,
+        capacityOverage: Number.isFinite(capacityOverage) ? capacityOverage : null,
+        capacityScore: Number.isFinite(capacityScore) ? capacityScore : null,
+        capacityBasis: String(analytics?.capacity_basis || 'model_risk_score_fallback'),
         trendValues: Array.isArray(analytics?.trend_values) ? analytics.trend_values.map((value: unknown) => Number(value)) : [riskScore],
         trendPeriods: Array.isArray(analytics?.trend_periods) ? analytics.trend_periods.map((value: unknown) => String(value)) : [],
         trendBasis: String(analytics?.trend_basis || 'latest_prediction_probability'),
@@ -2721,6 +2753,9 @@ const selectedTeamRoleMix = computed(() => {
 const selectedTeamSprintOverage = computed(() => {
   const team = selectedTeamAnalysis.value
   if (!team) return 0
+  if (typeof team.capacityOverage === 'number' && Number.isFinite(team.capacityOverage)) {
+    return Math.max(0, Math.min(35, Math.round(team.capacityOverage)))
+  }
   return Math.max(0, Math.min(35, Math.round((teamRiskScore(team) - 50) * 0.7)))
 })
 
@@ -2740,8 +2775,8 @@ const selectedTeamWeeklyRiskValues = computed(() => {
   const team = selectedTeamAnalysis.value
   if (!team) return []
   const values = selectedTrendValuesForTeam(team)
-  const normalized = normalizeTrendSeries(values.length ? values : [teamRiskScore(team)], 12)
-  return normalized.map((value) => Math.max(0, Math.min(10, Math.round((value / 10) * 10) / 10)))
+  const monthlyValues = (values.length ? values : [teamRiskScore(team)]).slice(-6)
+  return monthlyValues.map((value) => Math.max(0, Math.min(10, Math.round((value / 10) * 10) / 10)))
 })
 
 const selectedTeamRiskTrendAxisLabels = computed(() => {
@@ -2758,16 +2793,17 @@ const selectedTeamRiskTrendAxisLabels = computed(() => {
 
 const selectedTeamTrendChangeLabel = computed(() => {
   const values = selectedTeamWeeklyRiskValues.value
-  if (values.length < 8) return 'Trend verisi izleniyor'
-  const previous = values.slice(-8, -4)
-  const recent = values.slice(-4)
+  if (values.length < 4) return 'Trend verisi izleniyor'
+  const splitIndex = Math.max(1, Math.floor(values.length / 2))
+  const previous = values.slice(0, splitIndex)
+  const recent = values.slice(splitIndex)
   const previousAvg = previous.reduce((sum, value) => sum + value, 0) / previous.length
   const recentAvg = recent.reduce((sum, value) => sum + value, 0) / recent.length
   if (!previousAvg) return 'Trend verisi izleniyor'
   const change = Math.round(((recentAvg - previousAvg) / previousAvg) * 100)
-  if (change > 0) return `+%${change} artis son 4 haftada`
-  if (change < 0) return `-%${Math.abs(change)} dusus son 4 haftada`
-  return 'Stabil trend son 4 haftada'
+  if (change > 0) return `+%${change} artis son donemde`
+  if (change < 0) return `-%${Math.abs(change)} dusus son donemde`
+  return 'Stabil trend son donemde'
 })
 
 const selectedTeamRiskTrendChartData = computed(() => ({
@@ -3286,6 +3322,12 @@ function employeeCodeLabel(item: SoftwarePredictionResponse | null) {
   return item.summary_payload?.external_employee_code || `SE-${String(item.employee_id).padStart(3, '0')}`
 }
 
+function employeeKpiTrendLabel(item: SoftwarePredictionResponse) {
+  return item.top_drivers?.[0]?.trend_signal
+    || item.summary_payload?.trend_signal
+    || 'Trend sinyali yok'
+}
+
 function employeeRiskOutOfTen(item: SoftwarePredictionResponse) {
   return Math.max(1, Math.min(10, Math.round(modelRiskScore(item) / 10)))
 }
@@ -3351,6 +3393,11 @@ function narrativeActionPlan(prediction: SoftwarePredictionResponse | null) {
       reason: item.reason || 'Bu aksiyon modelin one cikardigi KPI sinyaline gore olusturuldu.',
       owner: item.owner || 'Takim lideri',
       timeframe: item.timeframe || 'Bu hafta',
+      expected_impact: item.expected_impact || '',
+      conversation_goal: item.conversation_goal || '',
+      manager_talking_points: Array.isArray(item.manager_talking_points) ? item.manager_talking_points.map(String) : [],
+      employee_questions: Array.isArray(item.employee_questions) ? item.employee_questions.map(String) : [],
+      success_signal: item.success_signal || '',
       metric_name: item.metric_name || index,
     }))
   }
@@ -3360,6 +3407,11 @@ function narrativeActionPlan(prediction: SoftwarePredictionResponse | null) {
     reason: 'Bu aksiyon KPI Registry aksiyon metni ve modelin one cikardigi sinyallerden turetildi.',
     owner: 'Takim lideri',
     timeframe: 'Bu hafta',
+    expected_impact: '',
+    conversation_goal: '',
+    manager_talking_points: [],
+    employee_questions: [],
+    success_signal: '',
     metric_name: index,
   }))
 }
@@ -4125,8 +4177,17 @@ function syncAnalyticsSectionFromRoute(value: unknown) {
 
 function adminTrainedState(states: SoftwareModelStateResponse[]) {
   return states.find((state) =>
-    state.target_column === 'performance_band' && state.is_trained && state.is_current_dataset
-  ) || states.find((state) => state.is_trained && state.is_current_dataset) || null
+    state.target_column === 'performance_band' && isAdminEnsembleState(state)
+  ) || states.find((state) => isAdminEnsembleState(state)) || null
+}
+
+function isAdminEnsembleState(state: SoftwareModelStateResponse) {
+  const modelName = String(state.model_name || '')
+  return Boolean(
+    state.is_trained
+    && state.is_current_dataset
+    && (modelName === 'stacking_lgbm_xgb_rf_lr' || modelName === 'random_forest_fallback')
+  )
 }
 
 async function loadDepartmentConfigs() {
@@ -4156,11 +4217,11 @@ async function loadUploadHistory() {
       mlUploadId.value = latestSoftwareUpload.value.id
       modelStates.value = await analyticsApi.getSoftwareModelState(latestSoftwareUpload.value.id).catch(() => [])
     }
-    mlError.value = 'Admin tarafinda bu yazilim datasetleri icin guncel egitilmis model bulunamadi.'
+    mlError.value = 'Admin tarafinda bu yazilim datasetleri icin guncel ensemble model bulunamadi.'
   } catch {
     softwareDatasets.value = []
     modelStates.value = []
-    mlError.value = 'Admin model kaynagi yuklenemedi.'
+    mlError.value = 'Admin ensemble model kaynagi yuklenemedi.'
   }
 }
 
@@ -4216,7 +4277,7 @@ async function loadDepartmentDashboard(useLlm = false) {
   }
   if (!hasAdminTrainedModel.value) {
     departmentDashboard.value = null
-    departmentDashboardError.value = 'Admin tarafinda bu dataset icin guncel egitilmis model bulunamadi.'
+    departmentDashboardError.value = 'Admin tarafinda bu dataset icin guncel ensemble model bulunamadi.'
     return
   }
 
@@ -4240,7 +4301,7 @@ async function loadDepartmentDashboard(useLlm = false) {
 async function loadPrediction(useLlmNarrative = false) {
   if (!mlUploadId.value || !mlEmployeeId.value) return
   if (!hasAdminTrainedModel.value) {
-    mlError.value = 'Admin tarafinda bu dataset icin guncel egitilmis model bulunamadi.'
+    mlError.value = 'Admin tarafinda bu dataset icin guncel ensemble model bulunamadi.'
     return
   }
   mlLoading.value = useLlmNarrative ? 'narrative' : 'predict'
@@ -4305,13 +4366,13 @@ async function applyEmployeeDeepLinkFromRoute() {
   if (mlEmployeeId.value === employeeIdNum && predictionResult.value?.employee_id === employeeIdNum) return
 
   mlEmployeeId.value = employeeIdNum
-  await loadPrediction(false)
+  await loadPrediction(true)
 }
 
 async function loadBulkPredictions(useLlmNarrative = false, llmTeam?: string) {
   if (!mlUploadId.value) return
   if (!hasAdminTrainedModel.value) {
-    mlError.value = 'Admin tarafinda bu dataset icin guncel egitilmis model bulunamadi.'
+    mlError.value = 'Admin tarafinda bu dataset icin guncel ensemble model bulunamadi.'
     return
   }
   const requestedSection = activeAnalyticsSection.value

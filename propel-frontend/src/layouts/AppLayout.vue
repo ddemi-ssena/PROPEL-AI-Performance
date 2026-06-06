@@ -309,7 +309,6 @@ const allNavigation: NavigationItem[] = [
     role: 'department_manager',
     dept: 'sales',
     children: [
-      { name: 'Model Durumu', to: '/manager/sales-analytics', icon: ChartBarIcon },
       { name: 'Departman Analizi', to: '/manager/sales-kpi-analysis?section=department', icon: DocumentTextIcon },
       { name: 'Takım Analizi', to: '/manager/sales-kpi-analysis?section=teams', icon: UsersIcon },
       { name: 'Çalışan Analizi', to: '/manager/sales-kpi-analysis?section=watchlist', icon: UsersIcon },

@@ -18,6 +18,7 @@ from app.schemas.employee import (
     TeamHealthStat,
 )
 from app.services.analytics_service import AnalyticsService
+from app.services.software_ml_service import SoftwareMLService
 
 
 class EmployeeService:
@@ -167,6 +168,7 @@ class EmployeeService:
             department_id=scope_department_id,
         )
         performance_by_employee = {row.employee_id: row for row in performance.employees}
+        ml_predictions = EmployeeService._current_software_ml_predictions_by_employee(db)
 
         latest_surveys = EmployeeService._latest_surveys_by_employee(db, employee_ids)
         latest_profiles = EmployeeService._latest_profiles_by_employee(db, employee_ids)
@@ -174,11 +176,13 @@ class EmployeeService:
         members: list[TeamHealthMember] = []
         for employee in employees:
             performance_row = performance_by_employee.get(employee.id)
+            ml_prediction = EmployeeService._match_ml_prediction(employee, ml_predictions)
+            ml_risk_score = EmployeeService._ml_risk_score(ml_prediction)
             survey = latest_surveys.get(employee.id)
             profile = latest_profiles.get(employee.id)
-            risk_score = EmployeeService._combined_risk_score(performance_row, survey, profile)
+            risk_score = EmployeeService._combined_risk_score(performance_row, survey, profile, ml_risk_score)
             risk_level = EmployeeService._risk_level_from_score(risk_score)
-            data_sources = EmployeeService._data_sources(performance_row, survey, profile)
+            data_sources = EmployeeService._data_sources(performance_row, survey, profile, ml_prediction)
             members.append(
                 TeamHealthMember(
                     id=employee.id,
@@ -189,9 +193,13 @@ class EmployeeService:
                     latest_pulse_score=round(float(survey.score), 2) if survey else None,
                     latest_mte=round(float(survey.mte_score), 3) if survey and survey.mte_score is not None else None,
                     latest_ars=round(float(survey.ars_score), 3) if survey and survey.ars_score is not None else None,
-                    kpi_score=performance_row.kpi_score if performance_row else None,
-                    kpi_trend=performance_row.trend if performance_row else None,
+                    kpi_score=ml_risk_score,
+                    kpi_trend=None,
                     kpi_latest_period=performance_row.latest_period if performance_row else None,
+                    kpi_band=str(ml_prediction.predicted_band) if ml_prediction else None,
+                    kpi_confidence=round(float(ml_prediction.confidence), 3) if ml_prediction else None,
+                    kpi_top_driver=EmployeeService._ml_top_driver(ml_prediction),
+                    kpi_source="admin_software_ml_bulk" if ml_prediction else None,
                     feedback_count=profile.feedback_count if profile else 0,
                     feedback_sentiment_score=round(float(profile.avg_sentiment_score), 2) if profile and profile.avg_sentiment_score is not None else None,
                     feedback_motivation_score=round(float(profile.avg_motivation_score), 2) if profile and profile.avg_motivation_score is not None else None,
@@ -267,13 +275,105 @@ class EmployeeService:
         return latest
 
     @staticmethod
-    def _combined_risk_score(performance_row, survey: SurveyResponse | None, profile: EmployeeNLPProfile | None) -> float:
+    def _current_software_ml_predictions_by_employee(db: Session) -> dict[str, object]:
+        try:
+            datasets = SoftwareMLService.list_datasets(db)
+            for dataset in datasets:
+                states = SoftwareMLService.list_model_states(db, dataset.id)
+                current_state = next(
+                    (
+                        state
+                        for state in states
+                        if state.target_column == "performance_band"
+                        and state.is_trained
+                        and state.is_current_dataset
+                        and state.model_name in {"stacking_lgbm_xgb_rf_lr", "random_forest_fallback"}
+                    ),
+                    None,
+                )
+                if not current_state:
+                    continue
+
+                bulk = SoftwareMLService.predict_all_from_upload(
+                    db=db,
+                    upload_id=dataset.id,
+                    target_column="performance_band",
+                    use_llm_narrative=False,
+                )
+                predictions: dict[str, object] = {}
+                for item in bulk.items:
+                    payload = item.summary_payload or {}
+                    code = EmployeeService._normalize_match_key(payload.get("external_employee_code"))
+                    name = EmployeeService._normalize_match_key(payload.get("employee_name") or payload.get("display_label"))
+                    if code:
+                        predictions[f"code:{code}"] = item
+                    if name:
+                        predictions[f"name:{name}"] = item
+                return predictions
+        except Exception:
+            return {}
+        return {}
+
+    @staticmethod
+    def _match_ml_prediction(employee: Employee, predictions: dict[str, object]):
+        code = EmployeeService._normalize_match_key(employee.external_employee_code)
+        if code and f"code:{code}" in predictions:
+            return predictions[f"code:{code}"]
+        name = EmployeeService._normalize_match_key(employee.full_name)
+        if name and f"name:{name}" in predictions:
+            return predictions[f"name:{name}"]
+        return None
+
+    @staticmethod
+    def _normalize_match_key(value) -> str:
+        if value in (None, ""):
+            return ""
+        return " ".join(str(value).strip().lower().split())
+
+    @staticmethod
+    def _ml_risk_score(prediction) -> float | None:
+        if not prediction:
+            return None
+        value = getattr(prediction, "risk_score", None)
+        if value is None:
+            return None
+        return round(float(value), 1)
+
+    @staticmethod
+    def _ml_top_driver(prediction) -> str | None:
+        if not prediction:
+            return None
+        drivers = getattr(prediction, "top_drivers", None) or []
+        if not drivers:
+            return None
+        first = drivers[0]
+        if isinstance(first, dict):
+            return first.get("metric_name")
+        return getattr(first, "metric_name", None)
+
+    @staticmethod
+    def _performance_row_risk(performance_row) -> float | None:
+        if not performance_row or performance_row.kpi_score is None:
+            return None
+        kpi_risk = max(0.0, min(100.0, 100.0 - float(performance_row.kpi_score)))
+        if performance_row.trend is not None and performance_row.trend < 0:
+            kpi_risk = min(100.0, kpi_risk + min(20.0, abs(float(performance_row.trend)) * 2))
+        return round(kpi_risk, 1)
+
+    @staticmethod
+    def _combined_risk_score(
+        performance_row,
+        survey: SurveyResponse | None,
+        profile: EmployeeNLPProfile | None,
+        ml_risk_score: float | None = None,
+    ) -> float:
         signals: list[tuple[float, float]] = []
-        if performance_row and performance_row.kpi_score is not None:
-            kpi_risk = max(0.0, min(100.0, 100.0 - float(performance_row.kpi_score)))
-            if performance_row.trend is not None and performance_row.trend < 0:
-                kpi_risk = min(100.0, kpi_risk + min(20.0, abs(float(performance_row.trend)) * 2))
-            signals.append((kpi_risk, 0.4))
+        if ml_risk_score is not None:
+            signals.append((max(0.0, min(100.0, float(ml_risk_score))), 0.4))
+        else:
+            kpi_risk = EmployeeService._performance_row_risk(performance_row)
+            if kpi_risk is not None:
+                signals.append((kpi_risk, 0.4))
         if survey and survey.ars_score is not None:
             signals.append((max(0.0, min(100.0, float(survey.ars_score) * 100.0)), 0.35))
         if profile:
@@ -311,9 +411,16 @@ class EmployeeService:
         return "Low"
 
     @staticmethod
-    def _data_sources(performance_row, survey: SurveyResponse | None, profile: EmployeeNLPProfile | None) -> list[str]:
+    def _data_sources(
+        performance_row,
+        survey: SurveyResponse | None,
+        profile: EmployeeNLPProfile | None,
+        ml_prediction=None,
+    ) -> list[str]:
         sources: list[str] = []
-        if performance_row and performance_row.kpi_score is not None:
+        if ml_prediction:
+            sources.append("KPI/ML")
+        elif performance_row and performance_row.kpi_score is not None:
             sources.append("KPI")
         if survey:
             sources.append("Nabiz")
@@ -345,6 +452,7 @@ class EmployeeService:
         risky_count = len([member for member in members if member.combined_risk_level in {"High", "Medium"}])
         high_risk_count = len([member for member in members if member.combined_risk_level == "High"])
         avg_pulse = round(sum(pulse_scores) / len(pulse_scores), 1) if pulse_scores else None
+        avg_pulse_100 = round(avg_pulse * 20, 1) if avg_pulse is not None else None
         confidence = round(
             (
                 (source_summary.kpi_analyzed_count / total)
@@ -365,8 +473,8 @@ class EmployeeService:
             TeamHealthStat(
                 key="pulse_average",
                 label="Nabiz Ortalamasi",
-                value=f"{avg_pulse}/5" if avg_pulse is not None else "Yok",
-                hint="Son weekly pulse baglilik skoru",
+                value=f"{avg_pulse_100}/100" if avg_pulse_100 is not None else "Yok",
+                hint=f"Son weekly pulse ortalamasi: {avg_pulse}/5" if avg_pulse is not None else "Son weekly pulse baglilik skoru",
                 tone="blue",
             ),
             TeamHealthStat(

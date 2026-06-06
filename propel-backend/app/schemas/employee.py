@@ -104,6 +104,10 @@ class TeamHealthMember(BaseModel):
     kpi_score: Optional[float] = None
     kpi_trend: Optional[float] = None
     kpi_latest_period: Optional[date] = None
+    kpi_band: Optional[str] = None
+    kpi_confidence: Optional[float] = None
+    kpi_top_driver: Optional[str] = None
+    kpi_source: Optional[str] = None
     feedback_count: int = 0
     feedback_sentiment_score: Optional[float] = None
     feedback_motivation_score: Optional[float] = None

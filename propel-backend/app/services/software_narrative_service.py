@@ -384,19 +384,29 @@ class SoftwareNarrativeService:
             or prediction.summary_payload.get("display_label")
             or f"Dataset #{prediction.employee_id}"
         )
+        team = str(prediction.summary_payload.get("team") or "ilgili takim")
+        role = SoftwareNarrativeService._employee_role(prediction)
+        seniority = SoftwareNarrativeService._seniority(role)
+        role_context = SoftwareNarrativeService._role_context(role, seniority)
+        risk_score = int(prediction.risk_score or 0)
+        driver_phrase = SoftwareNarrativeService._driver_phrase(prediction.top_drivers[:3])
+        support_lens = SoftwareNarrativeService._support_lens(prediction)
 
         return {
             "source": "deterministic",
             "model": None,
             "fallback_used": True,
-            "action_source": "KPI Registry action_when_risky + KPI esik/trend kurallari",
+            "action_source": "Admin ensemble prediction + KPI Registry esik/trend kurallari + rol/seniority baglami",
             "manager_summary": (
-                f"{employee_label} icin model {prediction.predicted_band} sonucunu "
-                f"%{round(prediction.confidence * 100, 1)} guvenle uretti. En belirgin sinyal {metric_name}."
+                f"{employee_label} icin admin ensemble modeli {prediction.predicted_band} sonucunu "
+                f"%{round(prediction.confidence * 100, 1)} guvenle uretti; model risk skoru {risk_score}/100. "
+                f"Kisi {team} takimi icinde takip ediliyor. "
+                f"En belirgin sinyal {metric_name}; {support_lens}"
             ),
             "risk_interpretation": (
                 f"{metric_name} su anda {threshold_status.lower()} ve {trend_signal.lower()}. "
-                "Bu yorum KPI Registry esikleri ve son donem trendinden uretildi."
+                f"Ilk uc driver okumasinda {driver_phrase}. "
+                "Bu yorum dataset satirlarindan uretilen son donem feature degeri, KPI Registry esikleri ve 4 haftalik trend sinyaliyle hesaplandi."
             ),
             "next_best_actions": [item["title"] for item in action_plan] or [primary_action],
             "action_plan": action_plan,
@@ -410,6 +420,13 @@ class SoftwareNarrativeService:
     def _action_plan(prediction: SoftwarePredictionResponse) -> list[dict[str, str]]:
         plans: list[dict[str, str]] = []
         team = str(prediction.summary_payload.get("team") or "ilgili takim")
+        role = SoftwareNarrativeService._employee_role(prediction)
+        seniority = SoftwareNarrativeService._seniority(role)
+        role_context = SoftwareNarrativeService._role_context(role, seniority)
+        action_context = SoftwareNarrativeService._action_context(role_context, team)
+        risk_score = int(prediction.risk_score or 0)
+        stress_driver = SoftwareNarrativeService._find_driver(prediction, ("is yuku", "asiri", "toplanti", "stres"))
+        motivation_driver = SoftwareNarrativeService._find_driver(prediction, ("motivasyon", "gelisim"))
         for index, driver in enumerate(prediction.top_drivers[:3]):
             metric_name = str(driver.get("metric_name") or "KPI sinyali")
             category = str(driver.get("category") or "Genel")
@@ -427,24 +444,41 @@ class SoftwareNarrativeService:
                         base_action=fallback_action,
                         metric_name=metric_name,
                         team=team,
+                        role=role,
+                        seniority=seniority,
+                        risk_score=risk_score,
                     ),
                     "reason": (
-                        f"{team} baglaminda {metric_name} {threshold_status.lower()} ve {trend_signal.lower()}. "
-                        f"Bu nedenle {category.lower()} basliginda hedefli takip oneriliyor."
+                        SoftwareNarrativeService._specific_reason(
+                            team=team,
+                            role=role,
+                            seniority=seniority,
+                            role_context=action_context,
+                            metric_name=metric_name,
+                            category=category,
+                            threshold_status=threshold_status,
+                            trend_signal=trend_signal,
+                            risk_score=risk_score,
+                            driver=driver,
+                            stress_driver=stress_driver,
+                            motivation_driver=motivation_driver,
+                        )
                     ),
                     "owner": SoftwareNarrativeService._owner_for_category(category),
-                    "timeframe": "Bu hafta",
+                    "timeframe": SoftwareNarrativeService._timeframe_for_risk(risk_score, threshold_status, trend_signal),
                     "expected_impact": SoftwareNarrativeService._expected_impact_for_driver(
                         metric_name=metric_name,
                         threshold_status=threshold_status,
                         trend_signal=trend_signal,
                     ),
-                    "conversation_goal": SoftwareNarrativeService._conversation_goal_for_driver(metric_name),
+                    "conversation_goal": SoftwareNarrativeService._conversation_goal_for_driver(metric_name, action_context),
                     "manager_talking_points": SoftwareNarrativeService._manager_talking_points_for_driver(
                         metric_name=metric_name,
                         team=team,
+                        role_context=action_context,
+                        risk_score=risk_score,
                     ),
-                    "employee_questions": SoftwareNarrativeService._employee_questions_for_driver(metric_name),
+                    "employee_questions": SoftwareNarrativeService._employee_questions_for_driver(metric_name, action_context, seniority),
                     "success_signal": SoftwareNarrativeService._success_signal_for_driver(metric_name),
                     "metric_name": metric_name,
                     "metric_code": str(driver.get("metric_code") or ""),
@@ -479,17 +513,52 @@ class SoftwareNarrativeService:
         ]
 
     @staticmethod
-    def _contextual_action_title(base_action: str, metric_name: str, team: str) -> str:
+    def _contextual_action_title(base_action: str, metric_name: str, team: str, role: str = "", seniority: str = "", risk_score: int = 0) -> str:
         normalized_metric = metric_name.lower()
+        role_context = SoftwareNarrativeService._role_context(role, seniority)
+        action_context = SoftwareNarrativeService._action_context(role_context, team)
         if "motivasyon" in normalized_metric:
-            return f"{team} icinde motivasyon dususu gorulen kisilerle 1:1 gorusme planla."
+            return f"{action_context} icin motivasyon ve gelisim engellerini 1:1'de netlestir."
         if "is yuku" in normalized_metric or "fazla" in normalized_metric or "toplanti" in normalized_metric:
-            return f"{team} sprint kapasitesini ve gorev dagilimini yeniden dengele."
+            return f"{action_context} icin is yukunu ve odak zamanini yeniden dengele."
         if "bug" in normalized_metric or "review" in normalized_metric or "kalite" in normalized_metric:
-            return f"{team} icin kod kalitesi ve review kontrol listesini gozden gecir."
+            return f"{action_context} icin hata kaynagini ve review kontrol noktasini daralt."
         if "teslim" in normalized_metric or "gorev" in normalized_metric:
-            return f"{team} teslim blokajlarini ve task kapsamlarini netlestir."
+            return f"{action_context} icin teslim blokajlarini ve task kapsamlarini netlestir."
+        if risk_score >= 80:
+            return f"{team} icin yuksek riskli KPI sinyaline ayni hafta destek plani cikar."
         return base_action
+
+    @staticmethod
+    def _specific_reason(
+        *,
+        team: str,
+        role: str,
+        seniority: str,
+        role_context: str,
+        metric_name: str,
+        category: str,
+        threshold_status: str,
+        trend_signal: str,
+        risk_score: int,
+        driver: dict[str, Any],
+        stress_driver: dict[str, Any] | None,
+        motivation_driver: dict[str, Any] | None,
+    ) -> str:
+        value = SoftwareNarrativeService._driver_value_text(driver)
+        context = role_context or team
+        secondary: list[str] = []
+        if stress_driver and stress_driver is not driver:
+            secondary.append(f"is yuku/stres: {stress_driver.get('threshold_status', 'izleme')} - {stress_driver.get('trend_signal', 'trend yok')}")
+        if motivation_driver and motivation_driver is not driver:
+            secondary.append(f"motivasyon: {motivation_driver.get('threshold_status', 'izleme')} - {motivation_driver.get('trend_signal', 'trend yok')}")
+        secondary_text = f" Ek sinyal: {'; '.join(secondary)}." if secondary else ""
+        return (
+            f"{context} baglaminda {metric_name} {threshold_status.lower()} ve {trend_signal.lower()}; "
+            f"model risk skoru {risk_score}/100. {value} "
+            f"Bu nedenle {category.lower()} basliginda genel takip degil, calisanin rol kapsami ve haftalik teslim ritmine bagli hedefli aksiyon oneriliyor."
+            f"{secondary_text}"
+        )
 
     @staticmethod
     def _owner_for_category(category: str) -> str:
@@ -503,6 +572,102 @@ class SoftwareNarrativeService:
         if "is birligi" in normalized or "organizasyon" in normalized:
             return "Takim lideri + ekip"
         return "Takim lideri"
+
+    @staticmethod
+    def _timeframe_for_risk(risk_score: int, threshold_status: str, trend_signal: str) -> str:
+        status = threshold_status.lower()
+        trend = trend_signal.lower()
+        if risk_score >= 85 or ("risk" in status and "olumsuz" in trend):
+            return "Ilk 48 saat"
+        if risk_score >= 70 or "olumsuz" in trend:
+            return "Bu hafta"
+        return "Bu sprint icinde"
+
+    @staticmethod
+    def _employee_role(prediction: SoftwarePredictionResponse) -> str:
+        return str(
+            prediction.summary_payload.get("position")
+            or prediction.summary_payload.get("role")
+            or "Software Engineer"
+        )
+
+    @staticmethod
+    def _seniority(role: str) -> str:
+        normalized = role.lower()
+        if "junior" in normalized:
+            return "junior"
+        if "senior" in normalized or "lead" in normalized or "principal" in normalized:
+            return "senior"
+        if "mid" in normalized:
+            return "mid"
+        return "orta seviye"
+
+    @staticmethod
+    def _role_context(role: str, seniority: str) -> str:
+        normalized_role = role.lower()
+        if seniority in {"junior", "mid", "senior"} and seniority in normalized_role:
+            return role
+        if seniority == "orta seviye":
+            return role
+        return f"{seniority} {role}".strip()
+
+    @staticmethod
+    def _action_context(role_context: str, team: str) -> str:
+        # Keep action copy readable: detailed role appears in the header/summary, while actions use a lighter label.
+        normalized = role_context.lower()
+        if "devops" in normalized:
+            return "DevOps calisani"
+        if "backend" in normalized:
+            return "Backend calisani"
+        if "frontend" in normalized:
+            return "Frontend calisani"
+        if "qa" in normalized or "quality" in normalized:
+            return "QA calisani"
+        return f"{team} calisani" if team and team != "ilgili takim" else "calisan"
+
+    @staticmethod
+    def _driver_value_text(driver: dict[str, Any]) -> str:
+        current = driver.get("current_value")
+        trend = driver.get("trend_4")
+        parts: list[str] = []
+        if current not in (None, ""):
+            parts.append(f"son deger {current}")
+        if trend not in (None, ""):
+            parts.append(f"4 haftalik fark {trend}")
+        return f"({' / '.join(parts)})." if parts else "Sayisal deger sinirli."
+
+    @staticmethod
+    def _find_driver(prediction: SoftwarePredictionResponse, keywords: tuple[str, ...]) -> dict[str, Any] | None:
+        for driver in prediction.top_drivers or []:
+            haystack = " ".join(
+                str(driver.get(key) or "")
+                for key in ("metric_name", "category", "metric_code", "feature")
+            ).lower()
+            if any(keyword in haystack for keyword in keywords):
+                return driver
+        return None
+
+    @staticmethod
+    def _driver_phrase(drivers: list[dict[str, Any]]) -> str:
+        phrases = []
+        for driver in drivers:
+            name = driver.get("metric_name") or "KPI sinyali"
+            status = str(driver.get("threshold_status") or "izleme").lower()
+            trend = str(driver.get("trend_signal") or "trend yok").lower()
+            phrases.append(f"{name}: {status}, {trend}")
+        return "; ".join(phrases) if phrases else "aciklanabilir surucu listesi sinirli"
+
+    @staticmethod
+    def _support_lens(prediction: SoftwarePredictionResponse) -> str:
+        stress = SoftwareNarrativeService._find_driver(prediction, ("is yuku", "asiri", "toplanti", "stres"))
+        motivation = SoftwareNarrativeService._find_driver(prediction, ("motivasyon", "gelisim"))
+        if stress and motivation:
+            return "aksiyon plani is yuku/stres ve motivasyon sinyallerini birlikte kontrol etmeli."
+        if stress:
+            return "aksiyon plani kapasite, odak zamani ve stres sinyalini oncelemeli."
+        if motivation:
+            return "aksiyon plani motivasyon, gelisim ve aidiyet sinyalini oncelemeli."
+        return "aksiyon plani ana KPI driver'lari ve rol kapsami uzerinden ilerlemeli."
 
     @staticmethod
     def _expected_impact_for_driver(metric_name: str, threshold_status: str, trend_signal: str) -> str:
@@ -528,37 +693,40 @@ class SoftwareNarrativeService:
         return "Odakli takip ile yonetici karar kalitesi artar; kisa vadede oncelikler netlesir."
 
     @staticmethod
-    def _conversation_goal_for_driver(metric_name: str) -> str:
+    def _conversation_goal_for_driver(metric_name: str, role_context: str = "") -> str:
         normalized = metric_name.lower()
+        role_text = role_context or "calisan"
         if "motivasyon" in normalized:
-            return "Motivasyon dususunun kokenini netlestirmek ve calisanin aidiyetini guclendirecek destek tipini belirlemek."
+            return f"{role_text} icin motivasyon dususunun kokenini netlestirmek ve aidiyeti guclendirecek destek tipini belirlemek."
         if "is yuku" in normalized or "toplanti" in normalized or "fazla" in normalized:
-            return "Kapasiteyi zorlayan alanlari tespit edip yuk dagilimini daha surdurulebilir hale getirmek."
+            return f"{role_text} uzerindeki kapasiteyi zorlayan alanlari tespit edip yuk dagilimini daha surdurulebilir hale getirmek."
         if "bug" in normalized or "review" in normalized or "kalite" in normalized:
-            return "Kalite sorununu besleyen teknik veya surecsel nedenleri ayristirip netlestirmek."
+            return f"{role_text} icin kalite sorununu besleyen teknik veya surecsel nedenleri ayristirip netlestirmek."
         if "teslim" in normalized or "gorev" in normalized:
-            return "Teslim gecikmesine yol acan belirsizlik ve bagimliliklari gorunur hale getirmek."
+            return f"{role_text} icin teslim gecikmesine yol acan belirsizlik ve bagimliliklari gorunur hale getirmek."
         return "KPI sinyalini etkileyen ana davranissal ve operasyonel etkenleri netlestirmek."
 
     @staticmethod
-    def _manager_talking_points_for_driver(metric_name: str, team: str) -> list[str]:
+    def _manager_talking_points_for_driver(metric_name: str, team: str, role_context: str = "", risk_score: int = 0) -> list[str]:
         normalized = metric_name.lower()
+        role_text = role_context or "bu calisan"
+        risk_text = f"Model risk skoru {risk_score}/100; bunu performans hukumunden cok destek onceligi olarak okuyalim."
         if "motivasyon" in normalized:
             return [
-                f"{team} icindeki mevcut tempo ve baski seviyesini birlikte degerlendirelim.",
+                f"{team} icindeki mevcut tempo ve {role_text} beklentilerini birlikte degerlendirelim.",
                 "Bu gorusme performans etiketi koymak icin degil, motivasyonu dusuren nedenleri anlamak icin.",
-                "Calisma gununu kolaylastiracak 1-2 destek adimini birlikte kararlastiralim.",
+                risk_text,
             ]
         if "is yuku" in normalized or "toplanti" in normalized or "fazla" in normalized:
             return [
-                "Bu hafta en cok enerji tuketen gorevleri birlikte siralayalim.",
-                "Oncelik dusurulebilecek veya devredilebilecek isleri netlestirelim.",
+                f"{role_text} icin bu hafta en cok enerji tuketen gorevleri birlikte siralayalim.",
+                "Oncelik dusurulebilecek, bolunebilecek veya devredilebilecek isleri netlestirelim.",
                 "Toplanti ve odak zamani dengesini koruyacak yeni bir ritim belirleyelim.",
             ]
         if "bug" in normalized or "review" in normalized or "kalite" in normalized:
             return [
-                "Son donemde hata cikaran adimlarda tekrar eden paterni birlikte gorelim.",
-                "Kod review beklentilerini ve kalite kontrol noktasini netlestirelim.",
+                f"{role_text} icin son donemde hata cikaran adimlarda tekrar eden paterni birlikte gorelim.",
+                "Kod review beklentilerini, test kapsamini ve kalite kontrol noktasini netlestirelim.",
                 "Kaliteyi artirirken teslim ritmini bozmayacak pratik iyilestirmeleri secelim.",
             ]
         return [
@@ -568,8 +736,9 @@ class SoftwareNarrativeService:
         ]
 
     @staticmethod
-    def _employee_questions_for_driver(metric_name: str) -> list[str]:
+    def _employee_questions_for_driver(metric_name: str, role_context: str = "", seniority: str = "") -> list[str]:
         normalized = metric_name.lower()
+        seniority_hint = "mentorluk veya netlestirme" if seniority == "junior" else "kapsam, delegasyon veya teknik karar netligi"
         if "motivasyon" in normalized:
             return [
                 "Son 2 haftada motivasyonunu en cok dusuren durum neydi?",
@@ -586,7 +755,7 @@ class SoftwareNarrativeService:
             return [
                 "Hatalar en cok hangi adimda ortaya cikiyor?",
                 "Review geri bildirimlerinde tekrar eden konu ne?",
-                "Kaliteyi artirmak icin hangi checklist veya otomasyon sana en cok yardim eder?",
+                f"Kaliteyi artirmak icin {seniority_hint} tarafinda hangi destek en cok yardim eder?",
             ]
         return [
             "Bu KPI sinyalini etkileyen en kritik iki neden sence neler?",
@@ -629,6 +798,9 @@ class SoftwareNarrativeService:
             "Baglam kurallari:\n"
             "- Sadece MODEL_PAYLOAD verisini kullan; yeni KPI, yeni olay veya kesin hukum uydurma.\n"
             "- Kisiyi mumkunse isim/rol/takimla an; sadece ID kullanma.\n"
+            "- Rol/seniority bilgisini sadece karar baglami icin kullan; Junior/Senior/Mid unvanini her cumlede veya her aksiyon basliginda tekrar etme.\n"
+            "- Aksiyon title'lari kisa ve manager dilinde olsun; 'Junior DevOps Engineer icin...' gibi tekrarli kaliplar kullanma.\n"
+            "- Teknik unvan gerekiyorsa bir kez manager_summary'de belirt, aksiyonlarda 'DevOps calisani', 'Backend calisani' veya calisan adi gibi daha dogal ifade kullan.\n"
             "- confidence bir guven seviyesidir, performans puani gibi anlatma.\n"
             "- Tahmin bandi kesin karar degil; yonetici icin onceliklendirme sinyalidir.\n"
             "- Top drivers KPI Registry esik ve trend kurallarindan geliyor; yorumu bunlara bagla.\n"
@@ -641,6 +813,8 @@ class SoftwareNarrativeService:
             "- next_best_actions oncelik sirasinda 3 aksiyon olsun; her birinde ne yapilacagi + beklenen kisa etki acik olsun.\n"
             "- action_plan her maddede title, reason, owner, timeframe, expected_impact, conversation_goal, manager_talking_points, employee_questions, success_signal icersin.\n"
             "- title generic olmasin; takim/rol/KPI baglamina gore ozellestir.\n"
+            "- action_plan maddeleri birbirinin kopyasi olmasin; ayni kok neden varsa maddeleri birlestir veya farkli aci ver.\n"
+            "- reason metinleri uzun rapor paragrafi gibi degil, 1-2 net cumle olsun; sayisal KPI degeri varsa yalniz en onemli olani kullan.\n"
             "- reason, hangi KPI/trend nedeniyle secildigini acikca soylesin.\n"
             "- expected_impact, 1 hafta icinde beklenen operasyonel etkisini net anlatsin.\n"
             "- manager_talking_points yoneticiye gorusmede kullanabilecegi 3 profesyonel cumle olsun.\n"

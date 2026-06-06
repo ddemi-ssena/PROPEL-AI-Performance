@@ -132,8 +132,7 @@ const router = createRouter({
         {
           path: 'sales-analytics',
           name: 'manager-sales-analytics',
-          component: () => import('@/views/sales/SalesAnalyticsView.vue'),
-          meta: { title: 'Satis KPI & ML Analizi' },
+          redirect: { name: 'manager-sales-kpi-analysis', query: { section: 'department' } },
         },
         {
           path: 'sales-department-analytics',
@@ -254,7 +253,7 @@ router.beforeEach(async (to, _from, next) => {
       const deptId = authStore.user?.department_id ?? Number(localStorage.getItem('deptId') || '0')
       const deptName = (authStore.user?.department_name || '').toLowerCase()
       const isSalesMgr = deptName.includes('sat') || email.includes('satis') || email.startsWith('sl-') || deptId === 14 || deptId === 18 || deptId === 2 || deptId === 20
-      next(isSalesMgr ? '/manager/sales-analytics' : '/manager')
+      next(isSalesMgr ? '/manager/sales-kpi-analysis?section=department' : '/manager')
     } else if (role === 'employee') {
       next(isSalesUser(authStore) ? '/employee/sales' : '/employee')
     } else {

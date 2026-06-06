@@ -29,6 +29,10 @@ export interface TeamHealthMember {
   kpi_score?: number | null
   kpi_trend?: number | null
   kpi_latest_period?: string | null
+  kpi_band?: string | null
+  kpi_confidence?: number | null
+  kpi_top_driver?: string | null
+  kpi_source?: string | null
   feedback_count: number
   feedback_sentiment_score?: number | null
   feedback_motivation_score?: number | null

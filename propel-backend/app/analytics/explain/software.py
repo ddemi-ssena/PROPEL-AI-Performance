@@ -7,6 +7,38 @@ from app.analytics.kpi_registry import KPIDefinition, get_software_kpi_by_featur
 
 class SoftwareExplanationBuilder:
     @staticmethod
+    def _threshold_priority(status: str) -> int:
+        lowered = status.lower()
+        if "risk" in lowered or "altinda" in lowered or "ustunde" in lowered:
+            return 4
+        if "izleme" in lowered:
+            return 2
+        if "optimal aralikta" in lowered or "guclu" in lowered:
+            return 0
+        return 1
+
+    @staticmethod
+    def _trend_priority(signal: str) -> int:
+        lowered = signal.lower()
+        if "olumsuz" in lowered:
+            return 3
+        if "yatay" in lowered:
+            return 1
+        if "iyilesiyor" in lowered:
+            return 0
+        return 1
+
+    @staticmethod
+    def _feature_type_priority(feature_name: str) -> int:
+        if feature_name.endswith("_trend_4"):
+            return 2
+        if feature_name.endswith("_rolling_4"):
+            return 1
+        if feature_name.endswith("_lag_1"):
+            return 0
+        return 3
+
+    @staticmethod
     def _risk_level(target_column: str, predicted_band: str) -> str:
         if target_column == "attrition_risk_band":
             return {"Yuksek": "high", "Orta": "medium", "Dusuk": "low"}.get(predicted_band, "medium")
@@ -117,6 +149,8 @@ class SoftwareExplanationBuilder:
         actions: list[str] = []
         seen_actions: set[str] = set()
 
+        candidates: list[tuple[float, dict[str, Any], str]] = []
+
         for item in top_features:
             feature_name = str(item.get("feature", ""))
             definition = get_software_kpi_by_feature_name(feature_name)
@@ -134,15 +168,25 @@ class SoftwareExplanationBuilder:
             trend_value = feature_row.get(f"{base_feature}_trend_4")
             threshold_status = SoftwareExplanationBuilder._threshold_status(definition, current_value)
             trend_signal = SoftwareExplanationBuilder._trend_signal(definition, trend_value)
+            importance = round(float(item.get("importance", 0)), 6)
+            priority = (
+                SoftwareExplanationBuilder._threshold_priority(threshold_status) * 100
+                + SoftwareExplanationBuilder._trend_priority(trend_signal) * 25
+                + SoftwareExplanationBuilder._feature_type_priority(feature_name) * 5
+                + importance
+            )
 
-            drivers.append(
-                {
+            candidates.append(
+                (
+                    priority,
+                    {
                     "feature": feature_name,
                     "metric_code": definition.canonical_code,
                     "metric_name": definition.display_name,
                     "category": definition.category,
                     "direction": definition.direction,
-                    "importance": round(float(item.get("importance", 0)), 6),
+                    "importance": importance,
+                    "driver_priority": round(priority, 6),
                     "value": SoftwareExplanationBuilder._format_value(value),
                     "current_value": SoftwareExplanationBuilder._format_value(current_value),
                     "trend_4": SoftwareExplanationBuilder._format_value(trend_value),
@@ -156,13 +200,23 @@ class SoftwareExplanationBuilder:
                         predicted_band=predicted_band,
                         target_column=target_column,
                     ),
-                }
+                    },
+                    definition.action_when_risky,
+                )
             )
 
-            if definition.action_when_risky not in seen_actions:
-                seen_actions.add(definition.action_when_risky)
-                actions.append(definition.action_when_risky)
+        best_by_metric: dict[str, tuple[float, dict[str, Any], str]] = {}
+        for candidate in candidates:
+            _, driver, _ = candidate
+            metric_code = str(driver["metric_code"])
+            if metric_code not in best_by_metric or candidate[0] > best_by_metric[metric_code][0]:
+                best_by_metric[metric_code] = candidate
 
+        for _, driver, action in sorted(best_by_metric.values(), key=lambda candidate: candidate[0], reverse=True):
+            drivers.append(driver)
+            if action not in seen_actions:
+                seen_actions.add(action)
+                actions.append(action)
             if len(drivers) >= limit:
                 break
 
