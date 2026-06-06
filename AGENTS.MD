@@ -985,6 +985,38 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
 
 ---
 
+### 2026-06-06 Personel Yönetimi — Top 5 / Bottom 5 Aksiyonlar Modalları ★
+
+**Değiştirilen Dosya**: `propel-frontend/src/views/admin/EmployeeManagement.vue`
+
+#### Top 5 "Aksiyonlar" Butonu ve Modalı
+- "En Yüksek Skor — Top 5" panel başlığının yanına yeşil **Aksiyonlar** butonu eklendi (`StarIcon`)
+- Modal iki ana bölümden oluşuyor:
+  1. **Ödüllendirme Önerileri** — 6 kart (Performans Sertifikası, Ekstra İzin Günü, Mentorluk Fırsatı, Kariyer Gelişim Bütçesi, Şirket Geneli Takdir, Performans Primi)
+  2. **Hayır Kurumu Bağışı** — Her Top 5 çalışanı için ayrı blok; 9 kurumdan biri seçiliyor:
+     - LÖSEV, TEMA Vakfı, Darüşşafaka Cemiyeti, Türk Eğitim Vakfı (TEV), Türk Kızılay, UNICEF Türkiye, AHBAP Derneği, Mehmetçik Vakfı, WWF-Türkiye
+     - Seçim yapıldıkça "Seçildi" rozeti + "Bağış Özeti" paneli beliriyor
+     - Seçimler `selectedCharities` reactive map'inde tutulur (code → charity name)
+  3. **Desteklenen Kurumlar** bilgi kartları — 9 kurumun açıklaması grid formatında
+
+#### Bottom 5 "Aksiyonlar" Butonu ve Modalı
+- "Dikkat Gerektiren — Bottom 5" panel başlığının yanına kırmızı **Aksiyonlar** butonu eklendi (`ClipboardDocumentListIcon`)
+- Her çalışan için:
+  - Risk sinyali rozetleri: PD%, Tükenmişlik%, İstifa%, ARS%, Motivasyon renk kodlu
+  - `bottomActionsForEmployee()` fonksiyonu → ML değerlerine göre **otomatik öncelik sıralamalı aksiyon listesi** (Acil / Yüksek / Orta / Düşük)
+  - Acil: `high_risk ≥ 50` → birebir yönetici görüşmesi; Yüksek: `perf_drop ≥ 50`, `burnout ≥ 40`, `resignation ≥ 40`, `ARS ≥ 0.6`; Orta/Düşük: IDP, peer buddy, kısa vadeli hedef
+  - Alt kısımda genel uygulama rehberi (Acil = 1 hafta, İK kaydı, 4 haftalık izleme)
+
+#### Teknik Detaylar
+- `showTopActionsModal` / `showBottomActionsModal` — ref boolean
+- `selectedCharities` — `Record<string, string>` (employee code → seçilen kurum)
+- `charities` / `rewardSuggestions` — reactive olmayan sabit array'ler
+- `Teleport to="body"` + `Transition name="modal-fade"` — backdrop blur, scale+fade animasyonu
+- Yeni heroicon import'ları: `StarIcon`, `ClipboardDocumentListIcon`, `XMarkIcon`
+- IDE'de `2307` (vue/vue-router/heroicons bulunamıyor) hataları beklenen — `node_modules` sadece Docker container'ında mevcut
+
+---
+
 ## Sonraki Adımlar / Roadmap
 
 - [x] Satış departmanı frontend dashboard'u (Vue 3) — employee/manager/admin görünümleri
@@ -1012,6 +1044,8 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
 - [x] 360° Feedback gerçekçi seed dataseti (1883 response, 558 NLPProfile, patch_nlp_raw_analysis)
 - [x] Yetenek Dağılımı grafiği — gerçek 1-5 peer skorları (FeedbackResponse ortalamalar, skill_scores alanı)
 - [x] Personel Yönetimi tamamen yenilendi — ML + Nabız Anketi bütünleşik skor, Top5/Bottom5, Gemini paneli
+- [x] Personel Yönetimi Top 5 Aksiyonlar — ödüllendirme önerileri + 9 hayır kurumu bağış seçimi
+- [x] Personel Yönetimi Bottom 5 Aksiyonlar — ML verisi bazlı öncelikli önlemler listesi (Acil/Yüksek/Orta/Düşük)
 - [ ] Personel Yönetimi 360° sütunu backend entegrasyonu (per-employee 360 skoru endpoint'i)
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri

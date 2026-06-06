@@ -57,9 +57,18 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <!-- Top 5 -->
         <div class="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
-          <div class="bg-emerald-50 px-6 py-4 border-b border-emerald-100 flex items-center gap-2">
-            <TrophyIcon class="w-5 h-5 text-emerald-600" />
-            <h3 class="font-bold text-emerald-800">En Yüksek Skor — Top 5</h3>
+          <div class="bg-emerald-50 px-6 py-4 border-b border-emerald-100 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <TrophyIcon class="w-5 h-5 text-emerald-600" />
+              <h3 class="font-bold text-emerald-800">En Yüksek Skor — Top 5</h3>
+            </div>
+            <button
+              @click="showTopActionsModal = true"
+              class="flex items-center gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+            >
+              <StarIcon class="w-3.5 h-3.5" />
+              Aksiyonlar
+            </button>
           </div>
           <div class="p-4 space-y-3">
             <div
@@ -93,9 +102,18 @@
 
         <!-- Bottom 5 -->
         <div class="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
-          <div class="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center gap-2">
-            <ExclamationTriangleIcon class="w-5 h-5 text-red-600" />
-            <h3 class="font-bold text-red-800">Dikkat Gerektiren — Bottom 5</h3>
+          <div class="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <ExclamationTriangleIcon class="w-5 h-5 text-red-600" />
+              <h3 class="font-bold text-red-800">Dikkat Gerektiren — Bottom 5</h3>
+            </div>
+            <button
+              @click="showBottomActionsModal = true"
+              class="flex items-center gap-1.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+            >
+              <ClipboardDocumentListIcon class="w-3.5 h-3.5" />
+              Aksiyonlar
+            </button>
           </div>
           <div class="p-4 space-y-3">
             <div
@@ -127,6 +145,244 @@
           </div>
         </div>
       </div>
+
+      <!-- ── Top 5 Aksiyonlar Modalı ──────────────────────────────────────── -->
+      <Teleport to="body">
+        <Transition name="modal-fade">
+          <div v-if="showTopActionsModal" class="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 overflow-y-auto" @click.self="showTopActionsModal = false">
+            <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="showTopActionsModal = false"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl z-10 overflow-hidden">
+              <!-- Modal Header -->
+              <div class="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-5 text-white flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <TrophyIcon class="w-6 h-6 text-yellow-300" />
+                  <div>
+                    <h2 class="text-lg font-bold">Ödüllendirme ve Destek Aksiyonları</h2>
+                    <p class="text-xs text-emerald-100">En yüksek performanslı 5 çalışan için öneriler</p>
+                  </div>
+                </div>
+                <button @click="showTopActionsModal = false" class="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
+                  <XMarkIcon class="w-5 h-5" />
+                </button>
+              </div>
+
+              <div class="p-6 space-y-7 max-h-[70vh] overflow-y-auto">
+                <!-- Ödüllendirme Önerileri -->
+                <section>
+                  <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <span class="text-lg">🌟</span> Ödüllendirme Önerileri
+                  </h3>
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div v-for="reward in rewardSuggestions" :key="reward.title"
+                      class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-3 hover:shadow-sm transition-shadow">
+                      <div class="text-2xl mb-1.5">{{ reward.icon }}</div>
+                      <p class="text-xs font-bold text-emerald-800">{{ reward.title }}</p>
+                      <p class="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{{ reward.desc }}</p>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- Hayır Kurumu Bağışı -->
+                <section>
+                  <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-2">
+                    <span class="text-lg">❤️</span> Hayır Kurumu Bağışı
+                  </h3>
+                  <p class="text-xs text-slate-500 mb-4">Her çalışan adına yapılacak bağış için tercih edilen kurumu seçin. Çalışanlar kendi seçimlerini yapabilir.</p>
+
+                  <div class="space-y-4">
+                    <div v-for="emp in topFive" :key="emp.code" class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                      <div class="flex items-center gap-3 mb-3">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                          :class="emp.dept === 'Satış' ? 'bg-emerald-500' : 'bg-indigo-500'">
+                          {{ initials(emp.name) }}
+                        </div>
+                        <div>
+                          <p class="text-sm font-bold text-slate-800">{{ emp.name }}</p>
+                          <p class="text-xs text-slate-400">{{ emp.dept }} · Skor: {{ emp.genel_skor }}/100</p>
+                        </div>
+                        <div class="ml-auto">
+                          <span v-if="selectedCharities[emp.code]" class="text-[10px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">
+                            ✓ Seçildi
+                          </span>
+                        </div>
+                      </div>
+                      <div class="grid grid-cols-3 gap-1.5">
+                        <button
+                          v-for="charity in charities"
+                          :key="charity.name"
+                          @click="selectedCharities[emp.code] = selectedCharities[emp.code] === charity.name ? '' : charity.name"
+                          :class="[
+                            'text-left px-2.5 py-2 rounded-lg border text-[10px] font-medium transition-all',
+                            selectedCharities[emp.code] === charity.name
+                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-md scale-105'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-300 hover:bg-emerald-50'
+                          ]"
+                        >
+                          <span class="mr-1">{{ charity.emoji }}</span>{{ charity.name }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Seçim Özeti -->
+                  <div v-if="Object.values(selectedCharities).some(v => v)" class="mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                    <p class="text-xs font-bold text-emerald-700 mb-2">📋 Bağış Özeti</p>
+                    <div class="space-y-1">
+                      <div v-for="emp in topFive" :key="emp.code">
+                        <div v-if="selectedCharities[emp.code]" class="flex items-center gap-2 text-xs text-emerald-800">
+                          <span class="font-semibold">{{ emp.name.split(' ')[0] }}:</span>
+                          <span>{{ selectedCharities[emp.code] }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p class="text-[10px] text-emerald-600 mt-2">Bu seçimler İK sistemine kaydedilebilir veya bağış koordinatörüne iletilebilir.</p>
+                  </div>
+                </section>
+
+                <!-- Hayır Kurumları Bilgi Kartları -->
+                <section>
+                  <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <span class="text-lg">🏛️</span> Desteklenen Kurumlar
+                  </h3>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div v-for="charity in charities" :key="charity.name"
+                      class="flex items-start gap-2.5 bg-white border border-slate-100 rounded-lg p-3 hover:border-slate-200 transition-colors">
+                      <span class="text-xl flex-shrink-0">{{ charity.emoji }}</span>
+                      <div>
+                        <p class="text-xs font-bold text-slate-800">{{ charity.name }}</p>
+                        <p class="text-[10px] text-slate-400 leading-relaxed mt-0.5">{{ charity.desc }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+                <button @click="showTopActionsModal = false" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">
+                  Kapat
+                </button>
+                <button class="px-4 py-2 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
+                  Seçimleri Kaydet
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+
+      <!-- ── Bottom 5 Aksiyonlar Modalı ──────────────────────────────────── -->
+      <Teleport to="body">
+        <Transition name="modal-fade">
+          <div v-if="showBottomActionsModal" class="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 overflow-y-auto" @click.self="showBottomActionsModal = false">
+            <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="showBottomActionsModal = false"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl z-10 overflow-hidden">
+              <!-- Modal Header -->
+              <div class="bg-gradient-to-r from-red-600 to-rose-600 px-6 py-5 text-white flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <ExclamationTriangleIcon class="w-6 h-6 text-yellow-300" />
+                  <div>
+                    <h2 class="text-lg font-bold">Risk Azaltma Aksiyonları</h2>
+                    <p class="text-xs text-red-100">Dikkat gerektiren 5 çalışan için alınması gereken önlemler</p>
+                  </div>
+                </div>
+                <button @click="showBottomActionsModal = false" class="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
+                  <XMarkIcon class="w-5 h-5" />
+                </button>
+              </div>
+
+              <div class="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+                <div v-for="(emp, idx) in bottomFive" :key="emp.code"
+                  class="bg-white border rounded-xl overflow-hidden shadow-sm"
+                  :class="emp.genel_skor < 30 ? 'border-red-200' : 'border-amber-200'"
+                >
+                  <!-- Çalışan başlığı -->
+                  <div class="px-4 py-3 flex items-center gap-3"
+                    :class="emp.genel_skor < 30 ? 'bg-red-50 border-b border-red-100' : 'bg-amber-50 border-b border-amber-100'"
+                  >
+                    <span class="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0"
+                      :class="emp.genel_skor < 30 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'">
+                      {{ idx + 1 }}
+                    </span>
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                      :class="emp.dept === 'Satış' ? 'bg-emerald-500' : 'bg-indigo-500'">
+                      {{ initials(emp.name) }}
+                    </div>
+                    <div class="flex-1">
+                      <p class="text-sm font-bold text-slate-800">{{ emp.name }}</p>
+                      <p class="text-xs text-slate-400">{{ emp.dept }} · {{ emp.team }}</p>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs">
+                      <span class="font-mono">
+                        <span class="text-slate-400">Genel: </span>
+                        <span class="font-bold" :class="emp.genel_skor < 30 ? 'text-red-600' : 'text-amber-600'">{{ emp.genel_skor }}/100</span>
+                      </span>
+                      <span class="px-2 py-0.5 rounded-full font-semibold"
+                        :class="emp.genel_skor < 30 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'">
+                        {{ emp.genel_skor < 30 ? 'Kritik' : 'Yüksek Risk' }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Risk sinyalleri -->
+                  <div class="px-4 pt-3 pb-1 flex flex-wrap gap-1.5">
+                    <span v-if="emp.perf_drop >= 50" class="text-[10px] bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded-full font-medium">📉 Performans Düşüşü %{{ emp.perf_drop }}</span>
+                    <span v-if="emp.burnout >= 40" class="text-[10px] bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded-full font-medium">🔥 Tükenmişlik %{{ emp.burnout }}</span>
+                    <span v-if="emp.resignation >= 40" class="text-[10px] bg-purple-50 text-purple-600 border border-purple-100 px-2 py-0.5 rounded-full font-medium">🚪 İstifa Riski %{{ emp.resignation }}</span>
+                    <span v-if="emp.high_risk >= 50" class="text-[10px] bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-full font-medium">⚠️ Yüksek Risk %{{ emp.high_risk }}</span>
+                    <span v-if="emp.survey_score !== null && emp.survey_score < 3" class="text-[10px] bg-amber-50 text-amber-600 border border-amber-100 px-2 py-0.5 rounded-full font-medium">💛 Düşük Motivasyon {{ emp.survey_score.toFixed(1) }}/5</span>
+                    <span v-if="emp.survey_ars !== null && emp.survey_ars >= 0.6" class="text-[10px] bg-rose-50 text-rose-600 border border-rose-100 px-2 py-0.5 rounded-full font-medium">🔴 Yüksek ARS %{{ (emp.survey_ars * 100).toFixed(0) }}</span>
+                  </div>
+
+                  <!-- Aksiyon listesi -->
+                  <div class="px-4 pb-4 pt-2 space-y-1.5">
+                    <div v-for="action in bottomActionsForEmployee(emp)" :key="action.text"
+                      class="flex items-start gap-2.5 p-2.5 rounded-lg border"
+                      :class="{
+                        'bg-red-50 border-red-100': action.priority === 'Acil',
+                        'bg-amber-50 border-amber-100': action.priority === 'Yüksek',
+                        'bg-blue-50 border-blue-100': action.priority === 'Orta',
+                        'bg-slate-50 border-slate-100': action.priority === 'Düşük',
+                      }"
+                    >
+                      <span class="text-base flex-shrink-0 mt-0.5">{{ action.icon }}</span>
+                      <div class="flex-1">
+                        <p class="text-xs text-slate-800 font-medium leading-snug">{{ action.text }}</p>
+                      </div>
+                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                        :class="{
+                          'bg-red-200 text-red-800': action.priority === 'Acil',
+                          'bg-amber-200 text-amber-800': action.priority === 'Yüksek',
+                          'bg-blue-200 text-blue-800': action.priority === 'Orta',
+                          'bg-slate-200 text-slate-700': action.priority === 'Düşük',
+                        }"
+                      >
+                        {{ action.priority }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Genel notlar -->
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <p class="text-xs font-bold text-amber-800 mb-2">📌 Genel Uygulama Rehberi</p>
+                  <ul class="text-xs text-amber-700 space-y-1 list-disc list-inside">
+                    <li>"Acil" öncelikli aksiyonlar 1 hafta içinde başlatılmalı</li>
+                    <li>Tüm görüşmeler İK kayıtlarına işlenmelidir</li>
+                    <li>İyileşme süreci 4 haftalık dönemlerle takip edilmeli</li>
+                    <li>Çalışanın onayı alınmadan üçüncü kişilerle veri paylaşılmamalı</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <button @click="showBottomActionsModal = false" class="px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+                  Kapat
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
 
       <!-- Gemini Yorumu -->
       <div class="bg-gradient-to-br from-violet-900 via-indigo-900 to-slate-900 rounded-2xl p-6 mb-8 text-white shadow-xl">
@@ -439,6 +695,9 @@ import {
   TrophyIcon,
   ExclamationTriangleIcon,
   ArrowTopRightOnSquareIcon,
+  StarIcon,
+  ClipboardDocumentListIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { apiClient } from '@/services/api/client'
 import { employeeApi } from '@/services/api/employee.api'
@@ -447,6 +706,46 @@ const router = useRouter()
 const isLoading = ref(true)
 const geminiLoading = ref(false)
 const geminiUsed = ref(false)
+
+// ── Modal durumları ────────────────────────────────────────────────────────
+const showTopActionsModal = ref(false)
+const showBottomActionsModal = ref(false)
+const selectedCharities = ref<Record<string, string>>({})
+
+const charities = [
+  { name: 'LÖSEV', desc: 'Lösemi ve kanser hastası çocuklara sağlık, eğitim ve sosyal destek', emoji: '🎗️' },
+  { name: 'TEMA Vakfı', desc: 'Çevre, toprak koruma, ağaçlandırma ve iklim çalışmaları', emoji: '🌱' },
+  { name: 'Darüşşafaka Cemiyeti', desc: 'Anne veya babasını kaybetmiş çocuklara eğitim desteği', emoji: '📚' },
+  { name: 'Türk Eğitim Vakfı (TEV)', desc: 'Öğrencilere burs ve eğitim desteği', emoji: '🎓' },
+  { name: 'Türk Kızılay', desc: 'Afet yardımları, kan bağışı ve sosyal destek', emoji: '❤️' },
+  { name: 'UNICEF Türkiye', desc: 'Çocuk hakları, eğitim ve sağlık projeleri', emoji: '🌍' },
+  { name: 'AHBAP Derneği', desc: 'İhtiyaç sahiplerine ve afet bölgelerine destek', emoji: '🤝' },
+  { name: 'Mehmetçik Vakfı', desc: 'Şehit yakınları ve gazilere destek', emoji: '🏅' },
+  { name: 'WWF-Türkiye', desc: 'Doğa koruma ve biyolojik çeşitlilik projeleri', emoji: '🐾' },
+]
+
+const rewardSuggestions = [
+  { icon: '🏆', title: 'Performans Sertifikası', desc: 'Üstün başarı belgesi ve dijital rozet' },
+  { icon: '🎁', title: 'Ekstra İzin Günü', desc: '1-3 gün ilave tatil hakkı' },
+  { icon: '💡', title: 'Mentorluk Fırsatı', desc: 'Üst düzey yöneticilerle birebir koçluk' },
+  { icon: '📈', title: 'Kariyer Gelişim Bütçesi', desc: 'Eğitim ve sertifika programı desteği' },
+  { icon: '🌟', title: 'Şirket Geneli Takdir', desc: 'Tüm departmanlara duyurulan başarı paylaşımı' },
+  { icon: '💰', title: 'Performans Primi', desc: 'Kısa vadeli ikramiye önerileri' },
+]
+
+function bottomActionsForEmployee(emp: EnrichedEmployee): { icon: string; text: string; priority: string }[] {
+  const actions: { icon: string; text: string; priority: string }[] = []
+  if (emp.high_risk >= 50) actions.push({ icon: '⚠️', text: 'Acil 1-on-1 yönetici görüşmesi planla', priority: 'Acil' })
+  if (emp.perf_drop >= 50) actions.push({ icon: '📊', text: 'Haftalık KPI takip ve hedef revizyon toplantısı başlat', priority: 'Yüksek' })
+  if (emp.burnout >= 40) actions.push({ icon: '🧘', text: 'Tükenmişlik önleme programına yönlendir, iş yükünü dengele', priority: 'Yüksek' })
+  if (emp.resignation >= 40) actions.push({ icon: '🤝', text: 'Kariyer gelişim görüşmesi yap, elde tutma paketi hazırla', priority: 'Yüksek' })
+  if (emp.survey_ars !== null && emp.survey_ars >= 0.6) actions.push({ icon: '🔒', text: 'Bağlılık planı oluştur, uzun vadeli teşvik görüşmesi yap', priority: 'Yüksek' })
+  if (emp.survey_score !== null && emp.survey_score < 3) actions.push({ icon: '💬', text: 'Motivasyon artırıcı sorumluluk ve proje ata', priority: 'Orta' })
+  actions.push({ icon: '📋', text: 'Bireysel gelişim planı (IDP) hazırla ve 4 haftada bir gözden geçir', priority: 'Orta' })
+  actions.push({ icon: '👥', text: 'Peer destek programı ve buddy sistemi kur', priority: 'Düşük' })
+  actions.push({ icon: '🎯', text: 'Kısa vadeli, ulaşılabilir alt hedefler belirle', priority: 'Orta' })
+  return actions
+}
 
 // ── Raw veri ──────────────────────────────────────────────────────────────
 
@@ -751,3 +1050,23 @@ function genelScorLabel(score: number) {
   return { text: 'Yüksek Risk', color: 'text-red-500' }
 }
 </script>
+
+<style scoped>
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+.modal-fade-enter-active > div:last-child,
+.modal-fade-leave-active > div:last-child {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.modal-fade-enter-from > div:last-child,
+.modal-fade-leave-to > div:last-child {
+  transform: scale(0.95) translateY(-8px);
+  opacity: 0;
+}
+</style>
