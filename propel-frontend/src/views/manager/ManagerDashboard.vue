@@ -128,14 +128,11 @@
               <span class="rounded-full px-3 py-1 text-xs font-bold" :class="statusBadge(overallStatus)">
                 {{ statusLabel(overallStatus) }}
               </span>
-              <button
-                type="button"
-                class="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-                :disabled="loading || llmLoading"
-                @click="refreshDashboard(true)"
+              <span
+                class="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-slate-500"
               >
-                {{ llmLoading ? 'LLM yorumluyor...' : 'LLM ile detaylı yorumla' }}
-              </button>
+                Detayli yorum sag alttaki Gemini panelinde
+              </span>
             </div>
           </div>
 
@@ -458,32 +455,102 @@
         </div>
       </section>
 
-      <section class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">AI Özet</p>
-              <h2 class="mt-2 text-xl font-bold text-slate-900">Birleşik departman yorumu</h2>
-            </div>
-            <span class="w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-              {{ aiSummarySourceLabel }}
-            </span>
-          </div>
-          <p class="mt-4 text-sm leading-6 text-slate-700">{{ aiSummary.summary }}</p>
-
-          <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-            <SummaryList title="AI'nin Dayandığı Güçlü Kanıtlar" :items="aiSummary.strengths" tone="emerald" />
-            <SummaryList title="AI Risk Yorumu" :items="aiSummary.risks" tone="rose" />
-            <SummaryList title="AI Aksiyon Önerileri" :items="aiSummary.recommendations" tone="blue" />
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-6">
+      <section class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div class="grid grid-cols-1 gap-6 xl:col-span-2 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <RiskIndicators :risks="riskIndicatorGroups" />
           <QuickActions :actions="quickActionItems" />
         </div>
       </section>
     </template>
+
+    <div class="fixed bottom-6 right-6 z-40 flex max-h-[82vh] w-[min(26rem,calc(100vw-2rem))] flex-col">
+      <div v-if="!geminiPanelOpen" class="self-end">
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-bold text-white shadow-xl shadow-violet-200 transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="loading || llmLoading"
+          @click="openGeminiSummary"
+        >
+          <SparklesIcon class="h-5 w-5" />
+          {{ llmLoading ? 'Gemini analiz ediyor...' : 'Gemini ile Yorumla' }}
+        </button>
+      </div>
+
+      <div v-else class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div class="flex items-center justify-between gap-3 bg-violet-600 px-4 py-3 text-white">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <SparklesIcon class="h-5 w-5 shrink-0" />
+              <p class="truncate text-sm font-bold">Gemini departman yorumu</p>
+            </div>
+            <p class="mt-1 text-xs text-violet-100">KPI/ML + nabiz + 360 hibrit analizi</p>
+          </div>
+          <div class="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              title="Yenile"
+              class="rounded-lg p-1.5 text-white transition hover:bg-white/15 disabled:opacity-40"
+              :disabled="llmLoading"
+              @click="openGeminiSummary"
+            >
+              <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': llmLoading }" />
+            </button>
+            <button
+              type="button"
+              title="Kapat"
+              class="rounded-lg p-1.5 text-white transition hover:bg-white/15"
+              @click="geminiPanelOpen = false"
+            >
+              <XMarkIcon class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-4 border-b border-slate-100 text-center text-xs">
+          <div class="p-2">
+            <p class="font-bold text-slate-900">{{ score(scores.department_health) }}</p>
+            <p class="text-[10px] font-semibold uppercase text-slate-400">Saglik</p>
+          </div>
+          <div class="border-l border-slate-100 p-2">
+            <p class="font-bold text-slate-900">{{ score(scores.execution_score) }}</p>
+            <p class="text-[10px] font-semibold uppercase text-slate-400">KPI</p>
+          </div>
+          <div class="border-l border-slate-100 p-2">
+            <p class="font-bold" :class="riskToneClass(scores.risk_score)">{{ score(scores.risk_score) }}</p>
+            <p class="text-[10px] font-semibold uppercase text-slate-400">Risk</p>
+          </div>
+          <div class="border-l border-slate-100 p-2">
+            <p class="font-bold text-slate-900">{{ score(scores.confidence_score) }}</p>
+            <p class="text-[10px] font-semibold uppercase text-slate-400">Guven</p>
+          </div>
+        </div>
+
+        <div class="max-h-[58vh] overflow-y-auto p-4">
+          <div v-if="llmLoading" class="flex flex-col items-center justify-center gap-3 py-10">
+            <div class="h-8 w-8 animate-spin rounded-full border-4 border-violet-100 border-t-violet-600"></div>
+            <p class="text-sm text-slate-500">Gemini hibrit sinyalleri yorumluyor...</p>
+          </div>
+
+          <div v-else class="space-y-4">
+            <div>
+              <div class="mb-2 flex flex-wrap gap-2">
+                <span class="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-bold text-violet-700">
+                  {{ aiSummarySourceLabel }}
+                </span>
+                <span v-if="aiSummary.model" class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+                  {{ aiSummary.model }}
+                </span>
+              </div>
+              <p class="text-sm leading-6 text-slate-700">{{ aiSummary.summary }}</p>
+            </div>
+
+            <SummaryList title="Dayanaklar" :items="aiSummary.strengths" tone="emerald" />
+            <SummaryList title="Risk Yorumu" :items="aiSummary.risks" tone="rose" />
+            <SummaryList title="Aksiyon Onerileri" :items="aiSummary.recommendations" tone="blue" />
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -497,6 +564,7 @@ import {
   ShieldCheckIcon,
   SparklesIcon,
   UsersIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import KPICard from '@/components/dashboard/KPICard.vue'
 import PipelineTracking, { type PipelineStage } from '@/components/dashboard/PipelineTracking.vue'
@@ -530,6 +598,7 @@ const dashboard = ref<SoftwareDepartmentDashboardResponse | null>(null)
 const loading = ref(false)
 const llmLoading = ref(false)
 const errorMessage = ref('')
+const geminiPanelOpen = ref(false)
 
 const emptyDepartment: DepartmentDashboardDepartmentResponse = {
   id: 0,
@@ -1141,20 +1210,66 @@ const funnelInsights = computed(() => {
 })
 
 const riskIndicatorGroups = computed<RiskIndicatorGroups>(() => {
-  const critical = insights.value
-    .filter((item) => item.severity === 'critical')
-    .map((item) => item.title)
-  const warnings = insights.value
-    .filter((item) => item.severity === 'warning')
-    .map((item) => item.title)
-  const positive = aiSummary.value.strengths.length
-    ? aiSummary.value.strengths
-    : [`Departman sağlık skoru ${score(scores.value.department_health)}/100`]
+  const critical = new Set<string>()
+  const warnings = new Set<string>()
+  const positive = new Set<string>()
+
+  insights.value.forEach((item) => {
+    if (item.severity === 'critical') critical.add(item.title)
+    if (item.severity === 'warning') warnings.add(item.title)
+    if (item.severity === 'success') positive.add(item.title)
+  })
+
+  const highRiskCount = Number(sources.value.kpiMl?.metrics?.highRiskCount ?? 0)
+  const mediumRiskCount = Number(sources.value.kpiMl?.metrics?.mediumRiskCount ?? 0)
+  const pulseRisk = Number(sources.value.weeklyPulse?.metrics?.attritionRisk ?? sources.value.weeklyPulse?.metrics?.stressLevel ?? 0)
+  const feedbackBurnout = sources.value.feedback360?.metrics?.burnoutRisk
+  const feedbackFlight = sources.value.feedback360?.metrics?.flightRisk
+
+  if (scores.value.risk_score >= 60) {
+    critical.add(`Birlesik risk ${score(scores.value.risk_score)}/100: KPI/ML, nabiz ve 360 kaynaklari birlikte incelenmeli.`)
+  }
+  if (highRiskCount > 0) {
+    critical.add(`KPI/ML modelinde ${highRiskCount} yuksek riskli calisan gorunuyor.`)
+  }
+  if (pulseRisk >= 60) {
+    critical.add(`Nabiz ayrilma/stres riski ${score(pulseRisk)}/100 seviyesinde.`)
+  }
+
+  if (scores.value.risk_score >= 40 && scores.value.risk_score < 60) {
+    warnings.add(`Birlesik risk ${score(scores.value.risk_score)}/100: izleme bandinda.`)
+  }
+  if (mediumRiskCount > 0) {
+    warnings.add(`KPI/ML modelinde ${mediumRiskCount} calisan izleme bandinda.`)
+  }
+  if (coverage.value.pulse_percentage < 70) {
+    warnings.add(`Nabiz kapsami %${score(coverage.value.pulse_percentage)}; insan sinyali eksik kalabilir.`)
+  }
+  if (coverage.value.feedback_percentage < 70) {
+    warnings.add(`360 kapsami %${score(coverage.value.feedback_percentage)}; davranissal riskler tam dogrulanamiyor.`)
+  }
+  if (typeof feedbackBurnout === 'number' && feedbackBurnout >= 20) {
+    warnings.add(`360 burnout sinyali %${score(feedbackBurnout)} seviyesinde.`)
+  }
+  if (typeof feedbackFlight === 'number' && feedbackFlight >= 20) {
+    warnings.add(`360 ayrilma riski sinyali %${score(feedbackFlight)} seviyesinde.`)
+  }
+
+  if (scores.value.execution_score >= 75) {
+    positive.add(`KPI/ML performans skoru ${score(scores.value.execution_score)}/100.`)
+  }
+  if (scores.value.people_health_score >= 70) {
+    positive.add(`Nabiz + 360 insan sagligi skoru ${score(scores.value.people_health_score)}/100.`)
+  }
+  if (scores.value.confidence_score >= 80) {
+    positive.add(`Veri guveni ${score(scores.value.confidence_score)}/100; hibrit okuma guclu.`)
+  }
+  aiSummary.value.strengths.slice(0, 2).forEach((item) => positive.add(item))
 
   return {
-    critical: critical.length ? critical : ['Kritik birleşik risk sinyali yok.'],
-    warnings: warnings.length ? warnings : ['Uyarı sinyali veri geldikçe netleşecek.'],
-    positive: positive.slice(0, 3),
+    critical: Array.from(critical).slice(0, 4),
+    warnings: Array.from(warnings).slice(0, 5),
+    positive: Array.from(positive).slice(0, 4),
   }
 })
 
@@ -1410,6 +1525,11 @@ async function refreshDashboard(useLlm = false) {
     loading.value = false
     llmLoading.value = false
   }
+}
+
+async function openGeminiSummary() {
+  geminiPanelOpen.value = true
+  await refreshDashboard(true)
 }
 
 onMounted(async () => {

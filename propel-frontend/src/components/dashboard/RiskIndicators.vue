@@ -2,11 +2,11 @@
   <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
     <div class="mb-5 flex items-center gap-3">
       <ExclamationTriangleIcon class="h-6 w-6 text-amber-500" />
-      <h3 class="text-lg font-bold text-slate-900">Risk Gostergeleri</h3>
+      <h3 class="text-lg font-bold text-slate-900">Risk Göstergeleri</h3>
     </div>
 
     <div class="space-y-4">
-      <section>
+      <section v-if="risks.critical.length">
         <div class="mb-2 flex items-center gap-2 font-semibold text-rose-700">
           <ExclamationCircleIcon class="h-4 w-4" />
           <h4>Kritik Riskler</h4>
@@ -23,10 +23,10 @@
         </ul>
       </section>
 
-      <section class="border-t border-slate-100 pt-4">
+      <section v-if="risks.warnings.length" class="border-t border-slate-100 pt-4">
         <div class="mb-2 flex items-center gap-2 font-semibold text-amber-700">
           <ExclamationTriangleIcon class="h-4 w-4" />
-          <h4>Uyarilar</h4>
+          <h4>Uyarılar</h4>
         </div>
         <ul class="space-y-2">
           <li
@@ -40,10 +40,10 @@
         </ul>
       </section>
 
-      <section class="border-t border-slate-100 pt-4">
+      <section v-if="risks.positive.length" class="border-t border-slate-100 pt-4">
         <div class="mb-2 flex items-center gap-2 font-semibold text-emerald-700">
           <CheckCircleIcon class="h-4 w-4" />
-          <h4>Olumlu Isaretler</h4>
+          <h4>Olumlu İşaretler</h4>
         </div>
         <ul class="space-y-2">
           <li
@@ -56,6 +56,13 @@
           </li>
         </ul>
       </section>
+
+      <div
+        v-if="!risks.critical.length && !risks.warnings.length && !risks.positive.length"
+        class="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-600"
+      >
+        KPI/ML, nabız ve 360 kaynaklarından gösterilecek risk sinyali oluşmadı.
+      </div>
     </div>
   </div>
 </template>

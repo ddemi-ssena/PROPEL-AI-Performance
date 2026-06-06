@@ -44,17 +44,13 @@
     <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">ML Model</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Admin ML Kaynagi</p>
+          <p class="mt-2 text-sm leading-6 text-slate-500">
+            Model egitimi yalnizca admin ekraninda yapilir; bu sayfa adminin current dataset icin egittigi sonuclari okur.
+          </p>
           <h3 class="mt-1 text-lg font-bold text-slate-900">Satış risk tahmini — LightGBM + XGB + RF → LR</h3>
         </div>
         <div class="flex flex-wrap gap-2 w-full xl:max-w-4xl">
-          <button
-            class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
-            :disabled="!!mlLoading || !uploadId"
-            @click="trainModel"
-          >
-            {{ mlLoading === 'train' ? 'Eğitiliyor…' : 'Model Eğit' }}
-          </button>
           <select
             v-model.number="employeeId"
             class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-sm"
@@ -66,21 +62,21 @@
           </select>
           <button
             class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:text-slate-300"
-            :disabled="!!mlLoading || !uploadId || !employeeId"
+            :disabled="!!mlLoading || !hasAdminCurrentModel || !employeeId"
             @click="runPredict"
           >
             {{ mlLoading === 'predict' ? 'Hesaplanıyor…' : 'Tahmin Al' }}
           </button>
           <button
             class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-800 shadow-sm disabled:cursor-not-allowed disabled:text-indigo-300"
-            :disabled="!!mlLoading || !uploadId"
+            :disabled="!!mlLoading || !hasAdminCurrentModel"
             @click="runBulk(false)"
           >
             {{ mlLoading === 'bulk' ? 'Tarıyor…' : 'Toplu Tara' }}
           </button>
           <button
             class="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 shadow-sm disabled:cursor-not-allowed disabled:text-violet-300"
-            :disabled="!!mlLoading || !uploadId"
+            :disabled="!!mlLoading || !hasAdminCurrentModel"
             @click="runBulk(true)"
           >
             {{ mlLoading === 'narrative' ? 'Yorumlanıyor…' : 'LLM Yorumla' }}
@@ -89,10 +85,10 @@
       </div>
 
       <!-- Status badges -->
-      <div v-if="trainResult || mlError" class="mt-4 flex flex-wrap items-center gap-2 text-xs">
-        <span v-if="trainResult"
+      <div v-if="currentTargetState || mlError" class="mt-4 flex flex-wrap items-center gap-2 text-xs">
+        <span v-if="currentTargetState"
           class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
-          Model hazır: {{ targetLabel(trainResult.target_column) }} — F1 {{ fmtPct(trainResult.metrics?.weighted_f1) }}
+          Admin modeli hazir: {{ targetLabel(currentTargetState.target_column) }} - F1 {{ fmtPct(currentTargetState.metrics?.weighted_f1) }}
         </span>
         <span v-if="mlError"
           class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 font-medium text-rose-700">
@@ -112,7 +108,7 @@
         <button
           v-if="activeMeta.action"
           class="w-fit rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-800 shadow-sm disabled:cursor-not-allowed disabled:text-indigo-300"
-          :disabled="!!mlLoading || !uploadId"
+          :disabled="!!mlLoading || !hasAdminCurrentModel"
           @click="activeMeta.onAction()"
         >
           {{ mlLoading ? 'Çalışıyor…' : activeMeta.action }}
@@ -309,6 +305,159 @@
     <!-- ── Section: Takım Analizi ─────────────────────────────── -->
     <template v-if="activeSection === 'teams'">
       <div v-if="!bulkResult" class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+        <p class="text-sm font-semibold text-slate-900">Takim analizi adminin egittigi current sales modeliyle uretilir.</p>
+        <p class="mt-2 text-sm text-slate-500">Bolge risk dagilimi, 6 aylik trend ve satis baskisi ayni bulk prediction sonucundan okunur.</p>
+        <button class="mt-4 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" :disabled="!!mlLoading || !hasAdminCurrentModel" @click="runBulk(false)">
+          Analizi Calistir
+        </button>
+      </div>
+      <div v-else class="grid grid-cols-1 gap-5 xl:grid-cols-[240px_minmax(0,1fr)]">
+        <aside class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Takimlar</p>
+          <div class="mt-4 space-y-2">
+            <button v-for="row in teamRows" :key="row.team" type="button" class="w-full rounded-xl border px-3 py-3 text-left transition" :class="selectedTeam === row.team ? 'border-blue-300 bg-white shadow-sm' : 'border-transparent hover:bg-white'" @click="selectedTeam = row.team">
+              <div class="flex items-center justify-between gap-2">
+                <p class="truncate text-sm font-bold text-slate-900">{{ row.team }}</p>
+                <span class="h-2 w-2 rounded-full" :class="teamDotClass(row)"></span>
+              </div>
+              <p class="mt-1 text-xs text-slate-500">{{ row.highCount }} yuksek / {{ row.mediumCount }} orta</p>
+            </button>
+          </div>
+        </aside>
+
+        <div v-if="selectedTeamRow" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="bg-gradient-to-r from-blue-700 to-sky-500 p-6 text-white">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div class="min-w-0">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">Satis Takim Analizi</p>
+                <h3 class="mt-1 truncate text-3xl font-black">{{ selectedTeamRow.team }}</h3>
+                <p class="mt-2 text-sm text-white/80">{{ selectedTeamRow.total }} kisilik grupta {{ selectedTeamRow.highCount }} yuksek, {{ selectedTeamRow.mediumCount }} orta risk sinyali var.</p>
+              </div>
+              <span class="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-5 py-3 text-sm font-bold">
+                <span class="h-2.5 w-2.5 rounded-full" :class="teamDotClass(selectedTeamRow)"></span>
+                {{ teamRiskLabel(selectedTeamRow) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+            <article v-for="card in selectedTeamMetricCards" :key="card.label" class="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+              <div class="flex items-start justify-between gap-4">
+                <span class="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-black" :class="card.indexClass">{{ card.index }}</span>
+                <span class="text-xs font-semibold text-slate-400">{{ card.group }}</span>
+              </div>
+              <p class="mt-4 text-sm font-semibold text-slate-500">{{ card.label }}</p>
+              <p class="mt-2 text-[32px] font-bold leading-none" :class="card.valueClass">{{ card.value }}</p>
+              <p class="mt-3 text-sm text-slate-500">{{ card.hint }}</p>
+            </article>
+          </div>
+
+          <div class="px-5 pb-5">
+            <article class="rounded-xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-rose-50 p-6">
+              <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.7fr)_minmax(240px,0.3fr)] lg:items-center">
+                <div>
+                  <span class="inline-flex rounded-full border border-amber-300 bg-white/70 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-amber-800">Bu hafta odaklanilacak</span>
+                  <h5 class="mt-4 text-2xl font-bold text-amber-950">{{ selectedTeamRow.topReason }} kritik sinyal</h5>
+                  <p class="mt-3 text-base leading-7 text-amber-900">{{ selectedTeamProblemDescription }}</p>
+                </div>
+                <div class="rounded-xl border border-amber-200 bg-white/70 p-5 shadow-sm">
+                  <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-2xl font-black text-amber-700">!</div>
+                  <p class="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Ana Neden</p>
+                  <p class="mt-2 text-lg font-bold leading-6 text-amber-950">{{ selectedTeamRow.topReason }}</p>
+                  <div class="mt-4 h-2 overflow-hidden rounded-full bg-white">
+                    <div class="h-full rounded-full bg-gradient-to-r from-amber-400 to-rose-500" :style="{ width: `${selectedTeamRow.riskScore}%` }"></div>
+                  </div>
+                  <p class="mt-2 text-xs text-amber-800">{{ selectedTeamRow.riskScore }}/100 admin model takim risk skoru</p>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="grid grid-cols-1 gap-5 px-5 pb-5 xl:grid-cols-[minmax(0,0.65fr)_minmax(320px,0.35fr)]">
+            <article class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">Risk Trendi</p>
+                  <h5 class="mt-1 text-lg font-bold text-slate-900">6 Aylik Satis Risk Trendi</h5>
+                  <p class="mt-2 text-sm leading-6 text-slate-500">Y ekseni 0-100 risk skoru; seri admin ensemble modelinin ay bazli takim sinyalinden gelir.</p>
+                </div>
+                <span class="w-fit rounded-full bg-rose-50 px-3 py-1 text-sm font-bold text-rose-700">{{ selectedTeamTrendChangeLabel }}</span>
+              </div>
+              <div class="mt-6 h-[260px] rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <svg viewBox="0 0 600 220" class="h-full w-full" preserveAspectRatio="none">
+                  <line v-for="tick in [0, 25, 50, 75, 100]" :key="tick" x1="28" :y1="trendY(tick)" x2="585" :y2="trendY(tick)" stroke="#E2E8F0" stroke-width="1" />
+                  <polyline :points="selectedTeamTrendPoints" fill="none" stroke="#F43F5E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                  <circle v-for="(point, index) in selectedTeamTrendCirclePoints" :key="index" :cx="point.x" :cy="point.y" r="4" fill="#F43F5E" />
+                </svg>
+              </div>
+            </article>
+
+            <aside class="rounded-xl bg-gradient-to-br from-violet-600 to-blue-600 p-6 text-white shadow-sm">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">AI Aksiyon Paneli</p>
+                  <h5 class="mt-1 text-xl font-bold">Onerilen Aksiyonlar</h5>
+                </div>
+                <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white/90">Admin ML</span>
+              </div>
+              <div class="mt-5 space-y-3">
+                <article v-for="action in selectedTeamSalesActions" :key="action.title" class="rounded-lg border border-white/10 bg-white/10 p-3">
+                  <p class="text-sm font-bold leading-5">{{ action.title }}</p>
+                  <p class="mt-2 text-sm leading-6 text-white/80">{{ action.reason }}</p>
+                </article>
+                <button class="mt-2 rounded-lg bg-white px-3 py-2 text-xs font-bold text-violet-700 disabled:cursor-not-allowed disabled:opacity-60" :disabled="Boolean(mlLoading) || !selectedTeamRow" @click="runBulk(true)">
+                  {{ mlLoading === 'narrative' ? 'Yorumlaniyor...' : 'LLM ile Takimi Yorumla' }}
+                </button>
+              </div>
+            </aside>
+          </div>
+
+          <div v-if="selectedTeamNarrative" class="mx-5 mb-5 rounded-xl border border-violet-100 bg-violet-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">Takim Yorumu</p>
+            <p class="mt-3 text-sm leading-6 text-slate-700">{{ selectedTeamNarrative.manager_summary }}</p>
+          </div>
+
+          <div class="px-5 pb-5">
+            <section class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p class="text-2xl font-bold text-slate-950">Takim Uyeleri - Detayli Risk Analizi</p>
+                  <p class="mt-1 text-sm text-slate-500">{{ selectedTeamRow.highCount }} kisi yuksek risk seviyesinde</p>
+                </div>
+                <span class="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ selectedTeamPeople.length }} kisi listeleniyor</span>
+              </div>
+              <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                <article v-for="person in selectedTeamPeople" :key="person.employee_id" class="rounded-xl border border-slate-200 bg-white p-5">
+                  <div class="flex items-start gap-4">
+                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-black text-white">{{ initials(displayName(person)) }}</span>
+                    <div class="min-w-0">
+                      <p class="truncate text-lg font-bold text-slate-950">{{ displayName(person) }}</p>
+                      <p class="mt-1 truncate text-sm text-slate-500">{{ salesPersonRoleLabel(person) }}</p>
+                    </div>
+                  </div>
+                  <div class="my-4 border-t border-slate-100"></div>
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="text-sm font-semibold text-slate-600">Model Riski</p>
+                    <p class="text-sm font-bold text-slate-950">{{ personRiskScore(person) }}/100</p>
+                  </div>
+                  <div class="mt-2 h-2 overflow-hidden rounded bg-slate-100">
+                    <div class="h-full rounded bg-rose-500" :style="{ width: `${personRiskScore(person)}%` }"></div>
+                  </div>
+                  <div class="mt-4 flex items-center justify-between gap-3">
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">#{{ person.summary_payload?.external_code || person.summary_payload?.employee_code || person.employee_id }}</span>
+                    <span class="rounded-full px-3 py-1 text-xs font-bold" :class="bandClass(person.predicted_band, person.target_column)">{{ bandLabel(person.predicted_band, person.target_column) }}</span>
+                  </div>
+                  <p class="mt-3 text-xs leading-5 text-slate-500">{{ personTopDriver(person) }}</p>
+                </article>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template v-if="false && activeSection === 'teams'">
+      <div v-if="!bulkResult" class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
         <p class="text-sm font-semibold text-slate-900">Takım analizi için önce toplu tahmin çalıştırılmalı.</p>
         <button class="mt-4 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300"
           :disabled="!!mlLoading || !uploadId" @click="runBulk(false)">
@@ -389,8 +538,8 @@
         <!-- Department narrative -->
         <div v-if="deptNarrative" class="rounded-2xl border border-violet-100 bg-violet-50/70 p-5">
           <p class="text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">Departman Yorumu</p>
-          <h4 class="mt-1 text-base font-bold text-slate-900">{{ deptNarrative.manager_summary }}</h4>
-          <p class="mt-3 text-sm leading-6 text-slate-700">{{ deptNarrative.risk_interpretation }}</p>
+          <h4 class="mt-1 text-base font-bold text-slate-900">{{ deptNarrative?.manager_summary }}</h4>
+          <p class="mt-3 text-sm leading-6 text-slate-700">{{ deptNarrative?.risk_interpretation }}</p>
         </div>
       </template>
     </template>
@@ -462,9 +611,9 @@
 
     <!-- ── Section: Teknik Detaylar ───────────────────────────── -->
     <template v-if="activeSection === 'technical'">
-      <div v-if="!trainResult && !modelStates.some(s => s.is_trained)"
+      <div v-if="!modelStates.some(s => s.is_trained)"
         class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
-        Teknik detaylar için önce bir model eğitilmeli.
+        Teknik detaylar icin admin tarafinda current satis modeli egitilmeli.
       </div>
       <template v-else>
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -481,17 +630,17 @@
             </div>
           </div>
         </div>
-        <div v-if="trainResult?.top_features?.length" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div v-if="false" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 mb-4">En Önemli Özellikler</p>
           <div class="space-y-3">
-            <div v-for="(feat, idx) in trainResult.top_features.slice(0, 10)" :key="idx">
+            <div v-for="(feat, idx) in (trainResult?.top_features || []).slice(0, 10)" :key="idx">
               <div class="flex items-center justify-between text-xs mb-1">
                 <span class="font-semibold text-slate-700 truncate max-w-[60%]">{{ feat.feature || feat.name || `Özellik ${(idx as number) + 1}` }}</span>
                 <span class="text-slate-400 tabular-nums">{{ typeof feat.importance === 'number' ? feat.importance.toFixed(4) : feat.importance }}</span>
               </div>
               <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div class="h-full rounded-full bg-indigo-500"
-                  :style="{ width: `${Math.min(100, (feat.importance / (trainResult!.top_features[0]?.importance || 1)) * 100)}%` }"></div>
+                  :style="{ width: `${Math.min(100, (feat.importance / ((trainResult?.top_features || [])[0]?.importance || 1)) * 100)}%` }"></div>
               </div>
             </div>
           </div>
@@ -535,7 +684,10 @@ import {
 const route = useRoute()
 
 // ── Section navigation ──────────────────────────────────────────
-const activeSection = computed(() => (route.query.section as string) || 'model')
+const activeSection = computed(() => {
+  const section = (route.query.section as string) || 'department'
+  return section === 'model' ? 'department' : section
+})
 
 const SECTION_META: Record<string, { eyebrow: string; title: string; description: string; action?: string; onAction: () => void }> = {
   model: {
@@ -601,22 +753,169 @@ const selectedTeam = ref<string | null>(null)
 // ── Computed ────────────────────────────────────────────────────
 const deptNarrative = computed(() => bulkResult.value?.department_narrative || null)
 
+const currentTargetState = computed(() =>
+  modelStates.value.find((state) =>
+    state.target_column === targetColumn.value
+    && state.is_trained
+    && state.is_current_dataset
+  ) || null
+)
+
+const hasAdminCurrentModel = computed(() => Boolean(currentTargetState.value))
+
 const teamRows = computed(() => {
   const analytics = bulkResult.value?.team_analytics
   if (!analytics?.length) return []
   return analytics.map((ta: any) => ({
     team: ta.team as string,
     avgRisk: Math.round((ta.high_risk_rate ?? 0) * 100),
+    riskScore: Math.round(ta.risk_score ?? 0),
     highCount: ta.high_risk_count ?? 0,
+    mediumCount: ta.medium_risk_count ?? 0,
+    lowCount: ta.low_risk_count ?? 0,
     total: ta.employee_count ?? 0,
+    topReason: ta.top_reason || 'KPI sinyali',
+    roleCounts: ta.role_counts || {},
+    trendValues: Array.isArray(ta.trend_values) ? ta.trend_values.map((v: any) => Math.round(Number(v) || 0)) : [],
+    trendPeriods: Array.isArray(ta.trend_periods) ? ta.trend_periods : [],
+    salesPressureScore: Math.round(ta.sales_pressure_score ?? 0),
+    pipelinePressureScore: Math.round(ta.pipeline_pressure_score ?? 0),
   }))
 })
+
+const selectedTeamRow = computed(() => teamRows.value.find((row) => row.team === selectedTeam.value) || teamRows.value[0] || null)
 
 const selectedTeamPeople = computed(() => {
   if (!selectedTeam.value || !bulkResult.value) return []
   return bulkResult.value.items.filter((i: SalesPredictionResponse) =>
     (i.summary_payload?.region || i.summary_payload?.team || 'Genel') === selectedTeam.value
   )
+})
+
+const selectedTeamNarrative = computed(() =>
+  (bulkResult.value?.team_narratives || []).find((item: any) => item.team === selectedTeam.value) || null
+)
+
+const selectedTeamMonitorRate = computed(() => {
+  if (!selectedTeamRow.value?.total) return 0
+  return Math.round(((selectedTeamRow.value.highCount + selectedTeamRow.value.mediumCount) / selectedTeamRow.value.total) * 100)
+})
+
+const selectedTeamHighWidth = computed(() => {
+  if (!selectedTeamRow.value?.total) return 0
+  return Math.round((selectedTeamRow.value.highCount / selectedTeamRow.value.total) * 100)
+})
+
+const selectedTeamMediumWidth = computed(() => {
+  if (!selectedTeamRow.value?.total) return 0
+  return Math.round((selectedTeamRow.value.mediumCount / selectedTeamRow.value.total) * 100)
+})
+
+const selectedTeamPressureScore = computed(() =>
+  Math.max(selectedTeamRow.value?.salesPressureScore || 0, selectedTeamRow.value?.pipelinePressureScore || 0)
+)
+
+const selectedTeamRoleMix = computed(() => {
+  const counts = selectedTeamRow.value?.roleCounts || {}
+  const entries = Object.entries(counts).sort((a, b) => Number(b[1]) - Number(a[1]))
+  if (!entries.length) return 'Rol dagilimi dataset profilinden okunur'
+  return entries.slice(0, 2).map(([role, count]) => `${count} ${role}`).join(', ')
+})
+
+const selectedTeamMetricCards = computed(() => {
+  const row = selectedTeamRow.value
+  if (!row) return []
+  return [
+    {
+      index: '01',
+      group: 'Takim',
+      label: 'Toplam Kisi',
+      value: `${row.total} kisi`,
+      hint: selectedTeamRoleMix.value,
+      indexClass: 'bg-blue-50 text-blue-700',
+      valueClass: 'text-slate-950',
+    },
+    {
+      index: '02',
+      group: 'Model',
+      label: 'Takim Riski',
+      value: `${row.highCount + row.mediumCount} / ${row.total}`,
+      hint: `%${selectedTeamMonitorRate.value} izleme orani`,
+      indexClass: 'bg-rose-50 text-rose-700',
+      valueClass: 'text-rose-600',
+    },
+    {
+      index: '03',
+      group: 'Alarm',
+      label: 'Yuksek Riskli',
+      value: `${row.highCount} kisi`,
+      hint: row.highCount ? 'Haftalik takip gerekli' : 'Kritik sinyal yok',
+      indexClass: 'bg-red-50 text-red-700',
+      valueClass: 'text-red-600',
+    },
+    {
+      index: '04',
+      group: 'Satis',
+      label: 'Pipeline / Hedef Baskisi',
+      value: `${selectedTeamPressureScore.value}/100`,
+      hint: selectedTeamPressureScore.value >= 70 ? 'Yuksek baski' : selectedTeamPressureScore.value >= 45 ? 'Kontrollu baski' : 'Dengeli',
+      indexClass: 'bg-amber-50 text-amber-700',
+      valueClass: 'text-amber-600',
+    },
+  ]
+})
+
+const selectedTeamProblemDescription = computed(() => {
+  const row = selectedTeamRow.value
+  if (!row) return ''
+  const pressure = selectedTeamPressureScore.value >= 70
+    ? 'pipeline, takip disiplini ve hedef baskisi birlikte yuksek gorunuyor'
+    : 'model sinyali takim icinde odakli takip gerektiriyor'
+  return `${row.team} icin admin ensemble modeli ${row.riskScore}/100 takim risk skoru uretti. Ana sinyal ${row.topReason}; ${pressure}. Bu okuma satis KPI registry esikleri, son donem tahminleri ve 6 aylik takim trendinden gelir.`
+})
+
+const selectedTeamTrendValues = computed(() => selectedTeamRow.value?.trendValues?.length ? selectedTeamRow.value.trendValues : [0])
+
+const selectedTeamTrendChangeLabel = computed(() => {
+  const values = selectedTeamTrendValues.value
+  if (values.length < 2) return 'Trend yeni olusuyor'
+  const diff = values[values.length - 1] - values[0]
+  if (diff > 0) return `+${diff} puan son 6 ayda`
+  if (diff < 0) return `${diff} puan son 6 ayda`
+  return 'Degisim yok'
+})
+
+const selectedTeamTrendCirclePoints = computed(() => {
+  const values = selectedTeamTrendValues.value
+  const step = values.length > 1 ? 540 / (values.length - 1) : 0
+  return values.map((value: number, index: number) => ({
+    x: 35 + index * step,
+    y: trendY(value),
+  }))
+})
+
+const selectedTeamTrendPoints = computed(() =>
+  selectedTeamTrendCirclePoints.value.map((point: { x: number; y: number }) => `${point.x},${point.y}`).join(' ')
+)
+
+const selectedTeamSalesActions = computed(() => {
+  const row = selectedTeamRow.value
+  if (!row) return []
+  const reason = row.topReason
+  return [
+    {
+      title: `${reason} icin haftalik takip ritmi kur`,
+      reason: `${row.team} icinde ${row.highCount} yuksek riskli kisi var; once bu sinyalin hedef, pipeline veya takip disiplini kaynakli olup olmadigi netlestirilmeli.`,
+    },
+    {
+      title: 'Pipeline ve hedef baskisini birlikte oku',
+      reason: `Pipeline/hedef baskisi ${selectedTeamPressureScore.value}/100. Dusuk pipeline sagligi, geciken takipler ve is yuku ayni ekipte birikiyorsa aksiyon onceligi artar.`,
+    },
+    {
+      title: 'Kisi bazli gorusmeleri ana driver ile ac',
+      reason: 'Takim uyesi kartlarindaki ana sinyal, manager gorusmesinde genel performans yorumu yerine somut satis KPI konusu olarak kullanilmali.',
+    },
+  ]
 })
 
 const filteredItems = computed(() => {
@@ -656,7 +955,15 @@ async function loadDatasets() {
   try {
     datasets.value = await analyticsApi.getSalesDatasets()
     if (datasets.value.length) {
-      uploadId.value = datasets.value[0].id
+      let selectedDataset = datasets.value[0]
+      for (const dataset of datasets.value) {
+        const states = await analyticsApi.getSalesModelState(dataset.id).catch(() => [])
+        if (states.some((state) => state.is_trained && state.is_current_dataset)) {
+          selectedDataset = dataset
+          break
+        }
+      }
+      uploadId.value = selectedDataset.id
       await onDatasetChange()
     }
   } catch {}
@@ -701,6 +1008,10 @@ async function trainModel() {
 
 async function runPredict() {
   if (!uploadId.value || !employeeId.value) return
+  if (!hasAdminCurrentModel.value) {
+    mlError.value = "Admin tarafinda bu satis dataset'i icin current egitilmis model bulunamadi."
+    return
+  }
   mlLoading.value = 'predict'
   mlError.value = null
   try {
@@ -718,6 +1029,10 @@ async function runPredict() {
 
 async function runBulk(withNarrative: boolean) {
   if (!uploadId.value) return
+  if (!hasAdminCurrentModel.value) {
+    mlError.value = "Admin tarafinda bu satis dataset'i icin current egitilmis model bulunamadi."
+    return
+  }
   mlLoading.value = withNarrative ? 'narrative' : 'bulk'
   mlError.value = null
   try {
@@ -735,6 +1050,59 @@ async function runBulk(withNarrative: boolean) {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
+function trendY(value: number): number {
+  const bounded = Math.max(0, Math.min(100, Number(value) || 0))
+  return 200 - bounded * 1.8
+}
+
+function teamRiskLabel(row: { riskScore: number; highCount: number; mediumCount: number }): string {
+  if (row.riskScore >= 70 || row.highCount > 0) return 'Yuksek Risk'
+  if (row.riskScore >= 45 || row.mediumCount > 0) return 'Izlemede'
+  return 'Stabil'
+}
+
+function teamDotClass(row: { riskScore: number; highCount: number; mediumCount: number }): string {
+  if (row.riskScore >= 70 || row.highCount > 0) return 'bg-rose-500'
+  if (row.riskScore >= 45 || row.mediumCount > 0) return 'bg-amber-500'
+  return 'bg-emerald-500'
+}
+
+function personRiskScore(item: SalesPredictionResponse): number {
+  const probabilities = item.probabilities || {}
+  const high = (probabilities.Yuksek ?? probabilities.Evet ?? probabilities['1'] ?? 0) * 100
+  const medium = (probabilities.Orta ?? 0) * 55
+  const low = (probabilities.Dusuk ?? probabilities.Hayir ?? probabilities['0'] ?? 0) * 15
+  const score = high + medium + low
+  if (score > 0) return Math.round(Math.max(0, Math.min(100, score)))
+  const band = String(item.predicted_band)
+  if (['Yuksek', 'Evet', '1'].includes(band)) return Math.round(75 + item.confidence * 20)
+  if (band === 'Orta') return Math.round(45 + item.confidence * 20)
+  return Math.round(15 + item.confidence * 20)
+}
+
+function personTopDriver(item: SalesPredictionResponse): string {
+  const driver = item.top_drivers?.[0]
+  const name = driver?.metric_name || driver?.feature || 'KPI sinyali'
+  const status = driver?.threshold_status || driver?.status
+  const trend = driver?.trend_signal || driver?.trend
+  return [name, status, trend].filter(Boolean).join(' / ')
+}
+
+function salesPersonRoleLabel(item: SalesPredictionResponse): string {
+  const payload = item.summary_payload || {}
+  return [payload.region || payload.team, payload.position || payload.role].filter(Boolean).join(' / ') || 'Satis ekibi'
+}
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+}
+
 function targetLabel(col: string): string {
   return TARGETS.find(t => t.value === col)?.label ?? col
 }

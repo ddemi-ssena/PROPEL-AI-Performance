@@ -8,6 +8,7 @@
 ## Kalıcı Talimatlar
 
 - Her sohbet sonunda yapılan çalışma özeti, kalınan nokta ve sonraki adımlar bu dosyaya kaydedilecek.
+- Her sohbet sonunda AGENTS.MD'ye eklenen çalışma özeti, kalınan nokta ve sonraki adımlar CLAUDE.md'ye de aynı şekilde kaydedilecek.
 - Kod değişikliklerinden önce `py_compile` (backend) ve `npm.cmd run type-check` (frontend) doğrulaması yapılacak.
 - Container yeniden başlatma: `docker compose restart backend` / `docker compose restart frontend`.
 - Backend kod değişikliklerinden sonra **mutlaka** `docker restart propel_backend` çalıştır — uvicorn hot-reload kapalı.
@@ -2263,3 +2264,258 @@ Yazılım model F1 skorları (Random Forest, test_period_count=8):
 ## Sonraki Adim
 
 - Takim uyesi kartlarindaki risk skor ve etiketleri admin egitiminden gelen software bulk prediction response'undaki backend `risk_score`, `predicted_band`, `top_drivers` ve `recommended_actions` alanlarini yansitmali.
+
+## 2026-06-05 Yazilim Manager Calisan Analizi Admin Model Kaynagi
+
+- Kullanici yazilim manager KPI/ML `Calisan Analizi` ekranindaki `Risk Durumu`, `KPI Trend` gibi verilerin backend kaynagini sordu ve manager ekraninin sadece adminin egittigi model sonuclarina gore guncellenmesini istedi.
+- Tespit:
+  - Ust calisan listesi ve secili calisan detayi zaten admin egitimli artifact uzerinden calisan `/analytics/departments/software/predictions/bulk` ve `/predictions/latest` endpointlerinden geliyordu.
+  - `Risk Durumu` = `SoftwarePredictionResponse.predicted_band`.
+  - Ana sinyal/haftalik odak = `top_drivers` ve `recommended_actions`.
+  - Secili calisan anlatimi = `risk_summary` ve `narrative`.
+  - Ancak ayni ekranda altta eski genel KPI kaynakli `overview` / `/analytics/performance/summary` bloklari da gorunuyordu; bunlar admin model egitimi sonucu degildi.
+- Frontend duzeltmeleri:
+  - `ManagerAnalyticsView.vue` Calisan Analizi tablosuna backend model response'undan gelen `risk_score` ve `top_drivers[0].trend_signal` kaynakli `KPI Trend` kolonu eklendi.
+  - Calisan Analizi basligina kaynagin admin tarafinda egitilen guncel software modelinin bulk prediction sonucu oldugunu belirten not eklendi.
+  - Eski `overview` ve `performanceSummary` kaynakli `Canli KPI kapsam ozeti`, `KPI Calisan Tablosu`, `Calisan Snapshot` bloklari Calisan Analizi ekraninda kapatildi.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/schemas/analytics.py propel-backend/app/services/software_ml_service.py propel-backend/app/api/routers/analytics.py` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Yazilim manager Calisan Analizi ekraninda gorunen calisan risk bandi, risk skoru, KPI trend sinyali, ana sinyal ve haftalik odak alanlari admin egitimli modelin bulk/latest prediction response'undan okunmali.
+
+## 2026-06-05 Yazilim Calisan Analizi Ensemble ve Kisi Bazli Driver Ayrismasi
+
+- Kullanici Calisan Analizi tablosundaki skorlarin kesin admin ensemble modeliyle gelip gelmedigini ve `KPI Trend`, `Ana Sinyal`, `Haftalik Odak` sutunlarinin herkeste ayni gorunmesini sorguladi.
+- Tespit:
+  - Risk skoru backend model prediction olasiliklarindan `risk_score` olarak geliyor.
+  - Manager kaynak secimi adminin guncel egitimli modelini kullaniyordu; ancak model tipini ensemble olarak zorlamiyordu.
+  - Backend `SoftwarePredictionService` aciklama uretirken artifact metadata'sindaki global `top_features` sirasini kullandigi icin ilk driver bircok calisanda ayni KPI'ya dusebiliyordu.
+- Duzeltmeler:
+  - `ManagerAnalyticsView.vue` admin model secimini `stacking_lgbm_xgb_rf_lr` veya stacking veri yetersizliginde uretilen `random_forest_fallback` ile sinirladi.
+  - Guncel/current olmayan veya ensemble olmayan model varsa manager analizi calistirmaz.
+  - `SoftwareExplanationBuilder` kisi bazli driver priority hesaplamaya basladi: risk esigi, olumsuz trend, feature tipi ve model importance birlikte siralanir.
+  - Ayni KPI'nin lag/rolling/current tekrarlarindan en guclu driver tutulur; boylece calisan bazli `Ana Sinyal` ve `Haftalik Odak` daha iyi ayrisir.
+- Smoke:
+  - Upload #9 stacking ensemble ama `is_current_dataset=false`.
+  - Upload #6 `stacking_lgbm_xgb_rf_lr`, `is_current_dataset=true`, weighted_f1=0.806142.
+  - Bulk prediction ilk 12 calisanda 4 farkli ana sinyal uretti: Gorev Tamamlama Orani, Bug Yogunlugu, Zamaninda Teslim Orani, Goreli Katki Endeksi.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/analytics/explain/software.py propel-backend/app/analytics/prediction/software.py propel-backend/app/services/software_ml_service.py propel-backend/app/schemas/analytics.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Yazilim manager Calisan Analizi artik guncel admin ensemble modelinin upload_id'si uzerinden calismali; kisi bazli driver/action metinleri global feature importance yerine calisanin kendi KPI esik/trend sinyallerine gore ayrismali.
+
+## 2026-06-05 Secili Calisan Narrative ve Manager Onerileri Derinlestirme
+
+- Kullanici secili calisana ait yorumda `Bug Yogunlugu` gibi konularin neye gore secildigini, onerilerin genel/statik kalip kalmadigini ve manager'a rol, KPI/ML, motivasyon, stres/yogunluk durumuna gore daha spesifik oneriler uretilmesini istedi.
+- Tespit:
+  - `Bug Yogunlugu` gibi driver'lar calisanin dataset satirindan uretilen feature row, KPI Registry esikleri ve 4 haftalik trend sinyaline gore seciliyor.
+  - Ancak deterministic fallback action plan metinleri kategori/role baglamli olsa da hala genel kaliyor; role/seniority, risk_score, sayisal KPI degeri, trend farki, motivasyon ve is yuku/stres sinyallerini yeterince birlikte anlatmiyordu.
+- Backend duzeltmeleri:
+  - `SoftwareNarrativeService._fallback()` manager summary'sine admin ensemble model kaynagi, risk skoru, takim, rol/seniority ve destek lensi eklendi.
+  - `_action_plan()` artik role/seniority, risk_score, top driver, motivasyon driver'i ve is yuku/stres driver'ini birlikte kullanir.
+  - Action reason metinleri son deger, 4 haftalik fark, risk skoru ve ek motivasyon/stres sinyalini yazar.
+  - Timeframe risk skoru ve trend durumuna gore `Ilk 48 saat`, `Bu hafta`, `Bu sprint icinde` olarak ayrisir.
+  - Gorusme hedefi, manager talking points, employee questions ve success signal role/seniority baglamina gore zenginlestirildi.
+- Frontend duzeltmesi:
+  - Secili calisan aksiyon kartlarinda `Gorusme hedefi`, ilk manager talking point'leri ve `Basari sinyali` gosteriliyor.
+- Smoke:
+  - Elif Ozturk / Mid Backend Engineer icin narrative artik `model risk skoru 92/100`, `son deger 0.71`, `4 haftalik fark 0.1124`, motivasyon ek sinyali ve `Ilk 48 saat` zamanlamasini donduruyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/software_narrative_service.py propel-backend/app/analytics/explain/software.py propel-backend/app/services/software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` calistirildi.
+
+## Sonraki Adim
+
+- Secili calisan kartindaki haftalik manager onerileri genel registry cumleleri yerine calisanin rol/seniority, model risk skoru, KPI esik/trend degeri ve motivasyon/stres/yogunluk sinyalleriyle baglamsallasmalidir.
+
+## 2026-06-05 Secili Calisan Detayinda Gemini Otomatik Deneme
+
+- Kullanici secili calisan yorumunda rol/seniority'nin her aksiyonda tekrar etmesine gerek olmadigini ve model/KPI payload'inin Gemini'ye gidip daha dogal manager analizi uretmesini istedi.
+- Frontend duzeltmesi:
+  - `ManagerAnalyticsView.vue` icinde calisan secimi/deep-link akisi artik `loadPrediction(true)` cagirir; yani `/predictions/latest` istegi `use_llm_narrative=true` ile gider.
+- Backend duzeltmeleri:
+  - Gemini prompt'una rol/seniority bilgisini her cumlede tekrar etmeme, aksiyon basliklarini kisa tutma, `Junior DevOps Engineer icin...` gibi tekrarli kaliplardan kacinma kurallari eklendi.
+  - Deterministik fallback'te aksiyon baglami `Junior DevOps Engineer` gibi tam unvani surekli tekrar etmek yerine `DevOps calisani`, `Backend calisani`, `Frontend calisani`, `QA calisani` gibi daha okunur etikete indirildi.
+  - Summary de rol tekrarini azaltti; rol zaten UI basliginda gorundugu icin fallback metni takim baglamina odaklanir.
+- Smoke:
+  - `use_llm_narrative=true` ile canli API cagrisi yapildi; mevcut ortamda `source=deterministic`, `fallback_used=true` dondu. Bu Gemini provider'in ayarli olmadigini veya cevap vermedigini gosterir; provider aktif oldugunda ayni endpoint `source=gemini` dondurmelidir.
+  - Fallback ornegi artik `DevOps calisani baglaminda...` seklinde daha az tekrarli donuyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/software_narrative_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend propel_frontend` ve sonrasinda `docker restart propel_backend` calistirildi.
+
+## Sonraki Adim
+
+- Gemini provider aktif edildiginde secili calisan panelindeki narrative `source=gemini` olarak gelmeli; Gemini yoksa sade deterministic fallback kullanilir.
+
+## 2026-06-05 Takim Analizi Kaynak Tutarliligi ve Kapasite Metrigi
+
+- Kullanici Takim Analizi ekranindaki riskli kisi sayisi, sprint kapasitesi, detayli risk analizi ve performans trendinin gercekten admin egitimli ML sonucundan gelip gelmedigini sorguladi.
+- Tespit:
+  - Riskli kisi sayisi, takim uyeleri ve takim risk skoru manager bulk prediction response'undaki `items` ve `team_analytics` alanlarindan uretiliyor.
+  - Backend `SoftwareMLService.predict_all_from_upload()` adminin current dataset icin egittigi artifact ile tum calisanlari tahmin ediyor; frontend calisanlari `summary_payload.team` alanina gore grupluyor.
+  - `trend_values` backend tarafinda model olasilik risk skorlarindan ay bazli hesaplanip son 6 period olarak donuyor.
+  - `Sprint Kapasitesi` ekranda backend'den gelen ayri alan degildi; frontend `teamRiskScore` uzerinden heuristik `+%` uretiyordu.
+  - Detay kartindaki risk trendi backend aylik seri olmasina ragmen `12 Haftalik Risk Trendi` diye etiketleniyor ve 12 noktaya normalize ediliyordu.
+- Duzeltmeler:
+  - `SoftwareMLService._team_analytics()` artik takim bazinda `capacity_score`, `capacity_overage` ve `capacity_basis` dondurur.
+  - Kapasite skoru `kpi_9_iye`, `kpi_10_says`, `kpi_11_tyo` is yuku/surdurulebilirlik KPI feature'larindan hesaplanir; feature yoksa model risk skoruna fallback yapar.
+  - `ManagerAnalyticsView.vue` `Sprint Kapasitesi` kartinda backend `capacity_overage` alanini kullanir; fallback sadece response alanlari yoksa devreye girer.
+  - Secili takim trend karti `6 Aylik Risk Trendi` olarak guncellendi ve son 6 aylik backend trend serisini 0-10 eksende gosterir.
+- Smoke:
+  - Canli bulk response upload #6 icin `team_analytics` alaninda `capacity_basis=software_workload_kpis`, `capacity_overage`, `trend_values` ve `trend_periods` donuyor.
+  - Ornek Backend takimi: `risk_score=73`, `capacity_score=66.0`, `capacity_overage=11`, trend periodlari `2025-07`..`2025-12`.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+  - In-app browser baglantisi iki kez ortam hatasiyla acilamadi; canli API ve type-check ile dogrulama yapildi.
+
+## Sonraki Adim
+
+- Takim Analizi ekranindaki takim kartlari admin current ensemble modelinin bulk prediction sonucunu, kapasite karti ise backend `team_analytics.capacity_overage` alanini kullanmali; trend grafigi ay bazli model risk serisi olarak 6 aylik okunmalidir.
+
+## 2026-06-05 Ekibim KPI Kolonu Admin ML Risk Skoru Hizalama
+
+- Kullanici KPI/ML Calisan Analizi ekraninda Canan Dagdelen icin `Risk Skoru=56/100` gorunurken Ekibim sayfasinda KPI kolonunda `59.9/100` gorunmesini sorguladi.
+- Tespit:
+  - KPI/ML Calisan Analizi `SoftwareMLService.predict_all_from_upload()` bulk prediction response'undaki `risk_score` alanini kullaniyordu.
+  - Ekibim `/employees/team-health` endpoint'i ise `AnalyticsService.get_performance_summary()` ile KPI kayitlarindan normalize performans skoru hesapliyordu.
+  - Bu yuzden `56` admin ML risk skoru, `59.9` eski KPI performans skoru idi; ayni metrik degildi ve manager icin karisik gorunuyordu.
+- Backend duzeltmeleri:
+  - `EmployeeService.get_team_health()` current admin software ensemble modelini bulup bulk prediction sonucunu alir.
+  - Calisan eslestirmesi DB employee id ile degil `external_employee_code` (`SE-001`) ve isim uzerinden yapilir; cunku dataset employee id ile DB id ayni degil.
+  - TeamHealth member alanlarina `kpi_band`, `kpi_confidence`, `kpi_top_driver`, `kpi_source` eklendi.
+  - `kpi_score` artik admin ML `risk_score` olarak doner; birlesik risk hesabinda KPI bileseni varsa admin ML risk skorundan beslenir.
+- Frontend duzeltmeleri:
+  - `TeamManagement.vue` tablo basligi `KPI/ML Risk` olarak guncellendi.
+  - KPI/ML alt satiri trend yerine model bandi ve ana driver'i gosterir.
+- Smoke:
+  - Canli API'de Canan Dagdelen icin KPI/ML ekranindan `ml_risk_score=56`, Ekibim endpoint'inden `team_kpi_score=56.0`, `team_kpi_band=Stabil`, `team_kpi_top_driver=Zamaninda Teslim Orani`, `team_kpi_source=admin_software_ml_bulk` dondu.
+  - Ekibim `data_sources` artik `KPI/ML,Nabiz` donuyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/schemas/employee.py propel-backend/app/services/employee_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Ekibim sayfasinda KPI/ML kolonu artik admin current ensemble modelinin risk skorunu gostermeli; performans puani ile risk skoru ayni etiket altinda karistirilmamalidir.
+
+## 2026-06-05 Ekibim Nabiz Olcegi Departman Performansi ile Hizalama
+
+- Kullanici Ekibim sayfasindaki Nabiz kolonunun Departman Performansi `Insan Sagligi Sinyalleri (Nabiz)` kartindaki weekly pulse metrikleriyle ayni cevaplardan gelip gelmedigini sordu.
+- Tespit:
+  - Iki ekran da `survey_responses` tablosunda `survey_type='weekly_pulse'` kayitlarini kullaniyor.
+  - Departman Performansi `SoftwareMLService._dashboard_pulse_source()` ile secili period icindeki pulse cevaplarini 100'luk skala olarak hesapliyor: `score * 20`, `mte_score * 100`, `ars_score * 100`.
+  - Ekibim `EmployeeService._latest_surveys_by_employee()` ile her calisanin en son weekly pulse cevabini gosteriyordu; ancak birincil deger `3.3/5` gibi 5'lik skaladaydi.
+  - Bu nedenle kaynak tutarliydi ama ekran olcegi farkli oldugu icin manager'a tutarsiz gorunuyordu.
+- Duzeltmeler:
+  - Ekibim `Nabiz Ortalamasi` ust karti artik primary value olarak 100'luk skala dondurur (`66.0/100`), hint icinde `3.3/5` ortalamayi saklar.
+  - Ekibim tablo Nabiz sutunu kisinin pulse skorunu primary olarak `/100`, alt satirda `/5`, MTE etiketi ve `Ayrilma riski x/100` olarak gosterir.
+- Smoke:
+  - Canli Departman Performansi weekly pulse: `motivationAverage=66.0`, `stressLevel=49.0`, `attritionRisk=49.0`, `responseCount=30`.
+  - Canli Ekibim team-health: `pulse_average=66.0/100`, hint `Son weekly pulse ortalamasi: 3.3/5`, `pulse_response_count=30`.
+  - Ornek kisi Derya Koc: `latest_pulse_score=2.9`, `latest_mte=-0.21`, `latest_ars=0.6` -> tablo 58/100 ve ayrilma riski 60/100 olarak okunur.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/employee_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Departman Performansi ve Ekibim Nabiz alanlari ayni weekly pulse cevaplarindan beslenir; Ekibim kisi bazli, Departman Performansi agregasyon bazli okunmalidir.
+
+## 2026-06-05 Satis Manager ML Egitim Kontrollerini Admin Kaynagina Alma
+
+- Kullanici yazilim manager ekraninda oldugu gibi satis manager KPI/ML ekraninda da model egitiminin admin tarafinda yapilmasi gerektigini, `Model Durumu` sayfasi ve `Model Egit` butonunun manager icin gereksiz oldugunu belirtti.
+- Tespit:
+  - Satis manager sidebar'inda `Model Durumu` linki `/manager/sales-analytics` route'una gidiyordu.
+  - `/manager/sales-analytics` adminle ayni `SalesAnalyticsView.vue` bileşenini kullandigi icin manager tarafinda da `Model Egit` gorunebiliyordu.
+  - `/manager/sales-kpi-analysis` alt sayfalarinda `SalesManagerAnalyticsView.vue` icinde ayrica `Model Egit` butonu bulunuyordu.
+- Frontend duzeltmeleri:
+  - Satis manager sidebar'indan `Model Durumu` kaldirildi.
+  - `/manager/sales-analytics` route'u manager icin `/manager/sales-kpi-analysis?section=department` sayfasina redirect edildi.
+  - `SalesAnalyticsView.vue` icindeki `Model Egit` butonu sadece admin rolunde gorunecek sekilde `isAdmin` ile sinirlandi.
+  - `SalesManagerAnalyticsView.vue` icindeki `Model Egit` butonu kaldirildi; panel `Admin ML Kaynagi` olarak guncellendi.
+  - Manager satis tahmin/toplu tarama butonlari sadece secili target icin admin current model varsa aktif olur.
+  - Satis manager dataset yukleme akisi current egitilmis modeli olan dataset'i otomatik secmeye basladi.
+  - `section=model` query'si manager satis ekraninda `department` section'a dusurulur.
+- Smoke:
+  - Canli satis model state kontrolunde 4 hedef de current dataset icin `stacking_lgbm_xgb_rf_lr` olarak egitili bulundu: train/test `1240/372`.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Satis manager KPI/ML ekranlari admin current dataset ve admin egitimli stacking ensemble sonuclarini okumali; model egitme ve model durumu yonetimi yalnizca admin ekraninda kalmalidir.
+
+## 2026-06-06 Departman Performansi Gemini Paneli ve Dinamik Risk/Aksiyonlar
+
+- Kullanici Departman Performansi ekranindaki buyuk/statik AI ozet alaninin sayfada gereksiz yer kapladigini, Gemini ile yorumlama deneyiminin sag alt sabit buton/panel olarak calismasini istedi.
+- Frontend duzeltmeleri:
+  - `ManagerDashboard.vue` icinde ust hibrit saglik kartindaki inline LLM butonu kaldirildi; kullanici sag alttaki sabit `Gemini ile Yorumla` butonuna yonlendirildi.
+  - Sag alt Gemini paneli eklendi; panel `use_llm=true` ile ayni hibrit dashboard endpoint'ini cagirir ve KPI/ML + nabiz + 360 skorlarini, kaynak etiketini, model bilgisini, dayanak/risk/aksiyon listelerini gosterir.
+  - Alttaki tekrar eden buyuk AI ozet karti render disina alindi; risk gostergeleri ve hizli aksiyonlar iki kolon olarak daha genis alanda gosterildi.
+  - `riskIndicatorGroups` artik statik `kritik yok/veri geldikce netlesecek` mesajlari yerine backend `hybrid_insights`, KPI/ML risk sayilari, nabiz attrition/stres, 360 burnout/flight ve veri kapsama oranlarindan dinamik sinyal uretir.
+  - `RiskIndicators.vue` bos kategorileri gizler; gercek sinyal yoksa tek veri durumu mesaji gosterir.
+- Backend duzeltmesi:
+  - `SoftwareMLService._dashboard_ai_summary_prompt()` Gemini prompt'u aksiyonlari departman durumuna gore degistirecek, KPI/ML+nabiz+360 kanitlarina baglayacak ve zayif kaynagi acik soyleyecek sekilde guclendirildi.
+- Smoke:
+  - Normal dashboard API: `status=success`, `health=50.6`, `risk=49.1`, `insights=1`, `monitoring=4`, `ai_source=deterministic`.
+  - Gemini acik dashboard API: `ai_source=gemini`, `ai_model=gemini-2.5-flash-lite`, `fallback=false`, `insights=4`, `recommendations=4`, `monitoring=5`.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Departman Performansi sayfasinda Gemini butonu sadece kullanici istediginde LLM maliyetini tetikler; risk ve hizli aksiyonlar varsayilan durumda backend hibrit sinyallerinden dinamik uretilmelidir.
+
+## 2026-06-06 Satis Takim Analizi Admin ML Sonuclari ile Hizalama
+
+- Kullanici satis manager KPI/ML `Takim Analizi` sayfasinin yazilim manager deneyimine benzemesini, ancak satis departmani bilesenlerine gore ve admin tarafinda egitilen current model sonucundan beslenmesini istedi.
+- Backend duzeltmeleri:
+  - `SalesMLService._team_analytics()` artik sadece `risk_score` ve `trend_values` degil; `employee_count`, `high_risk_count`, `medium_risk_count`, `low_risk_count`, `high_risk_rate`, `monitored_count`, `top_reason`, `role_counts`, `sales_pressure_score`, `pipeline_pressure_score` alanlarini da uretir.
+  - Takim `top_reason` DB summary/team encoding eslesmesine bagli kalmasin diye admin artifact `top_features` + son donem feature satirlari uzerinden dogrudan hesaplanir.
+  - 6 aylik takim trendi admin stacking ensemble bulk prediction skorlarinin ay bazli ortalamasindan gelir.
+- Frontend duzeltmeleri:
+  - `SalesManagerAnalyticsView.vue` icinde yeni satis `Takim Analizi` dashboard'u eklendi; eski tablo tabanli blok render disina alindi.
+  - Sol takim listesi, gradient takim header'i, 4 KPI karti, ana neden karti, 6 aylik satis risk trendi SVG grafiği, AI aksiyon paneli, takim yorumu ve `Takim Uyeleri - Detayli Risk Analizi` kartlari eklendi.
+  - Kartlar ve grafik `bulkResult.team_analytics` + `bulkResult.items` alanlarindan beslenir; manager tarafinda model egitimi yoktur.
+- Smoke:
+  - `manager.satis@propel.com` ile `upload_id=10`, `Performance_Drop_Target` bulk prediction calistirildi.
+  - Ornek ilk takim: `team=Doğu Anadolu`, `employee_count=7`, `high_risk_count=6`, `risk_score=70`, `top_reason=Tekliften Kazanima Donusum Orani`, `sales_pressure_score=22`, `pipeline_pressure_score=38`, `trend_values=71,75,69,72,72,70`.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/sales_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Satis `Calisan Analizi` ve `Departman Analizi` alt sayfalari da ayni admin current model/bulk prediction kontratini okuyacak sekilde gozden gecirilmeli; manager ekraninda egitim/teknik model yonetimi kontrolleri geri gelmemelidir.
+
+### 2026-06-06 Satis Takim Analizi Route Tazeleme Notu
+
+- Kullanici satis manager `Takim Analizi` ekraninin hala eski gorundugunu bildirdi.
+- Kontrol:
+  - Frontend container icinde `SalesManagerAnalyticsView.vue` yeni `Satis Takim Analizi` template'ini iceriyor.
+  - Vite dev server `http://localhost:5173/src/views/sales/SalesManagerAnalyticsView.vue` modulu uzerinden yeni template'i servis ediyor.
+- Duzeltme:
+  - Satis manager login/default redirect'i eski `/manager/sales-analytics` yerine dogrudan `/manager/sales-kpi-analysis?section=department` olarak guncellendi.
+  - Frontend type-check tekrar calistirildi ve `docker restart propel_frontend` ile container tazelendi.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/services/sales_ml_service.py` basarili.

@@ -563,7 +563,7 @@ class SalesMLService:
         timings_ms["summaries_ms"] = round((time.perf_counter() - stage_start) * 1000)
 
         stage_start = time.perf_counter()
-        team_analytics = SalesMLService._team_analytics(rows, artifact, target_column)
+        team_analytics = SalesMLService._team_analytics(rows, artifact, target_column, team_summaries)
         timings_ms["team_analytics_ms"] = round((time.perf_counter() - stage_start) * 1000)
 
         from app.services.sales_narrative_service import SalesNarrativeService
@@ -781,7 +781,12 @@ class SalesMLService:
         return int(round(score))
 
     @staticmethod
-    def _team_analytics(rows: list[dict[str, Any]], artifact: Any, target_column: str) -> list[dict[str, Any]]:
+    def _team_analytics(
+        rows: list[dict[str, Any]],
+        artifact: Any,
+        target_column: str,
+        team_summaries: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         dataset = SalesFeatureBuilder.build_from_rows(rows)
         if not dataset.feature_rows:
             return []
@@ -795,6 +800,9 @@ class SalesMLService:
             else []
         )
         period_scores: dict[str, dict[str, list[int]]] = {}
+        latest_rows: dict[str, dict[str, Any]] = {}
+        team_counts: dict[str, int] = {}
+        team_risk_buckets: dict[str, dict[str, int]] = {}
 
         for index, metadata in enumerate(dataset.metadata_rows):
             team = str(metadata.get("team") or "Takim bilgisi yok")
@@ -810,6 +818,41 @@ class SalesMLService:
                 }
             score = SalesMLService._probability_risk_score(probabilities, predicted_band)
             period_scores.setdefault(team, {}).setdefault(period, []).append(score)
+            latest_key = str(metadata.get("employee_code") or metadata.get("employee_id") or index)
+            previous = latest_rows.get(latest_key)
+            if previous is None or str(previous.get("period_date") or "") <= period_date:
+                latest_rows[latest_key] = {
+                    "team": team,
+                    "predicted_band": predicted_band,
+                    "score": score,
+                    "feature_row": dataset.feature_rows[index],
+                    "period_date": period_date,
+                }
+
+        for row in latest_rows.values():
+            team = str(row.get("team") or "Takim bilgisi yok")
+            team_counts[team] = team_counts.get(team, 0) + 1
+            bucket = SalesMLService._risk_bucket(str(row.get("predicted_band")))
+            team_risk_buckets.setdefault(team, {"high": 0, "medium": 0, "low": 0})[bucket] += 1
+
+        summary_by_team = {str(item.get("team")): item for item in (team_summaries or [])}
+        team_driver_counts: dict[str, dict[str, int]] = {}
+        top_features = artifact.metadata.get("top_features", []) if getattr(artifact, "metadata", None) else []
+        for row in latest_rows.values():
+            team = str(row.get("team") or "Takim bilgisi yok")
+            explanation = SalesExplanationBuilder.build(
+                target_column=target_column,
+                predicted_band=str(row.get("predicted_band") or ""),
+                confidence=0.0,
+                feature_row=row.get("feature_row") or {},
+                top_features=top_features,
+                limit=1,
+            )
+            drivers = explanation.get("top_drivers") or []
+            driver_name = "KPI sinyali"
+            if drivers:
+                driver_name = str(drivers[0].get("metric_name") or drivers[0].get("feature") or driver_name)
+            team_driver_counts.setdefault(team, {})[driver_name] = team_driver_counts.setdefault(team, {}).get(driver_name, 0) + 1
 
         analytics: list[dict[str, Any]] = []
         for team, periods in period_scores.items():
@@ -820,6 +863,35 @@ class SalesMLService:
                 if periods[period]
             ]
             latest_score = trend_values[-1] if trend_values else 0
+            latest_team_feature_rows = [
+                row["feature_row"]
+                for row in latest_rows.values()
+                if str(row.get("team")) == team and isinstance(row.get("feature_row"), dict)
+            ]
+            sales_pressure_values: list[float] = []
+            pipeline_pressure_values: list[float] = []
+            for feature_row in latest_team_feature_rows:
+                workload = float(feature_row.get("kpi_12_siye") or 0)
+                stress = float(feature_row.get("kpi_13_siys") or 0)
+                pipeline_health_gap = max(0.0, 1.0 - float(feature_row.get("kpi_10_pso") or 0))
+                pipeline_aging = float(feature_row.get("kpi_11_pyo") or 0)
+                followup_gap = max(0.0, 1.0 - float(feature_row.get("kpi_14_tdo") or 0))
+                crm_gap = max(0.0, 1.0 - float(feature_row.get("kpi_17_crmd") or 0))
+                sales_pressure_values.append(min(100.0, (workload * 0.35) + (stress * 0.25) + (pipeline_health_gap * 100 * 0.25) + (followup_gap * 100 * 0.15)))
+                pipeline_pressure_values.append(min(100.0, (pipeline_health_gap * 100 * 0.35) + (pipeline_aging * 100 * 0.25) + (followup_gap * 100 * 0.2) + (crm_gap * 100 * 0.2)))
+
+            sales_pressure_score = int(round(sum(sales_pressure_values) / len(sales_pressure_values))) if sales_pressure_values else 0
+            pipeline_pressure_score = int(round(sum(pipeline_pressure_values) / len(pipeline_pressure_values))) if pipeline_pressure_values else 0
+            buckets = team_risk_buckets.get(team, {"high": 0, "medium": 0, "low": 0})
+            summary = summary_by_team.get(team, {})
+            employee_count = team_counts.get(team) or int(summary.get("total") or 0)
+            high_count = int(summary.get("high") if summary.get("high") is not None else buckets["high"])
+            medium_count = int(summary.get("medium") if summary.get("medium") is not None else buckets["medium"])
+            low_count = int(summary.get("low") if summary.get("low") is not None else buckets["low"])
+            driver_counts = team_driver_counts.get(team, {})
+            top_reason = summary.get("topReason") or "KPI sinyali"
+            if top_reason == "KPI sinyali" and driver_counts:
+                top_reason = sorted(driver_counts.items(), key=lambda entry: entry[1], reverse=True)[0][0]
             analytics.append(
                 {
                     "team": team,
@@ -827,6 +899,16 @@ class SalesMLService:
                     "trend_values": trend_values,
                     "trend_periods": ordered_periods,
                     "trend_basis": "model_probability_by_period",
+                    "employee_count": employee_count,
+                    "high_risk_count": high_count,
+                    "medium_risk_count": medium_count,
+                    "low_risk_count": low_count,
+                    "high_risk_rate": round(high_count / employee_count, 4) if employee_count else 0,
+                    "monitored_count": high_count + medium_count,
+                    "top_reason": top_reason,
+                    "role_counts": summary.get("role_counts") or {},
+                    "sales_pressure_score": sales_pressure_score,
+                    "pipeline_pressure_score": pipeline_pressure_score,
                 }
             )
 

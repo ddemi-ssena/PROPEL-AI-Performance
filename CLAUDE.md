@@ -8,6 +8,7 @@
 ## Kalıcı Talimatlar
 
 - Her sohbet sonunda yapılan çalışma özeti, kalınan nokta ve sonraki adımlar bu dosyaya kaydedilecek.
+- Her sohbet sonunda `AGENTS.MD` ile birlikte `CLAUDE.md` de aynı çalışma günlüğüyle güncellenecek.
 - Kod değişikliklerinden önce `py_compile` (backend) ve `npm.cmd run type-check` (frontend) doğrulaması yapılacak.
 - Container yeniden başlatma: `docker compose restart backend` / `docker compose restart frontend`.
 - Backend kod değişikliklerinden sonra **mutlaka** `docker restart propel_backend` çalıştır — uvicorn hot-reload kapalı.
@@ -939,3 +940,125 @@ Yazılım model F1 skorları (Random Forest, test_period_count=8):
 - [ ] Yeni departman desteği (İK, Pazarlama): registry + kpi_registry + seed genişletme
 - [ ] WebSocket ile gerçek zamanlı bildirimler
 - [ ] GDPR/KVKK uyumluluk özellikleri
+- Kalici not: AGENTS.MD'ye eklenen her calisma ozeti, kalinan nokta ve sonraki adim CLAUDE.md'ye de ayni sekilde kaydedilecek.
+
+## 2026-06-06 Departman Performansi Gemini Paneli ve Dinamik Risk/Aksiyonlar
+
+- Kullanici Departman Performansi ekranindaki buyuk/statik AI ozet alaninin sayfada gereksiz yer kapladigini, Gemini ile yorumlama deneyiminin sag alt sabit buton/panel olarak calismasini istedi.
+- Frontend duzeltmeleri:
+  - `ManagerDashboard.vue` icinde ust hibrit saglik kartindaki inline LLM butonu kaldirildi; kullanici sag alttaki sabit `Gemini ile Yorumla` butonuna yonlendirildi.
+  - Sag alt Gemini paneli eklendi; panel `use_llm=true` ile ayni hibrit dashboard endpoint'ini cagirir ve KPI/ML + nabiz + 360 skorlarini, kaynak etiketini, model bilgisini, dayanak/risk/aksiyon listelerini gosterir.
+  - Alttaki tekrar eden buyuk AI ozet karti kaldirildi; risk gostergeleri ve hizli aksiyonlar iki kolon olarak daha genis alanda gosterildi.
+  - `riskIndicatorGroups` artik statik `kritik yok/veri geldikce netlesecek` mesajlari yerine backend `hybrid_insights`, KPI/ML risk sayilari, nabiz attrition/stres, 360 burnout/flight ve veri kapsama oranlarindan dinamik sinyal uretir.
+  - `RiskIndicators.vue` bos kategorileri gizler; gercek sinyal yoksa tek veri durumu mesaji gosterir.
+- Backend duzeltmesi:
+  - `SoftwareMLService._dashboard_ai_summary_prompt()` Gemini prompt'u aksiyonlari departman durumuna gore degistirecek, KPI/ML+nabiz+360 kanitlarina baglayacak ve zayif kaynagi acik soyleyecek sekilde guclendirildi.
+- Smoke:
+  - Normal dashboard API: `status=success`, `health=50.6`, `risk=49.1`, `insights=1`, `monitoring=4`, `ai_source=deterministic`.
+  - Gemini acik dashboard API: `ai_source=gemini`, `ai_model=gemini-2.5-flash-lite`, `fallback=false`, `insights=4`, `recommendations=4`, `monitoring=5`.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Departman Performansi sayfasinda Gemini butonu sadece kullanici istediginde LLM maliyetini tetikler; risk ve hizli aksiyonlar varsayilan durumda backend hibrit sinyallerinden dinamik uretilmelidir.
+
+## 2026-06-05 Ekibim KPI Kolonu Admin ML Risk Skoru Hizalama
+
+- KPI/ML Calisan Analizi ekraninda Canan Dagdelen icin `Risk Skoru=56/100` gorunurken Ekibim sayfasinda KPI kolonunda `59.9/100` gorunmesi incelendi.
+- Tespit: KPI/ML ekrani admin ML bulk prediction `risk_score` alanini, Ekibim ise eski KPI performans skorunu kullaniyordu; bu nedenle iki deger ayni metrik degildi.
+- Backend:
+  - `EmployeeService.get_team_health()` current admin software ensemble modelini bulup bulk prediction sonucunu alacak sekilde guncellendi.
+  - Calisan eslestirmesi `external_employee_code` (`SE-001`) ve isim uzerinden yapildi.
+  - TeamHealth member alanlarina `kpi_band`, `kpi_confidence`, `kpi_top_driver`, `kpi_source` eklendi.
+  - `kpi_score` artik admin ML `risk_score` olarak doner.
+- Frontend:
+  - `TeamManagement.vue` tablo basligi `KPI/ML Risk` olarak guncellendi.
+  - KPI/ML alt satiri model bandi ve ana driver'i gosterir.
+- Smoke:
+  - Canan Dagdelen icin KPI/ML `ml_risk_score=56`, Ekibim `team_kpi_score=56.0`, `team_kpi_source=admin_software_ml_bulk`.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/schemas/employee.py propel-backend/app/services/employee_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+## 2026-06-05 Ekibim Nabiz Olcegi Departman Performansi ile Hizalama
+
+- Ekibim Nabiz kolonunun Departman Performansi `Insan Sagligi Sinyalleri (Nabiz)` kartiyla ayni cevaplardan gelip gelmedigi incelendi.
+- Tespit:
+  - Iki ekran da `survey_responses` tablosunda `survey_type='weekly_pulse'` kayitlarini kullanir.
+  - Departman Performansi 100'luk skala, Ekibim ise bazi yerlerde 5'lik skala gosteriyordu.
+- Duzeltme:
+  - Ekibim `Nabiz Ortalamasi` ust karti primary value olarak `66.0/100` gibi 100'luk skala dondurur; hint icinde `3.3/5` saklanir.
+  - Ekibim tablo Nabiz sutunu kisi pulse skorunu `/100`, alt satirda `/5`, MTE etiketi ve `Ayrilma riski x/100` olarak gosterir.
+- Smoke:
+  - Departman Performansi weekly pulse: `motivationAverage=66.0`, `stressLevel=49.0`, `attritionRisk=49.0`, `responseCount=30`.
+  - Ekibim team-health: `pulse_average=66.0/100`, hint `Son weekly pulse ortalamasi: 3.3/5`, `pulse_response_count=30`.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/employee_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+## 2026-06-05 Satis Manager ML Egitim Kontrollerini Admin Kaynagina Alma
+
+- Satis manager KPI/ML ekraninda model egitiminin admin tarafinda kalmasi gerektigi icin manager tarafindaki egitim/model durumu kontrolleri incelendi.
+- Tespit:
+  - Satis manager sidebar'inda `Model Durumu` linki `/manager/sales-analytics` route'una gidiyordu.
+  - `/manager/sales-analytics` adminle ayni `SalesAnalyticsView.vue` bilesenini kullandigi icin manager tarafinda `Model Egit` gorunebiliyordu.
+  - `/manager/sales-kpi-analysis` icinde ayrica `Model Egit` butonu vardi.
+- Frontend:
+  - Satis manager sidebar'indan `Model Durumu` kaldirildi.
+  - `/manager/sales-analytics` manager icin `/manager/sales-kpi-analysis?section=department` sayfasina redirect edildi.
+  - `SalesAnalyticsView.vue` icindeki `Model Egit` butonu sadece admin rolunde gorunecek sekilde sinirlandi.
+  - `SalesManagerAnalyticsView.vue` icindeki `Model Egit` butonu kaldirildi; panel `Admin ML Kaynagi` olarak guncellendi.
+  - Tahmin/toplu tarama butonlari sadece secili target icin admin current model varsa aktif olur.
+  - Dataset secimi current egitilmis modeli olan dataset'i otomatik secer.
+- Smoke:
+  - Satis model state kontrolunde 4 hedef de current dataset icin `stacking_lgbm_xgb_rf_lr`, train/test `1240/372`.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## 2026-06-06 Satis Takim Analizi Admin ML Sonuclari ile Hizalama
+
+- Satis manager KPI/ML `Takim Analizi` sayfasi yazilim manager deneyimine benzer, ancak satis departmani bilesenlerine gore yeniden duzenlendi.
+- Backend:
+  - `SalesMLService._team_analytics()` artik `risk_score` ve `trend_values` yaninda `employee_count`, `high_risk_count`, `medium_risk_count`, `low_risk_count`, `high_risk_rate`, `monitored_count`, `top_reason`, `role_counts`, `sales_pressure_score`, `pipeline_pressure_score` alanlarini da uretir.
+  - Takim `top_reason`, admin artifact `top_features` + son donem feature satirlari uzerinden hesaplanir.
+  - 6 aylik takim trendi admin stacking ensemble bulk prediction skorlarinin ay bazli ortalamasindan gelir.
+- Frontend:
+  - `SalesManagerAnalyticsView.vue` icinde yeni satis `Takim Analizi` dashboard'u eklendi.
+  - Sol takim listesi, gradient takim header'i, 4 KPI karti, ana neden karti, 6 aylik satis risk trendi SVG grafigi, AI aksiyon paneli, takim yorumu ve `Takim Uyeleri - Detayli Risk Analizi` kartlari eklendi.
+  - Kartlar ve grafik `bulkResult.team_analytics` + `bulkResult.items` alanlarindan beslenir; manager tarafinda model egitimi yoktur.
+- Smoke:
+  - `manager.satis@propel.com`, `upload_id=10`, `Performance_Drop_Target` bulk prediction calisti.
+  - Ornek takim: `team=Dogu Anadolu`, `employee_count=7`, `high_risk_count=6`, `risk_score=70`, `top_reason=Tekliften Kazanima Donusum Orani`, `sales_pressure_score=22`, `pipeline_pressure_score=38`, `trend_values=71,75,69,72,72,70`.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/sales_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+### 2026-06-06 Satis Takim Analizi Route Tazeleme Notu
+
+- Kullanici satis manager `Takim Analizi` ekraninin hala eski gorundugunu bildirdi.
+- Kontrol:
+  - Frontend container icinde `SalesManagerAnalyticsView.vue` yeni `Satis Takim Analizi` template'ini iceriyor.
+  - Vite dev server `http://localhost:5173/src/views/sales/SalesManagerAnalyticsView.vue` modulu uzerinden yeni template'i servis ediyor.
+- Duzeltme:
+  - Satis manager login/default redirect'i eski `/manager/sales-analytics` yerine dogrudan `/manager/sales-kpi-analysis?section=department` olarak guncellendi.
+  - Frontend type-check tekrar calistirildi ve `docker restart propel_frontend` ile container tazelendi.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/services/sales_ml_service.py` basarili.
+
+## 2026-06-06 CLAUDE.md Gunluk Senkronizasyonu
+
+- Kullanici bundan sonra `AGENTS.MD` icine kaydedilen tum calisma gunlugu notlarinin `CLAUDE.md` icine de kaydedilmesini istedi.
+- `CLAUDE.md` kalici talimatlarina `AGENTS.MD` ile birlikte `CLAUDE.md` de ayni calisma gunluguyle guncellenecek notu eklendi.
+- Bu sohbette eksik kalan Ekibim KPI/Nabiz hizalama, satis manager admin-ML gecisi, Departman Performansi Gemini paneli, Satis Takim Analizi ve route tazeleme notlari `CLAUDE.md` sonuna eklendi.
+
+## Sonraki Adim
+
+- Bundan sonraki her calisma kapanisinda `AGENTS.MD` ve `CLAUDE.md` birlikte guncellenmelidir; biri guncellenip digeri eksik birakilmamalidir.

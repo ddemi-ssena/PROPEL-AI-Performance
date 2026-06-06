@@ -76,7 +76,7 @@
             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
               <th class="px-6 py-4">Çalışan</th>
               <th class="px-6 py-4">Rol / Takım</th>
-              <th class="px-6 py-4">KPI</th>
+              <th class="px-6 py-4">KPI/ML Risk</th>
               <th class="px-6 py-4">Nabız</th>
               <th class="px-6 py-4">360 Profil</th>
               <th class="px-6 py-4">Birleşik Risk</th>
@@ -114,15 +114,17 @@
               </td>
               <td class="px-6 py-4 text-sm text-slate-600">
                 <p class="font-medium text-slate-800">{{ formatScore(member.kpi_score, '/100') }}</p>
-                <p class="text-xs" :class="trendClass(member.kpi_trend)">
-                  {{ formatTrend(member.kpi_trend) }}
+                <p class="text-xs text-slate-400">
+                  {{ kpiMlDetail(member) }}
                 </p>
               </td>
               <td class="px-6 py-4 text-sm text-slate-600">
-                <p class="font-medium text-slate-800">{{ formatScore(member.latest_pulse_score, '/5') }}</p>
+                <p class="font-medium text-slate-800">{{ formatScore(pulseScore100(member), '/100') }}</p>
+                <p class="text-xs text-slate-400">{{ formatScore(member.latest_pulse_score, '/5') }}</p>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1" :class="mteClass(member.latest_mte)">
                   {{ mteLabel(member.latest_mte) }}
                 </span>
+                <p class="mt-1 text-xs text-slate-400">{{ pulseRiskText(member) }}</p>
               </td>
               <td class="px-6 py-4 text-sm text-slate-600">
                 <p class="font-medium text-slate-800">{{ member.feedback_count }} yanıt</p>
@@ -416,6 +418,23 @@ function formatTrend(value?: number | null) {
   if (value === null || value === undefined) return 'Trend yok'
   if (value > 0) return `+${value} trend`
   return `${value} trend`
+}
+
+function kpiMlDetail(member: TeamHealthMember) {
+  if (member.kpi_band || member.kpi_top_driver) {
+    return [member.kpi_band, member.kpi_top_driver].filter(Boolean).join(' / ')
+  }
+  return formatTrend(member.kpi_trend)
+}
+
+function pulseScore100(member: TeamHealthMember) {
+  if (member.latest_pulse_score === null || member.latest_pulse_score === undefined) return null
+  return Math.round(Number(member.latest_pulse_score) * 20)
+}
+
+function pulseRiskText(member: TeamHealthMember) {
+  if (member.latest_ars === null || member.latest_ars === undefined) return 'Ayrilma riski yok'
+  return `Ayrilma riski ${Math.round(Number(member.latest_ars) * 100)}/100`
 }
 
 function trendClass(value?: number | null) {

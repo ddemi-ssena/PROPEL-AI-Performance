@@ -2010,7 +2010,9 @@ class SoftwareMLService:
             "- Summary 4-6 cumle olsun: once genel durum, sonra ana risk kaynagi, sonra insan/kultur sinyali, sonra veri guveni ve karar odaği.\n"
             "- Strengths bolumu 'olumlu' diye zorlama yapmasin; veri guveni, takip edilebilirlik veya eldeki kanit gucu gibi gercek guclu noktalar olabilir.\n"
             "- Risks bolumu sadece baslik listesi degil, 1-2 cumlelik risk aciklamalari olsun.\n"
-            "- Recommendations bolumu somut, sirali ve yonetici aksiyonuna uygun olsun.\n"
+            "- Recommendations bolumu departman durumuna gore degissin; dusuk veri guveninde veri tamamlama, yuksek riskte 48 saatlik dogrulama, takim sapmasinda takim lideri aksiyonu oner.\n"
+            "- Aksiyonlari Gemini'nin genel tavsiyesi gibi degil, PAYLOAD icindeki KPI/ML, nabiz, 360 ve hybridInsights kanitlarina bagli yaz.\n"
+            "- Hangi kaynak zayifsa onu acikca soyle: KPI/ML dususu, nabiz stresi, 360 guven/burnout sinyali veya kapsama eksigi.\n"
             "- Kisileri suclayan dil kullanma; kapasite, surec, motivasyon, guven ve destek baglaminda yaz.\n"
             "- Sadece gecerli JSON dondur.\n"
             "JSON semasi: {"
@@ -2227,6 +2229,7 @@ class SoftwareMLService:
             else []
         )
         period_scores: dict[str, dict[str, list[int]]] = {}
+        period_capacity_scores: dict[str, dict[str, list[float]]] = {}
 
         for index, metadata in enumerate(dataset.metadata_rows):
             team = str(metadata.get("team") or "Takim bilgisi yok")
@@ -2242,6 +2245,9 @@ class SoftwareMLService:
                 }
             score = SoftwareMLService._probability_risk_score(target_column, probabilities, predicted_band)
             period_scores.setdefault(team, {}).setdefault(period, []).append(score)
+            capacity_score = SoftwareMLService._capacity_pressure_score(dataset.feature_rows[index])
+            if capacity_score is not None:
+                period_capacity_scores.setdefault(team, {}).setdefault(period, []).append(capacity_score)
 
         analytics: list[dict[str, Any]] = []
         for team, periods in period_scores.items():
@@ -2252,6 +2258,13 @@ class SoftwareMLService:
                 if periods[period]
             ]
             latest_score = trend_values[-1] if trend_values else 0
+            latest_capacity_values = period_capacity_scores.get(team, {}).get(ordered_periods[-1], []) if ordered_periods else []
+            capacity_score = (
+                round(sum(latest_capacity_values) / len(latest_capacity_values), 1)
+                if latest_capacity_values
+                else float(latest_score)
+            )
+            capacity_overage = int(max(0, min(35, round((capacity_score - 50) * 0.7))))
             analytics.append(
                 {
                     "team": team,
@@ -2259,10 +2272,46 @@ class SoftwareMLService:
                     "trend_values": trend_values,
                     "trend_periods": ordered_periods,
                     "trend_basis": "model_probability_by_period",
+                    "capacity_score": capacity_score,
+                    "capacity_overage": capacity_overage,
+                    "capacity_basis": "software_workload_kpis" if latest_capacity_values else "model_risk_score_fallback",
                 }
             )
 
         return sorted(analytics, key=lambda item: item["risk_score"], reverse=True)
+
+    @staticmethod
+    def _capacity_pressure_score(feature_row: dict[str, Any]) -> float | None:
+        capacity_feature_names = {
+            "kpi_9_iye": 1.0,
+            "kpi_10_says": 1.0,
+            "kpi_11_tyo": 0.8,
+        }
+        weighted_scores: list[tuple[float, float]] = []
+        for feature_name, weight in capacity_feature_names.items():
+            value = feature_row.get(feature_name)
+            if value is None:
+                continue
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                continue
+            if number != number:
+                continue
+            if number <= 1.5:
+                score = number * 100
+            elif number <= 10:
+                score = number * 10
+            else:
+                score = number
+            weighted_scores.append((max(0, min(100, score)), weight))
+
+        if not weighted_scores:
+            return None
+        total_weight = sum(weight for _, weight in weighted_scores)
+        if not total_weight:
+            return None
+        return round(sum(score * weight for score, weight in weighted_scores) / total_weight, 2)
 
     @staticmethod
     def predict_all_targets(

@@ -73,6 +73,7 @@
             </div>
           </div>
           <button
+            v-if="isAdmin"
             @click="trainModel"
             :disabled="!!loading || !uploadId"
             class="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
@@ -699,6 +700,7 @@ import {
   type SoftwareDatasetResponse,
   type DepartmentAnalyticsOverviewResponse,
 } from '@/services/api/analytics.api'
+import { useAuthStore } from '@/stores/auth'
 
 const TARGETS: { value: SalesTargetColumn; label: string }[] = [
   { value: 'Performance_Drop_Target', label: 'Performans Düşüşü' },
@@ -722,6 +724,8 @@ const loading = ref<string | null>(null)
 const error = ref<string | null>(null)
 const tableSearch = ref('')
 const selectedTeamName = ref<string | null>(null)
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.userRole === 'admin')
 
 // ── Computed -----------------------------------------------------------------
 
