@@ -1047,7 +1047,9 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
 - [x] Personel Yönetimi tamamen yenilendi — ML + Nabız Anketi bütünleşik skor, Top5/Bottom5, Gemini paneli
 - [x] Personel Yönetimi Top 5 Aksiyonlar — ödüllendirme önerileri + 9 hayır kurumu bağış seçimi
 - [x] Personel Yönetimi Bottom 5 Aksiyonlar — ML verisi bazlı öncelikli önlemler listesi (Acil/Yüksek/Orta/Düşük)
-- [ ] Personel Yönetimi 360° sütunu backend entegrasyonu (per-employee 360 skoru endpoint'i)
+- [x] Personel Yönetimi 360° sütunu backend entegrasyonu — FeedbackNLPAnalysis enum ortalaması, sürekli 0-100 skor
+- [x] Personel Yönetimi Genel Skor yön düzeltmesi — risk skoru (yüksek=riskli), eşikler ve renkler tersine çevrildi
+- [x] "En Yüksek Skor Top 5" → "En Riskli 5" (kırmızı), "Dikkat Gerektiren Bottom 5" → "En Güvenli 5" (yeşil)
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri
 - [ ] LLM/Gemini endpoint'lerini async/background job olarak ayır (şu an bloklayıcı)
@@ -2621,6 +2623,62 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
 ## Sonraki Adim
 
 - Satis `Calisan Analizi` ve `Departman Analizi` alt sayfalari da ayni admin current model/bulk prediction kontratini okuyacak sekilde gozden gecirilmeli; manager ekraninda egitim/teknik model yonetimi kontrolleri geri gelmemelidir.
+
+---
+
+## 2026-06-06 Personel Yonetimi Genel Skor Yon Duzeltmesi + 360 Sutunu Entegrasyonu
+
+### Genel Skor: Saglik → Risk Skoru
+
+**Sorun**: `genel_skor` onceden saglik skoru olarak hesaplaniyordu (yuksek = iyi). Kullanici bunun tutarsiz oldugunu fark etti — ML sutunlarinin hepsi risk yuzdesi gosteriyor (yuksek = kotü), ama Genel Skor tersi yonde calisiyordu.
+
+**Duzeltilen Dosya**: `propel-frontend/src/views/admin/EmployeeManagement.vue`
+
+- `genel_skor` hesabi: `100 - composite + nabiz saglik formulü` → dogrudan `ml.composite` (backend zaten risk skoru donduruyor)
+- Nabiz verisinin cift sayimi kaldirildi — backend composite icinde zaten `ML×60 + Nabiz×20 + 360×20` var
+- Esik degerler tersine cevirildi:
+  - `highRiskCount`: `< 40` → `>= 60`
+  - `safeCount`: `>= 70` → `< 30`
+  - Filtre: `high_risk >= 60`, `medium_risk 30-59`, `safe < 30`
+- Renk fonksiyonlari (`genelScorColor`, `genelScorBarColor`, `genelScorLabel`) tersine cevirildi
+- KPI kart metni: "100 uzerinden saglik skoru" → "100 uzerinden risk skoru"
+- "En Yuksek Skor — Top 5" (yesil panel) → **"En Riskli 5"** (kirmizi panel)
+- "Dikkat Gerektiren — Bottom 5" (kirmizi panel) → **"En Guvenli 5"** (yesil panel)
+- Aksiyon butonu ikonlari da uygun sekilde degistirildi
+
+### 360° Sutunu Entegrasyonu
+
+**Sorun**: Tablo 360° Geri Bildirim sutunu "Yakinda" placeholder gosteriyordu. Backend `ai-insights` endpoint'i zaten `feedback_risk` alanini her calisan icin hesaplayip donduruyor, ama frontend kullanmiyordu.
+
+**Duzeltilen Dosya**: `propel-frontend/src/views/admin/EmployeeManagement.vue`
+
+- `EnrichedEmployee` arayuzune `feedback_risk: number | null` eklendi
+- `enriched` mapping'ine `ml.feedback_risk` dahil edildi
+- "Yakinda" placeholder → skor + progress bar + etiket (Ucus Riski / Izlemede / Guvenli)
+- Yeni helper fonksiyonlar: `feedbackRiskColor`, `feedbackRiskBarColor`, `feedbackRiskLabel`
+- Legend metni guncellendi: "ML Risk (%60) + Nabiz ARS (%20) + 360° Ucus Riski (%20)"
+
+### Backend: feedback_risk Surekli Skor
+
+**Sorun**: Backend `_flight_score()` fonksiyonu `EmployeeNLPProfile.flight_risk_level` enum degerini sabit sayilara ceviriyor ve yalnizca 3 farkli deger uretiyordu (80/45/15).
+
+**Duzeltilen Dosya**: `propel-backend/app/api/routers/admin_uploads.py`
+
+- `nlp_latest` dict kaldirildi, yerine `nlp_flight_scores` dict eklendi
+- `FeedbackNLPAnalysis.flight_risk` enum'unun tum kayitlari uzerinden agirlikli ortalamasi alinir:
+  - `High=80, Medium=45, Low=15` — SQLAlchemy `case()` ile
+  - `func.avg()` ile calisan basina gercek ortalama hesaplanir
+  - Ornek: 3 High + 1 Medium → (80+80+80+45)/4 = 71 (sabit 80 degil)
+- Sonuc: seed verisinde her calisanin tum feedbackleri ayni seviyede oldugu icin simdilk hala 15/45/80 gorunur; gercek kullanici feedbackleriyle ara degerler (62, 48 gibi) uretilecek
+- `raw_analysis` JSON yaklasimi denendi ancak tum kayitlarda `NULL` oldugu goruldu — enum ortalamasi daha saglikli
+
+### Dogrulama
+
+- `python -m py_compile propel-backend/app/api/routers/admin_uploads.py` basarili
+- `npm run type-check` (Docker icinde) basarili
+- `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi
+
+---
 
 ### 2026-06-06 Satis Takim Analizi Route Tazeleme Notu
 

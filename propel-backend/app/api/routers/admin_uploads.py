@@ -396,7 +396,11 @@ def get_ai_insights(
     except Exception:
         pass
 
-    # ── 2. Çalışan tablosu — 4 hedef bazlı ──────────────────────────────
+    # ── 2. Çalışan tablosu — ML + Nabız + 360° ───────────────────────────
+    from app.db.models.survey_response import SurveyResponse
+    from app.db.models.nlp import EmployeeNLPProfile, FeedbackNLPAnalysis
+    from sqlalchemy import func, desc, cast, Float, text
+
     def _risk_pct(t: Any) -> int:
         if t is None:
             return 0
@@ -404,42 +408,105 @@ def get_ai_insights(
         conf = t.confidence if hasattr(t, "confidence") else t.get("confidence", 0)
         return round(float(conf if str(band) == "1" else 1 - conf) * 100)
 
-    def _composite(emp: Any) -> int:
-        pd_ = _risk_pct(emp.perf_drop)   if hasattr(emp, "perf_drop")   else 0
-        bk_ = _risk_pct(emp.burnout)     if hasattr(emp, "burnout")     else 0
-        rs_ = _risk_pct(emp.resignation) if hasattr(emp, "resignation") else 0
-        hr_ = _risk_pct(emp.high_risk)   if hasattr(emp, "high_risk")   else 0
-        return round(pd_ * 0.35 + rs_ * 0.30 + hr_ * 0.25 + bk_ * 0.10)
+    # --- Nabız ve 360° verisini önceden çek ---
+    all_emp_objects = list(sales_bulk.employees if sales_bulk else []) + list(sw_bulk.employees if sw_bulk else [])
+    all_codes = [e.external_employee_code for e in all_emp_objects if e.external_employee_code]
 
-    sales_rows = [
-        {
-            "code":       e.external_employee_code or f"SA-{e.employee_id:03d}",
-            "name":       e.employee_name or e.external_employee_code or f"SA-{e.employee_id:03d}",
-            "department": "Satış",
-            "team":       e.team or "—",
-            "perf_drop":  _risk_pct(e.perf_drop),
-            "burnout":    _risk_pct(e.burnout),
-            "resignation":_risk_pct(e.resignation),
-            "high_risk":  _risk_pct(e.high_risk),
-            "composite":  _composite(e),
-        }
-        for e in (sales_bulk.employees if sales_bulk else [])
-    ]
+    emp_db_map: dict[str, int] = {
+        e.external_employee_code: e.id
+        for e in db.query(Employee).filter(Employee.external_employee_code.in_(all_codes)).all()
+        if e.external_employee_code
+    }
+    all_db_ids = list(emp_db_map.values())
 
-    sw_rows = [
-        {
-            "code":       e.external_employee_code or f"SE-{e.employee_id:03d}",
-            "name":       e.employee_name or e.external_employee_code or f"SE-{e.employee_id:03d}",
-            "department": "Yazılım",
-            "team":       e.team or "—",
-            "perf_drop":  _risk_pct(e.perf_drop),
-            "burnout":    _risk_pct(e.burnout),
-            "resignation":_risk_pct(e.resignation),
-            "high_risk":  _risk_pct(e.high_risk),
-            "composite":  _composite(e),
+    # Nabız: çalışan başına ortalama ars_score (0-1)
+    pulse_ars: dict[int, float] = dict(
+        db.query(SurveyResponse.employee_id, func.avg(SurveyResponse.ars_score))
+        .filter(
+            SurveyResponse.employee_id.in_(all_db_ids),
+            SurveyResponse.survey_type == "weekly_pulse",
+            SurveyResponse.ars_score.isnot(None),
+        )
+        .group_by(SurveyResponse.employee_id)
+        .all()
+    )
+
+    # 360°: FeedbackNLPAnalysis.flight_risk enum → sayısal ağırlık → çalışan başına ortalama (0-100)
+    # High=80, Medium=45, Low=15 yerine tüm feedback kayıtlarının ortalaması alınır
+    # → 3 High + 1 Medium = (80+80+80+45)/4 = 71 (daha gerçekçi)
+    nlp_flight_scores: dict[int, float] = {}
+    try:
+        from sqlalchemy import case as sa_case
+        from app.db.models.nlp import RiskLevel as _RL
+        weight_expr = sa_case(
+            (FeedbackNLPAnalysis.flight_risk == _RL.high,   80.0),
+            (FeedbackNLPAnalysis.flight_risk == _RL.medium, 45.0),
+            (FeedbackNLPAnalysis.flight_risk == _RL.low,    15.0),
+            else_=0.0,
+        )
+        rows = (
+            db.query(
+                FeedbackNLPAnalysis.employee_id,
+                func.avg(weight_expr).label("avg_score"),
+                func.count(FeedbackNLPAnalysis.id).label("cnt"),
+            )
+            .filter(
+                FeedbackNLPAnalysis.employee_id.in_(all_db_ids),
+                FeedbackNLPAnalysis.flight_risk.isnot(None),
+            )
+            .group_by(FeedbackNLPAnalysis.employee_id)
+            .all()
+        )
+        for eid, avg_score, cnt in rows:
+            if avg_score is not None and cnt and cnt > 0:
+                nlp_flight_scores[eid] = min(100, round(float(avg_score)))
+    except Exception:
+        pass  # tablo yoksa sessizce geç
+
+    def _composite_full(code: str, pd_: int, bk_: int, rs_: int, hr_: int) -> tuple[int, int, int]:
+        db_id = emp_db_map.get(code)
+        ml_part = round(pd_ * 0.35 + rs_ * 0.30 + hr_ * 0.25 + bk_ * 0.10)
+
+        has_pulse    = db_id is not None and db_id in pulse_ars
+        has_feedback = db_id is not None and db_id in nlp_flight_scores
+
+        pulse_risk    = round(float(pulse_ars.get(db_id, 0) or 0) * 100) if has_pulse else 0
+        feedback_risk = nlp_flight_scores[db_id] if has_feedback else 0
+
+        if has_pulse and has_feedback:
+            composite = round(ml_part * 0.60 + pulse_risk * 0.20 + feedback_risk * 0.20)
+        elif has_pulse:
+            composite = round(ml_part * 0.70 + pulse_risk * 0.30)
+        elif has_feedback:
+            composite = round(ml_part * 0.70 + feedback_risk * 0.30)
+        else:
+            composite = ml_part
+
+        return composite, pulse_risk, feedback_risk
+
+    def _make_row(e: Any, dept: str) -> dict:
+        code = e.external_employee_code or ""
+        pd_ = _risk_pct(e.perf_drop)
+        bk_ = _risk_pct(e.burnout)
+        rs_ = _risk_pct(e.resignation)
+        hr_ = _risk_pct(e.high_risk)
+        composite, pulse_risk, feedback_risk = _composite_full(code, pd_, bk_, rs_, hr_)
+        return {
+            "code":          code,
+            "name":          e.employee_name or code,
+            "department":    dept,
+            "team":          e.team or "—",
+            "perf_drop":     pd_,
+            "burnout":       bk_,
+            "resignation":   rs_,
+            "high_risk":     hr_,
+            "pulse_risk":    pulse_risk,
+            "feedback_risk": feedback_risk,
+            "composite":     composite,
         }
-        for e in (sw_bulk.employees if sw_bulk else [])
-    ]
+
+    sales_rows = [_make_row(e, "Satış")   for e in (sales_bulk.employees if sales_bulk else [])]
+    sw_rows    = [_make_row(e, "Yazılım") for e in (sw_bulk.employees    if sw_bulk    else [])]
 
     all_rows = sorted(sales_rows + sw_rows, key=lambda r: -r["composite"])
 
@@ -475,7 +542,7 @@ def get_ai_insights(
     kpis = [
         {"title": "Toplam Çalışan",   "value": str(all_emps_count), "trend": "ML Analizi",     "trendColor": "text-blue-500",    "comparison": "Her iki departman"},
         {"title": "Yüksek Risk",       "value": str(high_composite), "trend": "Dikkat",          "trendColor": "text-red-500",     "comparison": "Bileşik risk ≥ %50"},
-        {"title": "Ort. Genel Risk",   "value": f"%{avg_composite}", "trend": "Bileşik Skor",    "trendColor": "text-amber-600",   "comparison": "4 hedef ağırlıklı ort."},
+        {"title": "Ort. Genel Risk",   "value": f"%{avg_composite}", "trend": "Bileşik Skor",    "trendColor": "text-amber-600",   "comparison": "ML %60 + Nabız %20 + 360° %20"},
         {"title": "Güvenli Çalışan",   "value": str(all_emps_count - high_composite), "trend": "İyi", "trendColor": "text-emerald-600", "comparison": "Bileşik risk < %50"},
     ]
 

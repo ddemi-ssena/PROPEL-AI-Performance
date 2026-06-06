@@ -39,34 +39,34 @@
         <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Ort. Genel Skor</p>
           <p class="text-3xl font-bold" :class="avgScoreColor">{{ avgGenel }}</p>
-          <p class="text-xs text-slate-400 mt-1">100 üzerinden sağlık skoru</p>
+          <p class="text-xs text-slate-400 mt-1">100 üzerinden risk skoru</p>
         </div>
         <div class="bg-white rounded-2xl border border-red-100 p-5 shadow-sm bg-red-50/40">
           <p class="text-xs font-semibold text-red-400 uppercase tracking-wider mb-1">Yüksek Risk</p>
           <p class="text-3xl font-bold text-red-600">{{ highRiskCount }}</p>
-          <p class="text-xs text-red-400 mt-1">Genel skor &lt; 40</p>
+          <p class="text-xs text-red-400 mt-1">Genel skor ≥ 60</p>
         </div>
         <div class="bg-white rounded-2xl border border-emerald-100 p-5 shadow-sm bg-emerald-50/40">
           <p class="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-1">Güvenli Bölge</p>
           <p class="text-3xl font-bold text-emerald-600">{{ safeCount }}</p>
-          <p class="text-xs text-emerald-500 mt-1">Genel skor ≥ 70</p>
+          <p class="text-xs text-emerald-500 mt-1">Genel skor &lt; 30</p>
         </div>
       </div>
 
       <!-- Top 5 / Bottom 5 -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <!-- Top 5 -->
-        <div class="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
-          <div class="bg-emerald-50 px-6 py-4 border-b border-emerald-100 flex items-center justify-between gap-2">
+        <!-- Top 5 — En Riskli -->
+        <div class="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
+          <div class="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between gap-2">
             <div class="flex items-center gap-2">
-              <TrophyIcon class="w-5 h-5 text-emerald-600" />
-              <h3 class="font-bold text-emerald-800">En Yüksek Skor — Top 5</h3>
+              <ExclamationTriangleIcon class="w-5 h-5 text-red-600" />
+              <h3 class="font-bold text-red-800">En Riskli 5</h3>
             </div>
             <button
               @click="showTopActionsModal = true"
-              class="flex items-center gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+              class="flex items-center gap-1.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm"
             >
-              <StarIcon class="w-3.5 h-3.5" />
+              <ClipboardDocumentListIcon class="w-3.5 h-3.5" />
               Aksiyonlar
             </button>
           </div>
@@ -76,53 +76,8 @@
               :key="emp.code"
               class="flex items-center gap-3"
             >
-              <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                {{ Number(i) + 1 }}
-              </span>
-              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                :class="emp.dept === 'Satış' ? 'bg-emerald-500' : 'bg-indigo-500'">
-                {{ initials(emp.name) }}
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-slate-800 truncate">{{ emp.name }}</p>
-                <p class="text-xs text-slate-400 truncate">{{ emp.dept }} · {{ emp.team }}</p>
-              </div>
-              <div class="text-right flex-shrink-0">
-                <span class="text-lg font-bold text-emerald-600">{{ emp.genel_skor }}</span>
-                <p class="text-[10px] text-slate-400">/ 100</p>
-              </div>
-              <div class="w-20">
-                <div class="bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                  <div class="h-full bg-emerald-500 rounded-full" :style="{ width: `${emp.genel_skor}%` }"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bottom 5 -->
-        <div class="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
-          <div class="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2">
-              <ExclamationTriangleIcon class="w-5 h-5 text-red-600" />
-              <h3 class="font-bold text-red-800">Dikkat Gerektiren — Bottom 5</h3>
-            </div>
-            <button
-              @click="showBottomActionsModal = true"
-              class="flex items-center gap-1.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm"
-            >
-              <ClipboardDocumentListIcon class="w-3.5 h-3.5" />
-              Aksiyonlar
-            </button>
-          </div>
-          <div class="p-4 space-y-3">
-            <div
-              v-for="(emp, i) in bottomFive"
-              :key="emp.code"
-              class="flex items-center gap-3"
-            >
               <span class="w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                {{ i + 1 }}
+                {{ Number(i) + 1 }}
               </span>
               <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                 :class="emp.dept === 'Satış' ? 'bg-emerald-500' : 'bg-indigo-500'">
@@ -138,7 +93,52 @@
               </div>
               <div class="w-20">
                 <div class="bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                  <div class="h-full bg-red-500 rounded-full" :style="{ width: emp.genel_skor + '%' }"></div>
+                  <div class="h-full bg-red-500 rounded-full" :style="{ width: `${emp.genel_skor}%` }"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom 5 — En Güvenli -->
+        <div class="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
+          <div class="bg-emerald-50 px-6 py-4 border-b border-emerald-100 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <TrophyIcon class="w-5 h-5 text-emerald-600" />
+              <h3 class="font-bold text-emerald-800">En Güvenli 5</h3>
+            </div>
+            <button
+              @click="showBottomActionsModal = true"
+              class="flex items-center gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+            >
+              <StarIcon class="w-3.5 h-3.5" />
+              Aksiyonlar
+            </button>
+          </div>
+          <div class="p-4 space-y-3">
+            <div
+              v-for="(emp, i) in bottomFive"
+              :key="emp.code"
+              class="flex items-center gap-3"
+            >
+              <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                {{ i + 1 }}
+              </span>
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                :class="emp.dept === 'Satış' ? 'bg-emerald-500' : 'bg-indigo-500'">
+                {{ initials(emp.name) }}
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-slate-800 truncate">{{ emp.name }}</p>
+                <p class="text-xs text-slate-400 truncate">{{ emp.dept }} · {{ emp.team }}</p>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <span class="text-lg font-bold text-emerald-600">{{ emp.genel_skor }}</span>
+                <p class="text-[10px] text-slate-400">/ 100</p>
+              </div>
+              <div class="w-20">
+                <div class="bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="h-full bg-emerald-500 rounded-full" :style="{ width: emp.genel_skor + '%' }"></div>
                 </div>
               </div>
             </div>
@@ -455,19 +455,15 @@
       <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6 flex flex-wrap gap-4 text-xs text-slate-500">
         <div class="flex items-center gap-2">
           <span class="w-3 h-3 rounded bg-indigo-500 inline-block"></span>
-          <span><strong class="text-slate-700">ML Sağlık (%50)</strong> — 4 hedef riski (PD/TK/İR/YR) ters çevrilmiş</span>
+          <span><strong class="text-slate-700">ML Risk (%60)</strong> — PD×35 + İstifa×30 + Yük.Risk×25 + Tükenmişlik×10</span>
         </div>
         <div class="flex items-center gap-2">
           <span class="w-3 h-3 rounded bg-blue-400 inline-block"></span>
-          <span><strong class="text-slate-700">Nabız Skoru (%30)</strong> — Haftalık motivasyon ortalaması (0-5)</span>
+          <span><strong class="text-slate-700">Nabız ARS (%20)</strong> — Haftalık nabız anketi işten ayrılma riski</span>
         </div>
         <div class="flex items-center gap-2">
-          <span class="w-3 h-3 rounded bg-emerald-400 inline-block"></span>
-          <span><strong class="text-slate-700">Tutma Skoru (%20)</strong> — ARS elde tutma riski ters çevrilmiş</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="w-3 h-3 rounded bg-slate-300 inline-block"></span>
-          <span class="text-slate-400"><strong class="text-slate-500">360° Geri Bildirim</strong> — Backend entegrasyonu bekleniyor</span>
+          <span class="w-3 h-3 rounded bg-purple-400 inline-block"></span>
+          <span><strong class="text-slate-700">360° Uçuş Riski (%20)</strong> — NLP profil flight_risk_level (Yüksek=80, Orta=45, Düşük=15)</span>
         </div>
       </div>
 
@@ -488,9 +484,9 @@
         </select>
         <select v-model="selectedRiskFilter" class="bg-slate-50 border-none rounded-lg text-sm py-2 pl-3 pr-8 focus:ring-2 focus:ring-indigo-500 text-slate-600">
           <option value="">Tüm Skor Seviyeleri</option>
-          <option value="high_risk">Yüksek Risk (&lt;40)</option>
-          <option value="medium_risk">Orta Risk (40-69)</option>
-          <option value="safe">Güvenli (≥70)</option>
+          <option value="high_risk">Yüksek Risk (≥60)</option>
+          <option value="medium_risk">Orta Risk (30-59)</option>
+          <option value="safe">Güvenli (&lt;30)</option>
         </select>
         <select v-model="sortField" class="bg-slate-50 border-none rounded-lg text-sm py-2 pl-3 pr-8 focus:ring-2 focus:ring-indigo-500 text-slate-600">
           <option value="genel_desc">Genel Skor ↓</option>
@@ -614,16 +610,27 @@
                     <div class="flex items-center gap-2">
                       <span class="text-[10px] text-slate-400 w-20 shrink-0">ARS Riski</span>
                       <span class="text-sm font-bold" :class="arsColor(emp.survey_ars)">
-                        {{ (emp.survey_ars * 100).toFixed(0) }}<span class="text-xs font-normal text-slate-400">%</span>
+                        {{ ((emp.survey_ars ?? 0) * 100).toFixed(0) }}<span class="text-xs font-normal text-slate-400">%</span>
                       </span>
                     </div>
                   </div>
                   <span v-else class="text-xs text-slate-300">—</span>
                 </td>
 
-                <!-- 360 placeholder -->
+                <!-- 360° Geri Bildirim -->
                 <td class="px-5 py-3.5 text-center">
-                  <span class="text-[10px] text-slate-300 bg-slate-50 px-2 py-1 rounded border border-slate-100">Yakında</span>
+                  <div v-if="emp.feedback_risk !== null" class="flex flex-col items-center gap-1">
+                    <span class="text-sm font-bold" :class="feedbackRiskColor(emp.feedback_risk)">
+                      {{ emp.feedback_risk }}<span class="text-xs font-normal text-slate-400">/100</span>
+                    </span>
+                    <div class="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="h-full rounded-full transition-all" :class="feedbackRiskBarColor(emp.feedback_risk)" :style="{ width: emp.feedback_risk + '%' }"></div>
+                    </div>
+                    <span class="text-[10px]" :class="feedbackRiskLabel(emp.feedback_risk).color">
+                      {{ feedbackRiskLabel(emp.feedback_risk).text }}
+                    </span>
+                  </div>
+                  <span v-else class="text-xs text-slate-300">—</span>
                 </td>
 
                 <!-- Genel Skor -->
@@ -764,8 +771,8 @@ interface EnrichedEmployee {
   // Nabız
   survey_score: number | null
   survey_ars: number | null
-  // 360 — backend bekleniyor
-  // feedback_score: number | null
+  // 360
+  feedback_risk: number | null
   // Bütünleşik
   genel_skor: number
 }
@@ -825,20 +832,8 @@ const fetchAll = async () => {
       const dbId = codeToDbId[code] ?? null
       const survey = dbId ? (surveyByEmpId[dbId] ?? null) : null
 
-      const mlHealth = 100 - (ml.composite ?? 50)
-
-      // Nabız bileşeni: motivasyon 0-5 → 0-100; ARS ters çevir
-      let nabizHealth: number | null = null
-      if (survey) {
-        const nabizScore = (survey.avg_score / 5) * 100
-        const tutmaScore = (1 - survey.avg_ars) * 100
-        nabizHealth = nabizScore * 0.6 + tutmaScore * 0.4
-      }
-
-      // Genel skor: ML %50, Nabız %50 (360 gelince ağırlıklar dağıtılacak)
-      const genel = nabizHealth !== null
-        ? Math.round(mlHealth * 0.5 + nabizHealth * 0.5)
-        : Math.round(mlHealth)
+      // Backend composite = ML(%60) + Nabız(%20) + 360°(%20) — doğrudan risk skoru
+      const genel = ml.composite ?? 50
 
       return {
         code,
@@ -853,6 +848,7 @@ const fetchAll = async () => {
         ml_composite: ml.composite ?? 0,
         survey_score: survey?.avg_score ?? null,
         survey_ars: survey?.avg_ars ?? null,
+        feedback_risk: typeof ml.feedback_risk === 'number' ? ml.feedback_risk : null,
         genel_skor: Math.min(100, Math.max(0, genel)),
       } as EnrichedEmployee
     })
@@ -885,7 +881,7 @@ function parseGeminiNarrative(data: any) {
 
   // Gemini kullanılamıyor — stats'tan deterministik özet üret
   const total: number = stats.total ?? enriched.value.length
-  const highRisk: number = stats.high_risk ?? enriched.value.filter(e => e.genel_skor < 40).length
+  const highRisk: number = stats.high_risk ?? enriched.value.filter(e => e.genel_skor >= 60).length
   const avgComposite: number = stats.avg_composite ?? 50
   const avgSales: number = stats.avg_sales ?? 0
   const avgSw: number = stats.avg_sw ?? 0
@@ -946,18 +942,20 @@ const avgGenel = computed(() => {
 })
 
 const avgScoreColor = computed(() => {
-  if (avgGenel.value >= 70) return 'text-emerald-600'
-  if (avgGenel.value >= 50) return 'text-amber-500'
-  return 'text-red-600'
+  if (avgGenel.value >= 60) return 'text-red-600'
+  if (avgGenel.value >= 30) return 'text-amber-500'
+  return 'text-emerald-600'
 })
 
-const highRiskCount = computed(() => enriched.value.filter(e => e.genel_skor < 40).length)
-const safeCount = computed(() => enriched.value.filter(e => e.genel_skor >= 70).length)
+const highRiskCount = computed(() => enriched.value.filter(e => e.genel_skor >= 60).length)
+const safeCount = computed(() => enriched.value.filter(e => e.genel_skor < 30).length)
 
 const sortedByGenel = computed(() =>
   [...enriched.value].sort((a, b) => b.genel_skor - a.genel_skor)
 )
+// En riskli 5 (en yüksek skor)
 const topFive = computed(() => sortedByGenel.value.slice(0, 5))
+// En güvenli 5 (en düşük skor)
 const bottomFive = computed(() => [...enriched.value].sort((a, b) => a.genel_skor - b.genel_skor).slice(0, 5))
 
 // ── Filtreler ──────────────────────────────────────────────────────────────
@@ -980,9 +978,9 @@ const filteredEmployees = computed(() => {
     const matchSearch = !q || emp.name.toLowerCase().includes(q) || emp.dept.toLowerCase().includes(q) || emp.team.toLowerCase().includes(q)
     const matchDept = !selectedDepartment.value || emp.dept === selectedDepartment.value
     const matchRisk = !selectedRiskFilter.value ||
-      (selectedRiskFilter.value === 'high_risk' && emp.genel_skor < 40) ||
-      (selectedRiskFilter.value === 'medium_risk' && emp.genel_skor >= 40 && emp.genel_skor < 70) ||
-      (selectedRiskFilter.value === 'safe' && emp.genel_skor >= 70)
+      (selectedRiskFilter.value === 'high_risk' && emp.genel_skor >= 60) ||
+      (selectedRiskFilter.value === 'medium_risk' && emp.genel_skor >= 30 && emp.genel_skor < 60) ||
+      (selectedRiskFilter.value === 'safe' && emp.genel_skor < 30)
     return matchSearch && matchDept && matchRisk
   })
 
@@ -1033,21 +1031,39 @@ function arsColor(ars: number | null) {
 }
 
 function genelScorColor(score: number) {
-  if (score >= 70) return 'text-emerald-600'
-  if (score >= 40) return 'text-amber-500'
-  return 'text-red-600'
+  if (score >= 60) return 'text-red-600'
+  if (score >= 30) return 'text-amber-500'
+  return 'text-emerald-600'
 }
 
 function genelScorBarColor(score: number) {
-  if (score >= 70) return 'bg-emerald-500'
-  if (score >= 40) return 'bg-amber-400'
-  return 'bg-red-500'
+  if (score >= 60) return 'bg-red-500'
+  if (score >= 30) return 'bg-amber-400'
+  return 'bg-emerald-500'
 }
 
 function genelScorLabel(score: number) {
-  if (score >= 70) return { text: 'Güvenli', color: 'text-emerald-500' }
-  if (score >= 40) return { text: 'Orta Risk', color: 'text-amber-500' }
-  return { text: 'Yüksek Risk', color: 'text-red-500' }
+  if (score >= 60) return { text: 'Yüksek Risk', color: 'text-red-500' }
+  if (score >= 30) return { text: 'Orta Risk', color: 'text-amber-500' }
+  return { text: 'Güvenli', color: 'text-emerald-500' }
+}
+
+function feedbackRiskColor(score: number) {
+  if (score >= 60) return 'text-red-600'
+  if (score >= 30) return 'text-amber-500'
+  return 'text-emerald-600'
+}
+
+function feedbackRiskBarColor(score: number) {
+  if (score >= 60) return 'bg-red-500'
+  if (score >= 30) return 'bg-amber-400'
+  return 'bg-emerald-500'
+}
+
+function feedbackRiskLabel(score: number) {
+  if (score >= 60) return { text: 'Uçuş Riski', color: 'text-red-500' }
+  if (score >= 30) return { text: 'İzlemede', color: 'text-amber-500' }
+  return { text: 'Güvenli', color: 'text-emerald-500' }
 }
 </script>
 
