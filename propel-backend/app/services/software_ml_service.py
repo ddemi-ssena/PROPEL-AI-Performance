@@ -197,7 +197,7 @@ class SoftwareMLService:
         uploads = (
             db.query(DataUpload)
             .filter(
-                DataUpload.file_type == "Performans Metrikleri (KPI)",
+                DataUpload.file_type.in_(["Performans Metrikleri (KPI)", "performance_metrics"]),
                 DataUpload.status == "Success",
             )
             .order_by(DataUpload.upload_date.desc())
@@ -388,7 +388,7 @@ class SoftwareMLService:
         uploads = (
             db.query(DataUpload)
             .filter(
-                DataUpload.file_type == "Performans Metrikleri (KPI)",
+                DataUpload.file_type.in_(["Performans Metrikleri (KPI)", "performance_metrics"]),
                 DataUpload.status == "Success",
             )
             .order_by(DataUpload.upload_date.desc())
@@ -586,7 +586,8 @@ class SoftwareMLService:
             headers = {header.lower() for header in SoftwareMLService._upload_headers(upload)}
         except HTTPException:
             return False
-        return bool(headers & SUPPORTED_TARGETS)
+        supported_lower = {t.lower() for t in SUPPORTED_TARGETS}
+        return bool(headers & supported_lower)
 
     @staticmethod
     def _load_rows(path: Path) -> list[dict[str, Any]]:
