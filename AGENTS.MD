@@ -2519,3 +2519,37 @@ Yazılım model F1 skorları (Random Forest, test_period_count=8):
 - Dogrulama:
   - `npm.cmd run type-check` basarili.
   - `python -m py_compile propel-backend/app/services/sales_ml_service.py` basarili.
+
+## 2026-06-06 Satis Takim Analizi Yazilim Sayfasi Bloklari ile Hizalama
+
+- Kullanici satis manager `Takim Analizi` ekraninda takimlar gorunmesine ragmen yazilim sayfasindaki `Bu Hafta Konusulacak Konular`, `Takim Uyeleri - Detayli Risk Analizi`, `6 Aylik Performans Trendi` gibi manager calisma bloklarinin eksik kaldigini belirtti.
+- Frontend duzeltmeleri:
+  - `SalesManagerAnalyticsView.vue` satis takim detayina `6 Aylik Performans Trendi` karti eklendi. Bu seri admin ensemble modelinin 6 aylik takim risk trendinden `100 - risk` olarak uretilen performans sagligi sinyalidir.
+  - `Bu Hafta Konusulacak Konular` bolumu eklendi; ana driver, pipeline/hedef baskisi ve riskli calisan destek plani satis KPI baglaminda uretilir.
+  - `Takim Uyeleri - Detayli Risk Analizi` bolumu bos eslesme durumunda da gorunur ve dataset bolge/takim eslesmesi kontrol mesaji verir.
+  - Mevcut AI aksiyon paneli ve uye kartlari admin bulk prediction `team_analytics` + `items` kaynagini kullanmaya devam eder.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/services/sales_ml_service.py` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Satis `Takim Analizi` ekrani artik yazilim manager sayfasindaki ana calisma bolumleriyle uyumlu okunmalidir; sonraki inceleme satis `Calisan Analizi` tarafinda kisi bazli LLM/driver yorumlarinin ayni admin ML kaynagina baglanmasi olabilir.
+
+### 2026-06-06 Satis Takim Uyeleri Eslesme Duzeltmesi
+
+- Kullanici satis `Takim Uyeleri - Detayli Risk Analizi` bolumunde `6 kisi yuksek risk seviyesinde` yazarken `0 kisi listeleniyor` ve `admin bulk prediction sonucunda eslesen calisan bulunamadi` mesaji gorundugunu bildirdi.
+- Tespit:
+  - `team_analytics` takim adlari dataset tarafindan mojibake/Turkce karakterli geliyordu (`DoÄu Anadolu`, `GÃ¼neydoÄu Anadolu`, `Ä°Ã§ Anadolu`).
+  - Kisi kartlari ise DB employee profilinden ASCII takim adlari kullaniyordu (`Dogu Anadolu`, `Guneydogu Anadolu`, `Ic Anadolu`).
+  - Frontend birebir string karsilastirdigi icin takim agregasyonu 6 kisi bulsa da kisi listesi 0 gorunuyordu.
+- Frontend duzeltmesi:
+  - `SalesManagerAnalyticsView.vue` icinde `normalizeSalesTeamKey()` ve `salesItemTeamName()` helper'lari eklendi.
+  - `selectedTeamPeople` filtrelemesi artik takim adlarini normalize ederek eslestirir.
+  - Rol dagilimi `role_counts` bos gelirse eslesen `selectedTeamPeople` uzerinden hesaplanir.
+- Dogrulama:
+  - Normalize testi: `DoÄu Anadolu` / `Dogu Anadolu`, `GÃ¼neydoÄu Anadolu` / `Guneydogu Anadolu`, `Ä°Ã§ Anadolu` / `Ic Anadolu` ayni anahtara dustu.
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/services/sales_ml_service.py` basarili.
+  - `docker restart propel_frontend` calistirildi.

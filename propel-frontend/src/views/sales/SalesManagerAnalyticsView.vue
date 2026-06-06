@@ -377,17 +377,17 @@
             <article class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">Risk Trendi</p>
-                  <h5 class="mt-1 text-lg font-bold text-slate-900">6 Aylik Satis Risk Trendi</h5>
-                  <p class="mt-2 text-sm leading-6 text-slate-500">Y ekseni 0-100 risk skoru; seri admin ensemble modelinin ay bazli takim sinyalinden gelir.</p>
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">Performans Trendi</p>
+                  <h5 class="mt-1 text-lg font-bold text-slate-900">6 Aylik Performans Trendi</h5>
+                  <p class="mt-2 text-sm leading-6 text-slate-500">Y ekseni 0-100 performans sagligi; admin ensemble risk serisinin ters cevrilmis takim performans sinyalidir.</p>
                 </div>
-                <span class="w-fit rounded-full bg-rose-50 px-3 py-1 text-sm font-bold text-rose-700">{{ selectedTeamTrendChangeLabel }}</span>
+                <span class="w-fit rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">{{ selectedTeamPerformanceChangeLabel }}</span>
               </div>
               <div class="mt-6 h-[260px] rounded-xl border border-slate-100 bg-slate-50 p-4">
                 <svg viewBox="0 0 600 220" class="h-full w-full" preserveAspectRatio="none">
                   <line v-for="tick in [0, 25, 50, 75, 100]" :key="tick" x1="28" :y1="trendY(tick)" x2="585" :y2="trendY(tick)" stroke="#E2E8F0" stroke-width="1" />
-                  <polyline :points="selectedTeamTrendPoints" fill="none" stroke="#F43F5E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                  <circle v-for="(point, index) in selectedTeamTrendCirclePoints" :key="index" :cx="point.x" :cy="point.y" r="4" fill="#F43F5E" />
+                  <polyline :points="selectedTeamPerformanceTrendPoints" fill="none" stroke="#10B981" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                  <circle v-for="(point, index) in selectedTeamPerformanceCirclePoints" :key="index" :cx="point.x" :cy="point.y" r="4" fill="#10B981" />
                 </svg>
               </div>
             </article>
@@ -410,6 +410,36 @@
                 </button>
               </div>
             </aside>
+          </div>
+
+          <div class="px-5 pb-5">
+            <section class="rounded-xl bg-slate-50 p-6">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p class="text-xl font-bold text-slate-950">Bu Hafta Konusulacak Konular</p>
+                  <p class="mt-1 text-sm text-slate-500">{{ selectedTeamTalkingPointItems.length }} oncelikli satis konusu belirlendi</p>
+                </div>
+                <span class="w-fit rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">Manager checklist</span>
+              </div>
+
+              <div class="mt-5 space-y-3">
+                <article v-for="item in selectedTeamTalkingPointItems" :key="item.id" class="rounded-xl border border-slate-200 bg-white p-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">{{ item.index }}</span>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-base font-bold text-slate-900">{{ item.title }}</p>
+                        <span class="w-fit rounded-full px-3 py-1 text-xs font-bold" :class="item.badgeClass">{{ item.priority }}</span>
+                      </div>
+                      <p class="mt-2 text-sm leading-6 text-slate-600">{{ item.detail }}</p>
+                      <ul class="mt-3 space-y-1 text-sm leading-6 text-slate-500">
+                        <li v-for="bullet in item.bullets" :key="bullet">- {{ bullet }}</li>
+                      </ul>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </section>
           </div>
 
           <div v-if="selectedTeamNarrative" class="mx-5 mb-5 rounded-xl border border-violet-100 bg-violet-50 p-4">
@@ -449,6 +479,9 @@
                   </div>
                   <p class="mt-3 text-xs leading-5 text-slate-500">{{ personTopDriver(person) }}</p>
                 </article>
+                <div v-if="!selectedTeamPeople.length" class="col-span-full rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-semibold text-slate-500">
+                  Bu takim icin admin bulk prediction sonucunda eslesen calisan bulunamadi. Dataset bolge/takim kodu ve calisan eslesmesi kontrol edilmeli.
+                </div>
               </div>
             </section>
           </div>
@@ -787,8 +820,9 @@ const selectedTeamRow = computed(() => teamRows.value.find((row) => row.team ===
 
 const selectedTeamPeople = computed(() => {
   if (!selectedTeam.value || !bulkResult.value) return []
+  const selectedKey = normalizeSalesTeamKey(selectedTeam.value)
   return bulkResult.value.items.filter((i: SalesPredictionResponse) =>
-    (i.summary_payload?.region || i.summary_payload?.team || 'Genel') === selectedTeam.value
+    normalizeSalesTeamKey(salesItemTeamName(i)) === selectedKey
   )
 })
 
@@ -818,6 +852,18 @@ const selectedTeamPressureScore = computed(() =>
 const selectedTeamRoleMix = computed(() => {
   const counts = selectedTeamRow.value?.roleCounts || {}
   const entries = Object.entries(counts).sort((a, b) => Number(b[1]) - Number(a[1]))
+  if (!entries.length && selectedTeamPeople.value.length) {
+    const personRoleCounts: Record<string, number> = {}
+    selectedTeamPeople.value.forEach((person) => {
+      const role = String(person.summary_payload?.position || person.summary_payload?.role || 'Rol yok')
+      personRoleCounts[role] = (personRoleCounts[role] || 0) + 1
+    })
+    return Object.entries(personRoleCounts)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .slice(0, 2)
+      .map(([role, count]) => `${count} ${role}`)
+      .join(', ')
+  }
   if (!entries.length) return 'Rol dagilimi dataset profilinden okunur'
   return entries.slice(0, 2).map(([role, count]) => `${count} ${role}`).join(', ')
 })
@@ -898,6 +944,32 @@ const selectedTeamTrendPoints = computed(() =>
   selectedTeamTrendCirclePoints.value.map((point: { x: number; y: number }) => `${point.x},${point.y}`).join(' ')
 )
 
+const selectedTeamPerformanceValues = computed(() =>
+  selectedTeamTrendValues.value.map((value: number) => Math.max(0, Math.min(100, 100 - value)))
+)
+
+const selectedTeamPerformanceChangeLabel = computed(() => {
+  const values = selectedTeamPerformanceValues.value
+  if (values.length < 2) return 'Trend yeni olusuyor'
+  const diff = values[values.length - 1] - values[0]
+  if (diff > 0) return `+${diff} puan son 6 ayda`
+  if (diff < 0) return `${diff} puan son 6 ayda`
+  return 'Degisim yok'
+})
+
+const selectedTeamPerformanceCirclePoints = computed(() => {
+  const values = selectedTeamPerformanceValues.value
+  const step = values.length > 1 ? 540 / (values.length - 1) : 0
+  return values.map((value: number, index: number) => ({
+    x: 35 + index * step,
+    y: trendY(value),
+  }))
+})
+
+const selectedTeamPerformanceTrendPoints = computed(() =>
+  selectedTeamPerformanceCirclePoints.value.map((point: { x: number; y: number }) => `${point.x},${point.y}`).join(' ')
+)
+
 const selectedTeamSalesActions = computed(() => {
   const row = selectedTeamRow.value
   if (!row) return []
@@ -914,6 +986,52 @@ const selectedTeamSalesActions = computed(() => {
     {
       title: 'Kisi bazli gorusmeleri ana driver ile ac',
       reason: 'Takim uyesi kartlarindaki ana sinyal, manager gorusmesinde genel performans yorumu yerine somut satis KPI konusu olarak kullanilmali.',
+    },
+  ]
+})
+
+const selectedTeamTalkingPointItems = computed(() => {
+  const row = selectedTeamRow.value
+  if (!row) return []
+  const pressure = selectedTeamPressureScore.value
+  const riskLabel = `${row.highCount} yuksek, ${row.mediumCount} orta riskli kisi`
+  const mainDriver = row.topReason || 'KPI sinyali'
+  return [
+    {
+      id: 'driver',
+      index: '01',
+      title: `${mainDriver} sinyalinin satis sonucuna etkisi`,
+      priority: row.highCount ? 'Yuksek' : 'Orta',
+      badgeClass: row.highCount ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700',
+      detail: `${row.team} icin admin modeli ${row.riskScore}/100 takim risk skoru uretti; dagilim ${riskLabel}. Bu haftaki gorusmede ana driver genel yorum olarak degil, pipeline ve hedef davranisina etkisiyle okunmali.`,
+      bullets: [
+        'Bu sinyal hangi musteri, teklif veya takip adiminda tekrar ediyor?',
+        'Yuksek riskli kisilerde ayni driver mi baskin, yoksa farkli KPI nedenleri mi var?',
+      ],
+    },
+    {
+      id: 'pipeline',
+      index: '02',
+      title: 'Pipeline, hedef ve takip disiplini dengelemesi',
+      priority: pressure >= 70 ? 'Kritik' : pressure >= 45 ? 'Izleme' : 'Normal',
+      badgeClass: pressure >= 70 ? 'bg-rose-50 text-rose-700' : pressure >= 45 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700',
+      detail: `Pipeline/hedef baskisi ${pressure}/100. Bu skor pipeline sagligi, pipeline yasi, takip disiplini ve CRM disiplininden uretilen takim baski okumasidir.`,
+      bullets: [
+        'Acil kapanis baskisi ile yeni firsat uretimi dengede mi?',
+        'Geciken follow-up veya eksik CRM kaydi tahmin riskini buyutuyor mu?',
+      ],
+    },
+    {
+      id: 'people',
+      index: '03',
+      title: 'Riskli calisanlarla haftalik satis destek plani',
+      priority: row.highCount ? 'Ilk 48 saat' : 'Bu hafta',
+      badgeClass: row.highCount ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600',
+      detail: `Takim uyeleri bolumundeki risk skoru ve ana sinyal, her calisan icin gorusme acilis konusu olarak kullanilmali. Amac performans etiketi koymak degil, satis engelini netlestirmek.`,
+      bullets: [
+        'Her riskli kisi icin tek bir haftalik hedef, sahip ve kontrol tarihi belirle.',
+        'Rol/bolge farkina gore destek ihtiyacini ayrikan not al.',
+      ],
     },
   ]
 })
@@ -1091,6 +1209,27 @@ function personTopDriver(item: SalesPredictionResponse): string {
 function salesPersonRoleLabel(item: SalesPredictionResponse): string {
   const payload = item.summary_payload || {}
   return [payload.region || payload.team, payload.position || payload.role].filter(Boolean).join(' / ') || 'Satis ekibi'
+}
+
+function salesItemTeamName(item: SalesPredictionResponse): string {
+  return String(item.summary_payload?.region || item.summary_payload?.team || 'Genel')
+}
+
+function normalizeSalesTeamKey(value: string | null | undefined): string {
+  return String(value || 'Genel')
+    .toLowerCase()
+    .replace(/ä°|i̇/g, 'i')
+    .replace(/ä±/g, 'i')
+    .replace(/Ã¼|ã¼|ü/g, 'u')
+    .replace(/Ã¶|ã¶|ö/g, 'o')
+    .replace(/ÄŸ|ä|ğ/g, 'g')
+    .replace(/ÅŸ|åÿ|ş/g, 's')
+    .replace(/Ã§|ã§|ç/g, 'c')
+    .replace(/Ä|Äž|Ğ/g, 'g')
+    .replace(/İ/g, 'i')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '')
 }
 
 function initials(name: string): string {
