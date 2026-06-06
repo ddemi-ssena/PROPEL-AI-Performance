@@ -22,31 +22,10 @@
             class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           >
             <option :value="null">- Kisi secin -</option>
-            <optgroup
-              v-for="group in candidateGroups"
-              :key="group.key"
-              :label="group.label"
-            >
-              <option v-for="emp in group.items" :key="emp.id" :value="emp.id">
-                {{ emp.user.full_name }} · {{ getRoleLabel(emp.user.role) }} · {{ emp.position ?? emp.department.name }}
-              </option>
-            </optgroup>
+            <option v-for="emp in sortedCandidates" :key="emp.id" :value="emp.id">
+              {{ emp.user.full_name }} · {{ getRoleLabel(emp.user.role) }} · {{ emp.position ?? emp.department.name }}
+            </option>
           </select>
-          <div v-if="candidateGroups.length" class="mt-3 space-y-2">
-            <p class="text-xs font-semibold text-slate-500">Secim gruplari</p>
-            <div class="flex flex-wrap gap-2">
-              <span
-                v-for="group in candidateGroups"
-                :key="`pill-${group.key}`"
-                class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-600"
-              >
-                {{ group.label }}
-              </span>
-            </div>
-            <p v-if="slotHint" class="text-xs text-slate-500">
-              {{ slotHint }}
-            </p>
-          </div>
         </div>
 
         <div v-if="loadingQuestion" class="text-sm text-slate-500">Haftalik soru yukleniyor...</div>
@@ -194,6 +173,10 @@ const managerCandidates = computed(() =>
 
 const employeeCandidates = computed(() =>
   props.candidates.filter((candidate) => candidate.user.role === 'employee')
+)
+
+const sortedCandidates = computed(() =>
+  [...props.candidates].sort((a, b) => a.user.full_name.localeCompare(b.user.full_name, 'tr'))
 )
 
 const isMandatoryLocked = computed(() =>

@@ -437,11 +437,11 @@ async function loadData() {
     }
 
     const [received, requests, sum, emps, progress, assignment, nlpInsight] = await Promise.all([
-      feedbackApi.getReceivedFeedbacks(),
-      feedbackApi.getIncomingRequests(),
-      feedbackApi.getMyFeedbackSummary(),
-      feedbackApi.getFeedbackCandidates(),
-      feedbackApi.getWeeklyProgress(),
+      feedbackApi.getReceivedFeedbacks().catch(() => []),
+      feedbackApi.getIncomingRequests().catch(() => []),
+      feedbackApi.getMyFeedbackSummary().catch(() => null),
+      feedbackApi.getFeedbackCandidates().catch(() => []),
+      feedbackApi.getWeeklyProgress().catch(() => null),
       feedbackApi.getWeeklyAssignmentState().catch(() => null),
       feedbackApi.getMyWeeklyNlpProfile().catch(() => null),
     ])

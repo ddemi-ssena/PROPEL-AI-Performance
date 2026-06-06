@@ -909,6 +909,82 @@ Yazılım model F1 skorları (Random Forest, test_period_count=8):
 
 ---
 
+### 2026-06-05 360° Feedback Altyapısı, Yetenek Dağılımı Düzeltmesi, Personel Yönetimi Yenileme ★
+
+#### 360° Feedback — Kişi Seç Dropdown Düzeltmesi
+- **Sorun**: Admin kullanıcısının `Employee` kaydı olmadığından `Promise.all` içindeki `getReceivedFeedbacks()`, `getIncomingRequests()` vb. çağrılar 404/403 döndürüyor, tüm `Promise.all` reddediliyordu → `candidates` hiç set edilmiyordu.
+- **Düzeltme** (`FeedbackView.vue`): Her API çağrısına `.catch(() => [])` / `.catch(() => null)` eklendi.
+- **Dropdown düzeltmesi** (`FeedbackModal.vue`): `optgroup` grupları kaldırıldı, `sortedCandidates` computed (Türkçe alfabetik sıra) ile düz liste yapıldı.
+
+#### 360° Feedback Gerçekçi Seed Dataseti
+- **Yeni Script**: `scripts/seed_360_yazilim.py` — Yazılım + Satış departmanları için kapsamlı 360° seed
+  - 4 haftalık tema × 3 yön × çalışan profili bazlı Türkçe yanıtlar
+  - 9 dönem: (2026,4,1..4), (2026,5,1..4), (2026,6,1)
+  - Toplam: 957 Yazılım + 834 Satış = 1883 `FeedbackResponse`, 558 `EmployeeNLPProfile`
+- **Yeni Script**: `scripts/patch_nlp_raw_analysis.py` — 1791 `FeedbackNLPAnalysis` kaydına profil bazlı `raw_analysis` JSON eklendi
+  - high: flight_risk_score=2.1, complaint_topics=[]
+  - medium: flight_risk_score=3.8, complaint_topics=[inisiyatif eksikliği, dokümantasyon gecikmesi]
+  - medium_risk: flight_risk_score=5.5, flight_risk_reasons=[motivasyon düşüşü, yorgunluk belirtileri]
+  - atrisk: flight_risk_score=8.2, complaint_topics=[tükenmişlik riski, ayrılma sinyali, bağlılık kaybı]
+
+#### Yetenek Dağılımı Grafiği — Gerçek 1-5 Peer Skorları
+- **Sorun**: `EmployeeAnalysisView.vue` BarChart, `EmployeeNLPProfile` üzerindeki 0-1 normalize NLP skorlarını gösteriyordu; etiket "1-5 Puan" yazıyordu — yanıltıcı veri.
+- **Kök Neden**: `build_employee_360_summary_report()` metrics alanında `avg_motivation_score`, `avg_psychological_safety_score`, `avg_collaboration_score` (hepsi 0-1 NLP sentiment skoru) dönüyordu.
+- **Backend Düzeltmesi** (`app/services/nlp_service.py` ~852. satır): `FeedbackResponse.score_communication`, `score_teamwork`, `score_leadership`, `score_technical` alanlarının bu çalışana ait ortalamaları hesaplanıp `skill_scores` listesi olarak response'a eklendi.
+- **Backend Şema** (`app/schemas/feedbacks.py`): `SkillScore(label, value)` modeli + `Employee360SummaryReportResponse.skill_scores: Optional[List[SkillScore]]` eklendi — yoksa Pydantic `response_model` tarafından kırpılıyordu.
+- **Frontend Tip** (`services/api/feedback.api.ts`): `SkillScore` interface + `Employee360SummaryReportResponse.skill_scores` eklendi.
+- **Frontend Görünüm** (`views/manager/EmployeeAnalysisView.vue`): `skillScoreLabels` / `skillScoreValues` computed'ları eklendi; grafik `skill_scores` varsa bunları (gerçek 1-5), yoksa eski NLP metriklerine fallback yapıyor.
+- **Örnek çıktı**: İletişim=3.60, Takım Çalışması=3.62, Liderlik=3.46, Teknik Beceri=3.80
+
+#### RAG / Yapay Zeka Bellek Analizi — Durum Tespiti
+- `FeedbackMemoryChunk` tablosu boş (0 kayıt) çünkü seed scriptleri bu tabloyu doldurmaz — sadece gerçek kullanıcı feedback gönderince `RAGService.store_feedback_as_memory()` çağrılır.
+- RAG raporu `model_provider: "heuristic"` (deterministik fallback) döndürüyor — LLM/Gemini bu servis için ayrıca yapılandırılmamış.
+- `retrieved_memory_count: 0` tamamen doğru davranış — beklenen.
+
+#### Personel Yönetimi — Bütünleşik Skor Sayfası ★ BÜYÜK
+**Değiştirilen Dosya**: `propel-frontend/src/views/admin/EmployeeManagement.vue` (tamamen yeniden yazıldı)
+
+**Veri Kaynakları** (3 paralel API çağrısı):
+- `GET /admin/uploads/ai-insights` → `employee_table`: 61 çalışan × {code, name, dept, team, perf_drop, burnout, resignation, high_risk, composite}
+- `GET /employees/` → `external_employee_code → db_id` haritası
+- `GET /surveys/` → per employee: avg_score (0-5), avg_ars (0-1)
+
+**Genel Skor Formülü** (0-100, yüksek = sağlıklı):
+```
+ml_sağlık    = 100 - composite           // ML riski ters çevir
+nabız_sağlık = (avg_score / 5) * 100     // motivasyon skoru 0-5 → 0-100
+nabız_tutma  = (1 - avg_ars) * 100       // ARS riski ters çevir
+genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.40) * 0.50
+```
+- Nabız verisi yoksa: `genel_skor = ml_sağlık`
+- 360° sütunu şimdilik "Yakında" placeholder — backend entegrasyonu sonrası ağırlıklar dağıtılacak
+
+**Yeni UI Bileşenleri**:
+1. **4 KPI Kartı**: Toplam Personel · Ort. Genel Skor · Yüksek Risk (<40) · Güvenli Bölge (≥70)
+2. **Top 5 / Bottom 5 Panelleri**: Yeşil (en yüksek) + Kırmızı (en düşük) skor bandında 5'er kart
+3. **Gemini Yorumu Paneli** (koyu mor/indigo gradient):
+   - Gemini API çalışıyorsa gerçek 3 bölümlü rapor
+   - Gemini yoksa `stats` verisinden deterministik özet (total/high_risk/avg_composite) + bottom-5 isimlerini içeren 4 madde aksiyon listesi
+   - "Yeniden Yorumla" butonu
+4. **Skor Kaynağı Açıklama Şeridi**: ML %50 / Nabız %30 / Tutma %20 / 360° "Yakında"
+5. **Tam Tablo** (12/sayfa):
+   - Personel (avatar, isim, takım)
+   - Departman rozeti
+   - ML Hedefleri (4 mini progress bar: PD/Tükenmişlik/İstifa/Yüksek Risk)
+   - Nabız Anketi (motivasyon X.X/5 + ARS %)
+   - 360° sütunu (placeholder)
+   - Genel Skor (büyük rakam + bar + Güvenli/Orta Risk/Yüksek Risk etiketi)
+   - İşlemler (detay linki)
+6. **Filtreler**: Arama · Departman dropdown · Risk seviyesi (Yüksek/Orta/Güvenli) · Sıralama (Genel ↑↓ / ML / Nabız / İsim)
+
+**Renk kodlaması**:
+- ML bar: ≥70% → Kırmızı, 40-69% → Amber, <40% → Yeşil (risk yüksekse kırmızı)
+- Genel skor: ≥70 → Yeşil, 40-69 → Amber, <40 → Kırmızı
+
+**Önemli Teknik Not**: IDE (VS Code/Volar) `vue`, `vue-router`, `@heroicons` modüllerini çözümleyemiyor çünkü `node_modules` sadece Docker container içinde var, yerel makinede değil. Bu tek `2307` hatası bütün script type environment'ını bozar ve cascade `7006` (implicit any) + `2365` (`+` operator) hataları üretir. Vite container'da bunları görmez — HMR temiz derledi.
+
+---
+
 ## Sonraki Adımlar / Roadmap
 
 - [x] Satış departmanı frontend dashboard'u (Vue 3) — employee/manager/admin görünümleri
@@ -932,6 +1008,11 @@ Yazılım model F1 skorları (Random Forest, test_period_count=8):
 - [x] Gerçekçi dataset üretici scriptler (v3 satış, v2 yazılım) — bireysel profil + stokastik etiket
 - [x] bulk-all-targets endpoint'leri (satış + yazılım) — 4 hedef tek çağrıda
 - [x] AIInsights.vue yeniden tasarlandı — risk açıklamaları + grafikler + 4 hedef tablo
+- [x] 360° Feedback kişi seç dropdown düzeltmesi (admin için catch fallback + flat sorted list)
+- [x] 360° Feedback gerçekçi seed dataseti (1883 response, 558 NLPProfile, patch_nlp_raw_analysis)
+- [x] Yetenek Dağılımı grafiği — gerçek 1-5 peer skorları (FeedbackResponse ortalamalar, skill_scores alanı)
+- [x] Personel Yönetimi tamamen yenilendi — ML + Nabız Anketi bütünleşik skor, Top5/Bottom5, Gemini paneli
+- [ ] Personel Yönetimi 360° sütunu backend entegrasyonu (per-employee 360 skoru endpoint'i)
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri
 - [ ] LLM/Gemini endpoint'lerini async/background job olarak ayır (şu an bloklayıcı)

@@ -138,6 +138,11 @@ class SummarySection(BaseModel):
     items: List[str] = Field(default_factory=list)
 
 
+class SkillScore(BaseModel):
+    label: str
+    value: Optional[float] = None
+
+
 class Employee360SummaryReportResponse(BaseModel):
     employee_id: int
     employee_name: str
@@ -154,6 +159,7 @@ class Employee360SummaryReportResponse(BaseModel):
     badges: List[BadgeResponse] = Field(default_factory=list)
     metrics: List[SummaryMetric] = Field(default_factory=list)
     sections: List[SummarySection] = Field(default_factory=list)
+    skill_scores: Optional[List[SkillScore]] = None
 
 
 class Department360SummaryReportResponse(BaseModel):
