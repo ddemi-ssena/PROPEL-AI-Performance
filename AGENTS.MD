@@ -986,6 +986,38 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
 
 ---
 
+### 2026-06-06 Personel Yönetimi — Top 5 / Bottom 5 Aksiyonlar Modalları ★
+
+**Değiştirilen Dosya**: `propel-frontend/src/views/admin/EmployeeManagement.vue`
+
+#### Top 5 "Aksiyonlar" Butonu ve Modalı
+- "En Yüksek Skor — Top 5" panel başlığının yanına yeşil **Aksiyonlar** butonu eklendi (`StarIcon`)
+- Modal iki ana bölümden oluşuyor:
+  1. **Ödüllendirme Önerileri** — 6 kart (Performans Sertifikası, Ekstra İzin Günü, Mentorluk Fırsatı, Kariyer Gelişim Bütçesi, Şirket Geneli Takdir, Performans Primi)
+  2. **Hayır Kurumu Bağışı** — Her Top 5 çalışanı için ayrı blok; 9 kurumdan biri seçiliyor:
+     - LÖSEV, TEMA Vakfı, Darüşşafaka Cemiyeti, Türk Eğitim Vakfı (TEV), Türk Kızılay, UNICEF Türkiye, AHBAP Derneği, Mehmetçik Vakfı, WWF-Türkiye
+     - Seçim yapıldıkça "Seçildi" rozeti + "Bağış Özeti" paneli beliriyor
+     - Seçimler `selectedCharities` reactive map'inde tutulur (code → charity name)
+  3. **Desteklenen Kurumlar** bilgi kartları — 9 kurumun açıklaması grid formatında
+
+#### Bottom 5 "Aksiyonlar" Butonu ve Modalı
+- "Dikkat Gerektiren — Bottom 5" panel başlığının yanına kırmızı **Aksiyonlar** butonu eklendi (`ClipboardDocumentListIcon`)
+- Her çalışan için:
+  - Risk sinyali rozetleri: PD%, Tükenmişlik%, İstifa%, ARS%, Motivasyon renk kodlu
+  - `bottomActionsForEmployee()` fonksiyonu → ML değerlerine göre **otomatik öncelik sıralamalı aksiyon listesi** (Acil / Yüksek / Orta / Düşük)
+  - Acil: `high_risk ≥ 50` → birebir yönetici görüşmesi; Yüksek: `perf_drop ≥ 50`, `burnout ≥ 40`, `resignation ≥ 40`, `ARS ≥ 0.6`; Orta/Düşük: IDP, peer buddy, kısa vadeli hedef
+  - Alt kısımda genel uygulama rehberi (Acil = 1 hafta, İK kaydı, 4 haftalık izleme)
+
+#### Teknik Detaylar
+- `showTopActionsModal` / `showBottomActionsModal` — ref boolean
+- `selectedCharities` — `Record<string, string>` (employee code → seçilen kurum)
+- `charities` / `rewardSuggestions` — reactive olmayan sabit array'ler
+- `Teleport to="body"` + `Transition name="modal-fade"` — backdrop blur, scale+fade animasyonu
+- Yeni heroicon import'ları: `StarIcon`, `ClipboardDocumentListIcon`, `XMarkIcon`
+- IDE'de `2307` (vue/vue-router/heroicons bulunamıyor) hataları beklenen — `node_modules` sadece Docker container'ında mevcut
+
+---
+
 ## Sonraki Adımlar / Roadmap
 
 - [x] Satış departmanı frontend dashboard'u (Vue 3) — employee/manager/admin görünümleri
@@ -1013,7 +1045,11 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
 - [x] 360° Feedback gerçekçi seed dataseti (1883 response, 558 NLPProfile, patch_nlp_raw_analysis)
 - [x] Yetenek Dağılımı grafiği — gerçek 1-5 peer skorları (FeedbackResponse ortalamalar, skill_scores alanı)
 - [x] Personel Yönetimi tamamen yenilendi — ML + Nabız Anketi bütünleşik skor, Top5/Bottom5, Gemini paneli
-- [ ] Personel Yönetimi 360° sütunu backend entegrasyonu (per-employee 360 skoru endpoint'i)
+- [x] Personel Yönetimi Top 5 Aksiyonlar — ödüllendirme önerileri + 9 hayır kurumu bağış seçimi
+- [x] Personel Yönetimi Bottom 5 Aksiyonlar — ML verisi bazlı öncelikli önlemler listesi (Acil/Yüksek/Orta/Düşük)
+- [x] Personel Yönetimi 360° sütunu backend entegrasyonu — FeedbackNLPAnalysis enum ortalaması, sürekli 0-100 skor
+- [x] Personel Yönetimi Genel Skor yön düzeltmesi — risk skoru (yüksek=riskli), eşikler ve renkler tersine çevrildi
+- [x] "En Yüksek Skor Top 5" → "En Riskli 5" (kırmızı), "Dikkat Gerektiren Bottom 5" → "En Güvenli 5" (yeşil)
 - [ ] `app/tests/` dizinine temel pytest test suite'i (hedef: %80 coverage)
 - [ ] Playwright kurulumu ile frontend smoke testleri
 - [ ] LLM/Gemini endpoint'lerini async/background job olarak ayır (şu an bloklayıcı)
@@ -2588,6 +2624,62 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
 
 - Satis `Calisan Analizi` ve `Departman Analizi` alt sayfalari da ayni admin current model/bulk prediction kontratini okuyacak sekilde gozden gecirilmeli; manager ekraninda egitim/teknik model yonetimi kontrolleri geri gelmemelidir.
 
+---
+
+## 2026-06-06 Personel Yonetimi Genel Skor Yon Duzeltmesi + 360 Sutunu Entegrasyonu
+
+### Genel Skor: Saglik → Risk Skoru
+
+**Sorun**: `genel_skor` onceden saglik skoru olarak hesaplaniyordu (yuksek = iyi). Kullanici bunun tutarsiz oldugunu fark etti — ML sutunlarinin hepsi risk yuzdesi gosteriyor (yuksek = kotü), ama Genel Skor tersi yonde calisiyordu.
+
+**Duzeltilen Dosya**: `propel-frontend/src/views/admin/EmployeeManagement.vue`
+
+- `genel_skor` hesabi: `100 - composite + nabiz saglik formulü` → dogrudan `ml.composite` (backend zaten risk skoru donduruyor)
+- Nabiz verisinin cift sayimi kaldirildi — backend composite icinde zaten `ML×60 + Nabiz×20 + 360×20` var
+- Esik degerler tersine cevirildi:
+  - `highRiskCount`: `< 40` → `>= 60`
+  - `safeCount`: `>= 70` → `< 30`
+  - Filtre: `high_risk >= 60`, `medium_risk 30-59`, `safe < 30`
+- Renk fonksiyonlari (`genelScorColor`, `genelScorBarColor`, `genelScorLabel`) tersine cevirildi
+- KPI kart metni: "100 uzerinden saglik skoru" → "100 uzerinden risk skoru"
+- "En Yuksek Skor — Top 5" (yesil panel) → **"En Riskli 5"** (kirmizi panel)
+- "Dikkat Gerektiren — Bottom 5" (kirmizi panel) → **"En Guvenli 5"** (yesil panel)
+- Aksiyon butonu ikonlari da uygun sekilde degistirildi
+
+### 360° Sutunu Entegrasyonu
+
+**Sorun**: Tablo 360° Geri Bildirim sutunu "Yakinda" placeholder gosteriyordu. Backend `ai-insights` endpoint'i zaten `feedback_risk` alanini her calisan icin hesaplayip donduruyor, ama frontend kullanmiyordu.
+
+**Duzeltilen Dosya**: `propel-frontend/src/views/admin/EmployeeManagement.vue`
+
+- `EnrichedEmployee` arayuzune `feedback_risk: number | null` eklendi
+- `enriched` mapping'ine `ml.feedback_risk` dahil edildi
+- "Yakinda" placeholder → skor + progress bar + etiket (Ucus Riski / Izlemede / Guvenli)
+- Yeni helper fonksiyonlar: `feedbackRiskColor`, `feedbackRiskBarColor`, `feedbackRiskLabel`
+- Legend metni guncellendi: "ML Risk (%60) + Nabiz ARS (%20) + 360° Ucus Riski (%20)"
+
+### Backend: feedback_risk Surekli Skor
+
+**Sorun**: Backend `_flight_score()` fonksiyonu `EmployeeNLPProfile.flight_risk_level` enum degerini sabit sayilara ceviriyor ve yalnizca 3 farkli deger uretiyordu (80/45/15).
+
+**Duzeltilen Dosya**: `propel-backend/app/api/routers/admin_uploads.py`
+
+- `nlp_latest` dict kaldirildi, yerine `nlp_flight_scores` dict eklendi
+- `FeedbackNLPAnalysis.flight_risk` enum'unun tum kayitlari uzerinden agirlikli ortalamasi alinir:
+  - `High=80, Medium=45, Low=15` — SQLAlchemy `case()` ile
+  - `func.avg()` ile calisan basina gercek ortalama hesaplanir
+  - Ornek: 3 High + 1 Medium → (80+80+80+45)/4 = 71 (sabit 80 degil)
+- Sonuc: seed verisinde her calisanin tum feedbackleri ayni seviyede oldugu icin simdilk hala 15/45/80 gorunur; gercek kullanici feedbackleriyle ara degerler (62, 48 gibi) uretilecek
+- `raw_analysis` JSON yaklasimi denendi ancak tum kayitlarda `NULL` oldugu goruldu — enum ortalamasi daha saglikli
+
+### Dogrulama
+
+- `python -m py_compile propel-backend/app/api/routers/admin_uploads.py` basarili
+- `npm run type-check` (Docker icinde) basarili
+- `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi
+
+---
+
 ### 2026-06-06 Satis Takim Analizi Route Tazeleme Notu
 
 - Kullanici satis manager `Takim Analizi` ekraninin hala eski gorundugunu bildirdi.
@@ -3170,4 +3262,18 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
   - Merge sonrasi type-check'te yakalanan `EmployeeManagement.vue` `survey_ars` null durumu UI'da tire fallback'iyle duzeltildi.
 - Dogrulama:
   - `python -m py_compile propel-backend/app/services/nlp_service.py propel-backend/app/schemas/feedbacks.py` basarili.
+  - `npm.cmd run type-check` basarili.
+
+### 2026-06-17 PR 40 Guncel Master Conflict Cozumu
+
+- `origin/master` yeni commitlerle ilerledigi icin GitHub PR yeniden conflict gosterdi; `pr-40` branch'i guncel `origin/master` ile tekrar merge edildi.
+- Lokal merge conflictleri:
+  - `CLAUDE.md`
+  - `propel-frontend/src/views/admin/EmployeeManagement.vue`
+- Cozum:
+  - `CLAUDE.md`, otomatik temiz birlesen `AGENTS.MD` ile senkronlandi; iki agent gunlugu tekrar ayni hale getirildi.
+  - `EmployeeManagement.vue` icinde `survey_ars` null ise `0%` gostermek yerine `-` fallback'i korundu.
+  - GitHub'in onceki conflict listesinde gorunen backend/software/sales dosyalari guncel merge'de otomatik birlesti.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/api/routers/admin_uploads.py propel-backend/app/services/software_ml_service.py propel-backend/scripts/generate_software_dataset.py propel-backend/scripts/seed_360_yazilim.py` basarili.
   - `npm.cmd run type-check` basarili.

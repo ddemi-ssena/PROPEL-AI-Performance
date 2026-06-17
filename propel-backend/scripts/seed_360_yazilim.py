@@ -28,8 +28,11 @@ db = SessionLocal()
 RESET = "--reset" in sys.argv
 
 # ── Sabitler ─────────────────────────────────────────────────────────────────
-YAZILIM_DEPT_ID = 21
-SATIS_DEPT_ID   = 22
+from app.db.models.department import Department as _Dept
+_db_tmp = SessionLocal()
+YAZILIM_DEPT_ID = (_db_tmp.query(_Dept).filter(_Dept.name.ilike("%Yazılım%")).first() or type('', (), {'id': 23})()).id
+SATIS_DEPT_ID   = (_db_tmp.query(_Dept).filter(_Dept.name.ilike("%Satış%")).first()   or type('', (), {'id': 24})()).id
+_db_tmp.close()
 
 WEEKLY_THEMES = {
     1: "Süreçler & Blokajlar",
@@ -147,40 +150,28 @@ PROFILES = {
     },
 }
 
-# Yazılım çalışan → profil ataması (emp_id: profile_key)
-YAZILIM_PROFILES = {
-    194: "high",        # MGR-SW — yönetici
-    197: "high",        # SE-001
-    198: "medium",      # SE-004
-    199: "medium",      # SE-005
-    200: "medium",      # SE-006
-    201: "high",        # SE-007
-    202: "high",        # SE-009
-    203: "atrisk",      # SE-010
-    204: "medium_risk", # SE-013
-    205: "high",        # SE-014
-    206: "medium",      # SE-016
-    207: "high",        # SE-017
-    208: "medium",      # SE-018
-    209: "atrisk",      # SE-020
-    210: "high",        # SE-025
-    211: "medium",      # SE-026
-    212: "atrisk",      # SE-027
-    213: "medium_risk", # SE-028
-    214: "medium",      # SE-031
-    215: "atrisk",      # SE-032
-    216: "medium",      # SE-033
-    217: "atrisk",      # SE-034
-    218: "medium_risk", # SE-035
-    219: "atrisk",      # SE-038
-    220: "medium_risk", # SE-040
-    221: "high",        # SE-042
-    222: "medium",      # SE-045
-    223: "high",        # SE-046
-    224: "medium_risk", # SE-047
-    225: "medium",      # SE-048
-    226: "high",        # SE-049
+# Yazılım çalışan → profil ataması (external_employee_code: profile_key)
+_YAZILIM_CODE_PROFILES = {
+    "MGR-SW": "high",
+    "SE-001": "high",        "SE-004": "medium",      "SE-005": "medium",
+    "SE-006": "atrisk",      "SE-007": "high",        "SE-009": "high",
+    "SE-010": "atrisk",      "SE-013": "medium_risk", "SE-014": "high",
+    "SE-016": "medium",      "SE-017": "high",        "SE-018": "medium",
+    "SE-020": "atrisk",      "SE-025": "high",        "SE-026": "medium",
+    "SE-027": "atrisk",      "SE-028": "medium_risk", "SE-031": "medium",
+    "SE-032": "atrisk",      "SE-033": "medium",      "SE-034": "atrisk",
+    "SE-035": "medium_risk", "SE-038": "atrisk",      "SE-040": "medium_risk",
+    "SE-042": "high",        "SE-045": "medium",      "SE-046": "high",
+    "SE-047": "medium_risk", "SE-048": "medium",      "SE-049": "high",
 }
+
+def _build_yazilim_profiles():
+    _db = SessionLocal()
+    emps = _db.query(Employee).filter(Employee.department_id == YAZILIM_DEPT_ID).all()
+    _db.close()
+    return {e.id: _YAZILIM_CODE_PROFILES.get(e.external_employee_code or "", "medium") for e in emps}
+
+YAZILIM_PROFILES = _build_yazilim_profiles()
 
 # ── Yanıt metinleri ──────────────────────────────────────────────────────────
 # (profile, week, dept) → list of response templates
