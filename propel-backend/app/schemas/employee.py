@@ -112,7 +112,13 @@ class TeamHealthMember(BaseModel):
     feedback_sentiment_score: Optional[float] = None
     feedback_motivation_score: Optional[float] = None
     feedback_flight_risk_level: Optional[str] = None
+    feedback_flight_risk_confidence: Optional[float] = None
     feedback_burnout_risk_level: Optional[str] = None
+    feedback_burnout_risk_confidence: Optional[float] = None
+    nlp_review_status: Optional[str] = None
+    nlp_review_note: Optional[str] = None
+    nlp_reviewed_at: Optional[datetime] = None
+    nlp_reviewer_name: Optional[str] = None
     combined_risk_score: float
     combined_risk_level: str
     recommended_action: str

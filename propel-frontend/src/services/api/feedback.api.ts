@@ -177,6 +177,7 @@ export interface WeeklyAssignmentStateResponse {
 
 export type NLPRiskLevel = 'low' | 'medium' | 'high'
 export type NLPSentimentLabel = 'positive' | 'neutral' | 'negative'
+export type NLPHumanReviewStatus = 'pending' | 'approved' | 'false_alarm' | 'follow_up_required'
 
 export interface WeeklyNLPAnalysis {
   id: number
@@ -195,7 +196,9 @@ export interface WeeklyNLPAnalysis {
   sentiment_score?: number
   motivation_score?: number
   burnout_risk?: NLPRiskLevel
+  burnout_risk_confidence?: number | null
   flight_risk?: NLPRiskLevel
+  flight_risk_confidence?: number | null
   psychological_safety_score?: number
   collaboration_score?: number
   growth_signal_score?: number
@@ -225,7 +228,9 @@ export interface EmployeeNLPProfile {
   avg_collaboration_score?: number
   avg_growth_signal_score?: number
   burnout_risk_level?: NLPRiskLevel
+  burnout_risk_confidence?: number | null
   flight_risk_level?: NLPRiskLevel
+  flight_risk_confidence?: number | null
   top_strengths: string[]
   top_risk_areas: string[]
   top_support_needs: string[]
@@ -238,6 +243,36 @@ export interface EmployeeNLPProfile {
 export interface WeeklyNLPInsightResponse {
   profile: EmployeeNLPProfile
   recent_analyses: WeeklyNLPAnalysis[]
+  human_review?: EmployeeNLPReview | null
+}
+
+export interface EmployeeNLPReview {
+  id: number
+  employee_id: number
+  department_id?: number | null
+  reviewer_user_id: number
+  reviewer_employee_id?: number | null
+  reviewer_name?: string | null
+  period_type: 'weekly' | 'monthly'
+  period_year: number
+  period_month: number
+  period_week?: number | null
+  status: NLPHumanReviewStatus
+  note?: string | null
+  manager_acknowledged: boolean
+  reviewed_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface EmployeeNLPReviewPayload {
+  status: NLPHumanReviewStatus
+  note?: string | null
+  manager_acknowledged?: boolean
+  period_type?: 'weekly' | 'monthly'
+  period_year?: number
+  period_month?: number
+  period_week?: number | null
 }
 
 export interface NLPTestAnalysisPayload {
@@ -286,12 +321,21 @@ export interface SummaryMetric {
   value?: number
   display_value: string
   risk_level?: 'low' | 'medium' | 'high' | string
+  confidence?: number | null
+  drivers: RiskDriver[]
   description?: string
 }
 
 export interface SummarySection {
   title: string
   items: string[]
+}
+
+export interface RiskDriver {
+  label: string
+  evidence: string
+  count?: number | null
+  severity?: string | null
 }
 
 export interface Employee360SummaryReportResponse {
@@ -365,6 +409,9 @@ export interface EmployeeMonthlyDeepAnalysisResponse {
   top_themes: string[]
   flight_risk_score?: number | null
   flight_risk_reasons: string[]
+  burnout_risk_level?: string | null
+  burnout_risk_drivers: RiskDriver[]
+  burnout_risk_evidence: string[]
   action_recommendation?: string | null
 }
 
@@ -523,6 +570,11 @@ export const feedbackApi = {
 
   async getEmployeeWeeklyNlpProfile(employeeId: number): Promise<WeeklyNLPInsightResponse> {
     const { data } = await apiClient.get<WeeklyNLPInsightResponse>(`/feedbacks/nlp/employee/${employeeId}`)
+    return data
+  },
+
+  async upsertEmployeeNlpReview(employeeId: number, payload: EmployeeNLPReviewPayload): Promise<EmployeeNLPReview> {
+    const { data } = await apiClient.put<EmployeeNLPReview>(`/feedbacks/nlp/employee/${employeeId}/review`, payload)
     return data
   },
 

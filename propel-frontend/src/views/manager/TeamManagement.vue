@@ -23,6 +23,12 @@
     <div v-if="loadError" class="mb-6 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
       {{ loadError }}
     </div>
+    <div v-if="reviewError" class="mb-6 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+      {{ reviewError }}
+    </div>
+    <div v-if="reviewSuccess" class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+      {{ reviewSuccess }}
+    </div>
 
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
       <div
@@ -131,6 +137,35 @@
                 <p class="text-xs text-slate-400">
                   Uçuş: {{ riskLevelLabel(member.feedback_flight_risk_level) }} · Tükenmişlik: {{ riskLevelLabel(member.feedback_burnout_risk_level) }}
                 </p>
+                <div class="mt-2 flex flex-col gap-2">
+                  <span class="inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-xs font-medium" :class="nlpReviewClass(member.nlp_review_status)">
+                    {{ nlpReviewLabel(member.nlp_review_status) }}
+                  </span>
+                  <p v-if="member.nlp_review_note" class="text-xs text-slate-500">{{ member.nlp_review_note }}</p>
+                  <div v-if="member.feedback_count" class="flex flex-wrap gap-1.5">
+                    <button
+                      class="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                      :disabled="reviewSubmittingId === member.id"
+                      @click="submitNlpReview(member, 'approved')"
+                    >
+                      Onayla
+                    </button>
+                    <button
+                      class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                      :disabled="reviewSubmittingId === member.id"
+                      @click="submitNlpReview(member, 'follow_up_required')"
+                    >
+                      Takip
+                    </button>
+                    <button
+                      class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                      :disabled="reviewSubmittingId === member.id"
+                      @click="submitNlpReview(member, 'false_alarm')"
+                    >
+                      Yanlis alarm
+                    </button>
+                  </div>
+                </div>
               </td>
               <td class="px-6 py-4">
                 <div class="flex items-center gap-2">
@@ -267,6 +302,7 @@ import {
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { employeeApi, type TeamHealthMember, type TeamHealthResponse, type TeamHealthStat } from '@/services/api/employee.api'
+import { feedbackApi, type NLPHumanReviewStatus } from '@/services/api/feedback.api'
 import { meetingsApi } from '@/services/api/meetings.api'
 
 const router = useRouter()
@@ -279,6 +315,9 @@ const showMeetingModal = ref(false)
 const meetingSubmitting = ref(false)
 const meetingError = ref('')
 const meetingSuccess = ref('')
+const reviewSubmittingId = ref<number | null>(null)
+const reviewError = ref('')
+const reviewSuccess = ref('')
 const selectedMeetingMemberIds = ref<number[]>([])
 
 const meetingForm = reactive({
@@ -328,6 +367,35 @@ async function fetchTeamHealth() {
   } finally {
     isLoading.value = false
   }
+}
+
+async function submitNlpReview(member: TeamHealthMember, status: NLPHumanReviewStatus) {
+  reviewSubmittingId.value = member.id
+  reviewError.value = ''
+  reviewSuccess.value = ''
+  try {
+    await feedbackApi.upsertEmployeeNlpReview(member.id, {
+      status,
+      note: nlpReviewDefaultNote(member, status),
+      manager_acknowledged: true,
+      period_type: 'weekly',
+    })
+    reviewSuccess.value = `${member.name} icin NLP inceleme durumu kaydedildi: ${nlpReviewLabel(status)}.`
+    await fetchTeamHealth()
+  } catch (error) {
+    console.error('Failed to save NLP review', error)
+    reviewError.value = 'NLP inceleme durumu kaydedilemedi. Yetki ve backend baglantisini kontrol edin.'
+  } finally {
+    reviewSubmittingId.value = null
+  }
+}
+
+function nlpReviewDefaultNote(member: TeamHealthMember, status: NLPHumanReviewStatus) {
+  const riskText = `Flight ${riskLevelLabel(member.feedback_flight_risk_level)}, burnout ${riskLevelLabel(member.feedback_burnout_risk_level)}`
+  if (status === 'approved') return `${riskText}; yonetici NLP sinyalini karar destek olarak onayladi.`
+  if (status === 'follow_up_required') return `${riskText}; takip gorusmesi veya ek veri ile dogrulama gerekli.`
+  if (status === 'false_alarm') return `${riskText}; yonetici mevcut baglamda yanlis alarm olarak isaretledi.`
+  return `${riskText}; inceleme bekliyor.`
 }
 
 function openMeetingModal(member?: TeamHealthMember) {
@@ -468,6 +536,20 @@ function riskLabel(level?: string | null) {
 function riskLevelLabel(level?: string | null) {
   if (!level) return 'Yok'
   return riskLabel(level).replace(' Risk', '')
+}
+
+function nlpReviewLabel(status?: string | null) {
+  if (status === 'approved') return 'Yonetici onayladi'
+  if (status === 'false_alarm') return 'Yanlis alarm'
+  if (status === 'follow_up_required') return 'Takip gerekli'
+  return 'Onay bekliyor'
+}
+
+function nlpReviewClass(status?: string | null) {
+  if (status === 'approved') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  if (status === 'false_alarm') return 'bg-slate-50 text-slate-600 border-slate-200'
+  if (status === 'follow_up_required') return 'bg-amber-50 text-amber-700 border-amber-200'
+  return 'bg-white text-slate-500 border-slate-200'
 }
 
 function riskDotClass(level?: string | null) {

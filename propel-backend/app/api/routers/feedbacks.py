@@ -28,6 +28,7 @@ from app.schemas.feedbacks import (
     NLPTestAnalysisPayload,
     NLPTestAnalysisResponse,
 )
+from app.schemas.nlp import EmployeeNLPReviewResponse, EmployeeNLPReviewUpsert
 from app.services.feedback_service import FeedbackService
 from app.services.nlp_service import NLPService
 from app.services.ai_service import AIService
@@ -43,6 +44,18 @@ def _can_access_employee_nlp(current_user: User, current_employee: Employee | No
     if current_employee:
         return current_employee.id == target_employee.id
     return False
+
+
+def _resolve_review_period(payload: EmployeeNLPReviewUpsert | None = None) -> tuple[NLPPeriodType, int, int, int | None]:
+    now = datetime.utcnow()
+    period_type = payload.period_type if payload else NLPPeriodType.weekly
+    period_year = payload.period_year if payload and payload.period_year is not None else now.year
+    period_month = payload.period_month if payload and payload.period_month is not None else now.month
+    if period_type == NLPPeriodType.weekly:
+        period_week = payload.period_week if payload and payload.period_week is not None else FeedbackService.get_week_of_month(now.date())
+    else:
+        period_week = None
+    return period_type, period_year, period_month, period_week
 
 
 @router.get("/assignment", response_model=WeeklyAssignmentStateResponse)
@@ -224,7 +237,15 @@ def get_my_weekly_nlp_profile(
         period_week=week_number,
     )
     analyses = NLPService.get_recent_weekly_analyses(db, employee_id=current_employee.id, limit=5)
-    return WeeklyNLPInsightResponse(profile=profile, recent_analyses=analyses)
+    review = NLPService.get_employee_nlp_review(
+        db,
+        employee_id=current_employee.id,
+        period_type=NLPPeriodType.weekly,
+        period_year=now.year,
+        period_month=now.month,
+        period_week=week_number,
+    )
+    return WeeklyNLPInsightResponse(profile=profile, recent_analyses=analyses, human_review=review)
 
 
 @router.get("/nlp/employee/{employee_id}", response_model=WeeklyNLPInsightResponse)
@@ -252,7 +273,91 @@ def get_employee_weekly_nlp_profile(
         period_week=week_number,
     )
     analyses = NLPService.get_recent_weekly_analyses(db, employee_id=target_employee.id, limit=10)
-    return WeeklyNLPInsightResponse(profile=profile, recent_analyses=analyses)
+    review = NLPService.get_employee_nlp_review(
+        db,
+        employee_id=target_employee.id,
+        period_type=NLPPeriodType.weekly,
+        period_year=now.year,
+        period_month=now.month,
+        period_week=week_number,
+    )
+    return WeeklyNLPInsightResponse(profile=profile, recent_analyses=analyses, human_review=review)
+
+
+@router.get("/nlp/employee/{employee_id}/review", response_model=EmployeeNLPReviewResponse | None)
+def get_employee_nlp_review(
+    employee_id: int,
+    period_type: NLPPeriodType = NLPPeriodType.weekly,
+    year: int | None = None,
+    month: int | None = None,
+    week: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    target_employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not target_employee:
+        raise HTTPException(status_code=404, detail="Calisan bulunamadi")
+
+    current_employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+    if not _can_access_employee_nlp(current_user, current_employee, target_employee):
+        raise HTTPException(status_code=403, detail="Bu calisanin NLP incelemesine erisim yetkiniz yok")
+
+    now = datetime.utcnow()
+    review = NLPService.get_employee_nlp_review(
+        db,
+        employee_id=target_employee.id,
+        period_type=period_type,
+        period_year=year or now.year,
+        period_month=month or now.month,
+        period_week=(week or FeedbackService.get_week_of_month(now.date())) if period_type == NLPPeriodType.weekly else None,
+    )
+    return review
+
+
+@router.put("/nlp/employee/{employee_id}/review", response_model=EmployeeNLPReviewResponse)
+def upsert_employee_nlp_review(
+    employee_id: int,
+    payload: EmployeeNLPReviewUpsert,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in (UserRole.admin, UserRole.department_manager):
+        raise HTTPException(status_code=403, detail="NLP incelemesi sadece admin veya yonetici tarafindan kaydedilebilir")
+
+    target_employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not target_employee:
+        raise HTTPException(status_code=404, detail="Calisan bulunamadi")
+
+    current_employee = db.query(Employee).filter(Employee.user_id == current_user.id).first()
+    if current_user.role == UserRole.department_manager:
+        if not current_employee or current_employee.department_id != target_employee.department_id:
+            raise HTTPException(status_code=403, detail="Sadece kendi departmaninizdaki calisanlar icin NLP incelemesi kaydedebilirsiniz")
+
+    period_type, period_year, period_month, period_week = _resolve_review_period(payload)
+    profile = NLPService.get_or_build_employee_profile(
+        db,
+        employee_id=target_employee.id,
+        period_type=period_type,
+        period_year=period_year,
+        period_month=period_month,
+        period_week=period_week,
+    )
+
+    review = NLPService.upsert_employee_nlp_review(
+        db,
+        employee_id=target_employee.id,
+        department_id=profile.department_id or target_employee.department_id,
+        reviewer_user_id=current_user.id,
+        reviewer_employee_id=current_employee.id if current_employee else None,
+        period_type=period_type,
+        period_year=period_year,
+        period_month=period_month,
+        period_week=period_week,
+        status=payload.status,
+        note=payload.note,
+        manager_acknowledged=payload.manager_acknowledged,
+    )
+    return review
 
 
 @router.get("/nlp/department-summary", response_model=DepartmentWeeklyNLPResponse)

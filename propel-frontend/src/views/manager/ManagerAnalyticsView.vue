@@ -38,9 +38,9 @@
       </div>
     </div>
 
-    <div v-if="overview" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+    <div v-if="topStatusCards.length" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
       <div
-        v-for="metric in overview.metrics"
+        v-for="metric in topStatusCards"
         :key="metric.key"
         class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
       >
@@ -1811,51 +1811,68 @@
             </div>
           </section>
 
-          <section class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
-            <div class="rounded-2xl border border-violet-100 bg-violet-50/70 p-6 shadow-sm">
+          <section class="space-y-5">
+            <div class="self-start rounded-2xl border border-violet-100 bg-violet-50/70 p-5 shadow-sm">
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <p class="text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">Yonetici Ozeti</p>
-                  <h3 class="mt-1 text-lg font-bold text-slate-900">{{ departmentDashboard.ai_summary.summary }}</h3>
+                  <p class="mt-2 whitespace-pre-line text-sm font-semibold leading-7 text-slate-900">
+                    {{ departmentDashboard.ai_summary.summary }}
+                  </p>
                 </div>
                 <span class="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-semibold text-violet-700">
                   {{ narrativeSourceLabel(departmentDashboard.ai_summary.source) }}
                 </span>
               </div>
 
-              <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <div class="rounded-xl border border-white/70 bg-white p-4">
+              <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                <div class="rounded-xl border border-white/70 bg-white p-3.5">
                   <p class="text-xs font-semibold text-slate-500">Guclu Sinyaller</p>
-                  <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                  <ul class="mt-3 space-y-2 text-xs leading-5 text-slate-700">
                     <li v-for="item in departmentDashboard.ai_summary.strengths" :key="item">- {{ item }}</li>
                   </ul>
                 </div>
-                <div class="rounded-xl border border-white/70 bg-white p-4">
+                <div class="rounded-xl border border-white/70 bg-white p-3.5">
                   <p class="text-xs font-semibold text-slate-500">Riskler</p>
-                  <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                  <ul class="mt-3 space-y-2 text-xs leading-5 text-slate-700">
                     <li v-for="item in departmentDashboard.ai_summary.risks" :key="item">- {{ item }}</li>
                   </ul>
                 </div>
-                <div class="rounded-xl border border-white/70 bg-white p-4">
+                <div class="rounded-xl border border-white/70 bg-white p-3.5">
                   <p class="text-xs font-semibold text-slate-500">Oneriler</p>
-                  <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                  <ul class="mt-3 space-y-2 text-xs leading-5 text-slate-700">
                     <li v-for="item in departmentDashboard.ai_summary.recommendations" :key="item">- {{ item }}</li>
                   </ul>
                 </div>
               </div>
             </div>
 
-            <aside class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Aksiyonlar</p>
-              <div class="mt-4 space-y-3">
+            <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Aksiyonlar</p>
+                  <p class="mt-1 text-sm text-slate-500">AI icgorusu ve takim skor kirilimindan uretilen uygulanabilir takip maddeleri.</p>
+                </div>
+                <span class="w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                  {{ departmentDashboardActions.length }} aksiyon
+                </span>
+              </div>
+              <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
                 <div
                   v-for="action in departmentDashboardActions"
                   :key="`${action.priority}-${action.title}`"
-                  class="rounded-xl border border-slate-100 bg-slate-50 p-4"
+                  class="min-h-[180px] rounded-xl border border-slate-100 bg-slate-50 p-4"
                 >
                   <p class="text-sm font-bold text-slate-900">{{ action.title }}</p>
                   <p class="mt-1 text-xs leading-5 text-slate-600">{{ action.description }}</p>
-                  <p class="mt-2 text-xs font-semibold text-indigo-700">{{ action.owner }} / {{ action.due_date }}</p>
+                  <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
+                    <span class="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-1 text-indigo-700">
+                      {{ action.owner }} / {{ action.due_date }}
+                    </span>
+                    <span class="rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-500">
+                      {{ actionSourceLabel(action.source) }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </aside>
@@ -1910,28 +1927,88 @@
           </article>
         </div>
 
-        <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
-          <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="space-y-5">
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div class="flex items-start justify-between gap-4">
               <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">KPI Rol Karsilastirmasi</p>
-                <h3 class="mt-1 text-lg font-bold text-slate-900">Rol bazli performans ve trend</h3>
+                <h3 class="mt-1 text-lg font-bold text-slate-900">Rol bazli performans paneli</h3>
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                  Skor, trend ve kapsam bilgileri canli KPI kayitlarindan uretilen performans ozetine dayanir.
+                </p>
               </div>
               <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
                 {{ kpiPerformanceEmployees.length }} analizli calisan
               </span>
             </div>
-            <div v-if="kpiPerformanceRoles.length" class="mt-5 h-[340px]">
-              <Bar :data="kpiRoleChartData" :options="kpiRoleChartOptions" />
+
+            <div v-if="kpiRoleDashboardRows.length" class="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-4">
+              <article
+                v-for="role in kpiRoleDashboardRows"
+                :key="role.role_level"
+                class="rounded-xl border border-slate-100 bg-slate-50 p-4"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-bold text-slate-900">{{ role.label }}</p>
+                    <p class="mt-1 text-xs text-slate-500">
+                      {{ role.analyzed_count }}/{{ role.employee_count }} calisan analizli
+                    </p>
+                  </div>
+                  <span
+                    class="rounded-full px-2.5 py-1 text-xs font-bold"
+                    :class="kpiScoreBadgeClass(role.average_kpi)"
+                  >
+                    {{ kpiScoreStatus(role.average_kpi) }}
+                  </span>
+                </div>
+
+                <div class="mt-4">
+                  <div class="flex items-end justify-between gap-3">
+                    <p class="text-2xl font-black text-slate-900">{{ role.average_kpi ?? '-' }}/100</p>
+                    <p class="text-sm font-bold" :class="trendClass(role.average_trend || 0)">
+                      {{ formatSigned(role.average_trend || 0) }} 4H
+                    </p>
+                  </div>
+                  <div class="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
+                    <div
+                      class="h-full rounded-full"
+                      :class="kpiScoreBarClass(role.average_kpi)"
+                      :style="{ width: `${scoreWidth(role.average_kpi)}%` }"
+                    ></div>
+                  </div>
+                </div>
+
+                <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
+                  <div class="rounded-lg bg-white p-2">
+                    <p class="text-slate-400">En yuksek</p>
+                    <p class="mt-1 truncate font-semibold text-slate-800">{{ role.highest_employee_name || '-' }}</p>
+                    <p class="text-slate-500">{{ role.highest_kpi ?? '-' }}/100</p>
+                  </div>
+                  <div class="rounded-lg bg-white p-2">
+                    <p class="text-slate-400">Izlenecek</p>
+                    <p class="mt-1 truncate font-semibold text-slate-800">{{ role.lowest_employee_name || '-' }}</p>
+                    <p class="text-slate-500">{{ role.lowest_kpi ?? '-' }}/100</p>
+                  </div>
+                </div>
+              </article>
             </div>
             <div v-else class="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
               KPI rol karsilastirmasi icin yeterli veri yok.
             </div>
           </section>
 
-          <aside class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Takim KPI Ozeti</p>
-            <div class="mt-4 space-y-3">
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Takim KPI Ozeti</p>
+                <h3 class="mt-1 text-lg font-bold text-slate-900">Takimlara gore skor, kapsam ve trend</h3>
+              </div>
+              <span class="w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                Kaynak: /analytics/performance/summary
+              </span>
+            </div>
+            <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
               <div
                 v-for="team in kpiPerformanceTeams"
                 :key="team.team"
@@ -1939,42 +2016,106 @@
               >
                 <div class="flex items-center justify-between gap-3">
                   <p class="text-sm font-bold text-slate-900">{{ team.team }}</p>
-                  <span class="text-sm font-black text-slate-900">{{ team.average_kpi ?? '-' }}/100</span>
+                  <span
+                    class="rounded-full px-2.5 py-1 text-xs font-bold"
+                    :class="kpiScoreBadgeClass(team.average_kpi)"
+                  >
+                    {{ team.average_kpi ?? '-' }}/100
+                  </span>
                 </div>
-                <p class="mt-2 text-xs text-slate-500">
-                  {{ team.analyzed_count }}/{{ team.employee_count }} analizli / trend {{ formatSigned(team.average_trend || 0) }}
-                </p>
+                <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-white">
+                  <div
+                    class="h-full rounded-full"
+                    :class="kpiScoreBarClass(team.average_kpi)"
+                    :style="{ width: `${scoreWidth(team.average_kpi)}%` }"
+                  ></div>
+                </div>
+                <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+                  <div class="rounded-lg bg-white p-2">
+                    <p class="text-slate-400">Kapsam</p>
+                    <p class="mt-1 font-bold text-slate-800">{{ team.analyzed_count }}/{{ team.employee_count }}</p>
+                  </div>
+                  <div class="rounded-lg bg-white p-2">
+                    <p class="text-slate-400">Trend</p>
+                    <p class="mt-1 font-bold" :class="trendClass(team.average_trend || 0)">
+                      {{ formatSigned(team.average_trend || 0) }}
+                    </p>
+                  </div>
+                  <div class="rounded-lg bg-white p-2">
+                    <p class="text-slate-400">Dusus</p>
+                    <p class="mt-1 font-bold text-slate-800">{{ team.declining_count }}</p>
+                  </div>
+                </div>
               </div>
               <p v-if="!kpiPerformanceTeams.length" class="text-sm text-slate-500">Takim KPI verisi henuz yok.</p>
             </div>
-          </aside>
+          </section>
         </div>
       </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Yonetici Karar Paneli</p>
+            <h3 class="mt-1 text-lg font-bold text-slate-900">Bu hafta nereye odaklanmali?</h3>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+              Bu kartlar KPI performans ozetindeki calisan, takim ve rol kirilimlarindan turetilir; teknik mimari bilgisi degil, uygulanabilir yonetici takibi sunar.
+            </p>
+          </div>
+          <span class="w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+            Kaynak: /analytics/performance/summary
+          </span>
+        </div>
+
+        <div v-if="kpiManagerDecisionCards.length" class="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
+          <article
+            v-for="card in kpiManagerDecisionCards"
+            :key="card.title"
+            class="rounded-xl border p-4"
+            :class="card.toneClass"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">{{ card.label }}</p>
+                <h4 class="mt-2 text-base font-black">{{ card.title }}</h4>
+              </div>
+              <span class="rounded-full bg-white/70 px-2 py-1 text-xs font-bold">{{ card.metric }}</span>
+            </div>
+            <p class="mt-3 text-sm leading-6">{{ card.body }}</p>
+            <p class="mt-3 rounded-lg bg-white/65 p-2 text-xs font-semibold leading-5">
+              {{ card.action }}
+            </p>
+          </article>
+        </div>
+        <div v-else class="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+          Yonetici karar paneli icin KPI performans ozeti bekleniyor.
+        </div>
+      </section>
+
+      <div v-if="false && selectedDepartmentConfig" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Analytics Omurgasi</p>
             <h3 class="mt-1 text-xl font-bold text-slate-900">
-              {{ selectedDepartmentConfig.label }} Departmani
+              {{ selectedDepartmentConfig?.label }} Departmani
             </h3>
             <p class="mt-2 text-sm leading-6 text-slate-600">
-              {{ selectedDepartmentConfig.description }}
+              {{ selectedDepartmentConfig?.description }}
             </p>
           </div>
           <span
             class="rounded-full px-3 py-1 text-xs font-semibold"
-            :class="selectedDepartmentConfig.readiness_status === 'live'
+            :class="selectedDepartmentConfig?.readiness_status === 'live'
               ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
               : 'border border-amber-200 bg-amber-50 text-amber-700'"
           >
-            {{ readinessLabel(selectedDepartmentConfig.readiness_status) }}
+            {{ readinessLabel(selectedDepartmentConfig?.readiness_status || '') }}
           </span>
         </div>
 
         <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div
-            v-for="layer in selectedDepartmentConfig.layers"
+            v-for="layer in selectedDepartmentConfig?.layers || []"
             :key="layer.key"
             class="rounded-2xl border border-indigo-100 bg-indigo-50 p-5"
           >
@@ -1984,7 +2125,7 @@
         </div>
       </div>
 
-      <div class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
+      <div v-if="false && selectedDepartmentConfig && overview" class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Sprint 1</p>
         <h3 class="mt-2 text-lg font-bold text-white">Yapilanlar ve siradaki adim</h3>
 
@@ -1993,7 +2134,7 @@
             <p class="text-xs font-semibold text-slate-300">Planlanan hedefler</p>
             <div class="mt-3 flex flex-wrap gap-2">
               <span
-                v-for="target in selectedDepartmentConfig.planned_targets"
+                v-for="target in selectedDepartmentConfig?.planned_targets || []"
                 :key="target"
                 class="rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-xs text-indigo-100"
               >
@@ -2005,6 +2146,7 @@
           <div v-if="overview" class="rounded-2xl border border-white/10 bg-white/5 p-4">
             <p class="text-xs font-semibold text-slate-300">Sprint odagi</p>
             <ul class="mt-3 space-y-2 text-sm text-slate-200">
+              <!-- @vue-ignore hidden legacy sprint block -->
               <li v-for="item in overview.sprint_focus" :key="item">• {{ item }}</li>
             </ul>
           </div>
@@ -2425,7 +2567,7 @@ import {
   Tooltip,
 } from 'chart.js'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Bar, Line } from 'vue-chartjs'
+import { Line } from 'vue-chartjs'
 import { useRoute, useRouter } from 'vue-router'
 import {
   analyticsApi,
@@ -2702,11 +2844,148 @@ const kpiPerformanceEmployees = computed(() =>
 )
 const kpiPerformanceTeams = computed(() => performanceSummary.value?.teams || [])
 const kpiPerformanceRoles = computed(() => performanceSummary.value?.roles || [])
+const kpiRoleDashboardRows = computed(() =>
+  kpiPerformanceRoles.value
+    .filter((role) => role.employee_count > 0 || role.analyzed_count > 0)
+    .map((role) => ({
+      ...role,
+      average_kpi: role.average_kpi ?? null,
+      average_trend: role.average_trend ?? null,
+      highest_kpi: role.highest_kpi ?? null,
+      lowest_kpi: role.lowest_kpi ?? null,
+    }))
+)
+const kpiManagerDecisionCards = computed(() => {
+  const summary = kpiPerformanceSummary.value
+  if (!summary) return []
+
+  const teams = [...kpiPerformanceTeams.value]
+  const roles = [...kpiRoleDashboardRows.value]
+  const riskiestTeam = teams
+    .filter((team) => team.analyzed_count > 0)
+    .sort((a, b) => (b.declining_count - a.declining_count) || ((a.average_kpi ?? 999) - (b.average_kpi ?? 999)))[0]
+  const strongestTeam = teams
+    .filter((team) => team.average_kpi !== null && team.average_kpi !== undefined)
+    .sort((a, b) => (b.average_kpi ?? 0) - (a.average_kpi ?? 0))[0]
+  const lowestRole = roles
+    .filter((role) => role.average_kpi !== null && role.average_kpi !== undefined)
+    .sort((a, b) => (a.average_kpi ?? 999) - (b.average_kpi ?? 999))[0]
+
+  return [
+    {
+      label: 'Kapsam',
+      title: `${summary.analyzed_employees}/${summary.total_employees} calisan analizli`,
+      metric: `%${summary.total_employees ? Math.round((summary.analyzed_employees / summary.total_employees) * 100) : 0}`,
+      body: `Departman KPI ortalamasi ${summary.average_kpi ?? '-'}/100, genel 4 haftalik trend ${formatSigned(summary.average_trend)}.`,
+      action: summary.analyzed_employees < summary.total_employees
+        ? 'Eksik KPI kaydi olan calisanlar tamamlanmadan karar yalnizca mevcut kapsam icin yorumlanmali.'
+        : 'Kapsam tam; haftalik takip toplantisinda takim ve rol kirilimlari uzerinden ilerlenebilir.',
+      toneClass: 'border-blue-100 bg-blue-50 text-blue-900',
+    },
+    {
+      label: 'Oncelik',
+      title: riskiestTeam ? `${riskiestTeam.team} takimini incele` : 'Takim riski yok',
+      metric: riskiestTeam ? `${riskiestTeam.declining_count} dusus` : '0',
+      body: riskiestTeam
+        ? `${riskiestTeam.team} icin ortalama KPI ${riskiestTeam.average_kpi ?? '-'}/100, trend ${formatSigned(riskiestTeam.average_trend)} ve ${riskiestTeam.declining_count} calisanda dusus sinyali var.`
+        : 'Takim kiriliminda negatif trendli calisan sinyali gorunmuyor.',
+      action: riskiestTeam
+        ? 'Takim lideriyle bu hafta kapasite, is dagilimi ve blokaj nedenlerini dogrula.'
+        : 'Mevcut ritmi koru; yalnizca haftalik KPI sapmalarini izlemeye devam et.',
+      toneClass: riskiestTeam?.declining_count ? 'border-amber-100 bg-amber-50 text-amber-900' : 'border-emerald-100 bg-emerald-50 text-emerald-900',
+    },
+    {
+      label: 'Rol Grubu',
+      title: lowestRole ? `${lowestRole.label} rolunu takip et` : 'Rol verisi yok',
+      metric: lowestRole ? `${lowestRole.average_kpi}/100` : '-',
+      body: lowestRole
+        ? `${lowestRole.label} grubunda ${lowestRole.analyzed_count}/${lowestRole.employee_count} calisan analizli; en dusuk skor ${lowestRole.lowest_employee_name || '-'} tarafinda ${lowestRole.lowest_kpi ?? '-'}/100.`
+        : 'Rol bazli KPI verisi henuz karar uretmek icin yeterli degil.',
+      action: lowestRole
+        ? 'Bu rol grubu icin mentorluk, code review yogunlugu veya is kapsam netligini kontrol et.'
+        : 'Rol bazli yorum icin KPI kayit kapsamini tamamla.',
+      toneClass: 'border-slate-200 bg-slate-50 text-slate-900',
+    },
+    {
+      label: 'Guclu Ornek',
+      title: strongestTeam ? `${strongestTeam.team} pratiklerini yay` : 'Guclu takim yok',
+      metric: strongestTeam ? `${strongestTeam.average_kpi}/100` : '-',
+      body: strongestTeam
+        ? `${strongestTeam.team} en yuksek takim KPI ortalamasina sahip; ${strongestTeam.analyzed_count}/${strongestTeam.employee_count} calisan analizli ve trend ${formatSigned(strongestTeam.average_trend)}.`
+        : 'Takim skorlarinda paylasilabilir guclu ornek henuz olusmadi.',
+      action: strongestTeam
+        ? 'Bu takimin calisma ritmi, review pratigi veya blokaj cozme yaklasimini diger takimlarla paylastir.'
+        : 'Guclu ornek icin once takim KPI kapsamini artir.',
+      toneClass: 'border-emerald-100 bg-emerald-50 text-emerald-900',
+    },
+  ]
+})
 const kpiRiskPeople = computed(() =>
   (performanceSummary.value?.risk_people?.length ? performanceSummary.value.risk_people : kpiPerformanceEmployees.value)
     .filter((employee) => employee.has_kpi_data)
     .slice(0, 8)
 )
+
+const topStatusCards = computed(() => {
+  const dashboard = departmentDashboard.value
+  if (dashboard) {
+    return [
+      {
+        key: 'combined_status',
+        label: 'Durum',
+        value: 'Analiz hazır',
+        hint: `Dataset #${dashboard.upload_id} / ${dashboard.period} ile birleşik skor hesaplandı.`,
+        tone: 'success',
+      },
+      {
+        key: 'kpi_ml_scope',
+        label: 'KPI/ML Kapsamı',
+        value: `${dashboard.coverage.kpi_employee_count} çalışan`,
+        hint: `KPI/ML skoru ${Math.round(dashboard.sources.kpiMl?.score ?? 0)}/100.`,
+        tone: 'primary',
+      },
+      {
+        key: 'pulse_scope',
+        label: 'Nabız Kapsamı',
+        value: `%${Math.round(dashboard.coverage.pulse_percentage)}`,
+        hint: `${dashboard.coverage.pulse_response_count} haftalık nabız yanıtı.`,
+        tone: dashboard.coverage.pulse_response_count ? 'success' : 'warning',
+      },
+      {
+        key: 'feedback_scope',
+        label: '360 Kapsamı',
+        value: `%${Math.round(dashboard.coverage.feedback_percentage)}`,
+        hint: `${dashboard.coverage.feedback_response_count} feedback sinyali.`,
+        tone: dashboard.coverage.feedback_response_count ? 'success' : 'warning',
+      },
+      {
+        key: 'confidence',
+        label: 'Veri Güveni',
+        value: `%${Math.round(dashboard.scores.confidence_score)}`,
+        hint: `Departman sağlığı ${Math.round(dashboard.scores.department_health)}/100.`,
+        tone: 'info',
+      },
+    ]
+  }
+
+  const metrics = overview.value?.metrics || []
+  const hasKpiRows = (performanceSummary.value?.summary?.analyzed_employees || 0) > 0
+  if (hasKpiRows) {
+    const summary = performanceSummary.value?.summary
+    return [
+      {
+        key: 'kpi_status',
+        label: 'Durum',
+        value: 'KPI verisi hazır',
+        hint: `${summary?.analyzed_employees || 0}/${summary?.total_employees || 0} çalışan için KPI kaydı var; birleşik ML dashboard yükleniyor olabilir.`,
+        tone: 'success',
+      },
+      ...metrics.filter((metric) => metric.key !== 'readiness').slice(0, 4),
+    ]
+  }
+
+  return metrics
+})
 
 const kpiDepartmentCards = computed(() => {
   const summary = kpiPerformanceSummary.value
@@ -2737,48 +3016,6 @@ const kpiDepartmentCards = computed(() => {
     },
   ]
 })
-
-const kpiRoleChartData = computed(() => ({
-  labels: kpiPerformanceRoles.value.map((role) => role.label),
-  datasets: [
-    {
-      label: 'Ortalama KPI',
-      data: kpiPerformanceRoles.value.map((role) => role.average_kpi ?? 0),
-      backgroundColor: '#2563EB',
-      borderRadius: 8,
-      yAxisID: 'y',
-    },
-    {
-      label: '4H Trend',
-      data: kpiPerformanceRoles.value.map((role) => role.average_trend ?? 0),
-      backgroundColor: kpiPerformanceRoles.value.map((role) => (Number(role.average_trend || 0) >= 0 ? '#10B981' : '#EF4444')),
-      borderRadius: 8,
-      yAxisID: 'trend',
-    },
-  ],
-}))
-
-const kpiRoleChartOptions = computed<ChartOptions<'bar'>>(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  scales: {
-    y: { min: 0, max: 100, grid: { color: '#EEF2F7' }, title: { display: true, text: 'KPI Skoru' } },
-    trend: { position: 'right', min: -10, max: 10, grid: { drawOnChartArea: false }, title: { display: true, text: 'Trend' } },
-    x: { grid: { display: false } },
-  },
-  plugins: {
-    legend: { position: 'bottom' },
-    tooltip: {
-      callbacks: {
-        afterLabel(context) {
-          const role = kpiPerformanceRoles.value[context.dataIndex]
-          if (!role) return ''
-          return `${role.employee_count} calisan / ${role.analyzed_count} analizli`
-        },
-      },
-    },
-  },
-}))
 
 const departmentNarrative = computed(() => bulkPredictionResult.value?.department_narrative || null)
 
@@ -3562,6 +3799,35 @@ function formatSigned(value?: number | null) {
   return `${value > 0 ? '+' : ''}${value}`
 }
 
+function scoreWidth(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return 0
+  return Math.max(0, Math.min(100, Math.round(Number(value))))
+}
+
+function kpiScoreStatus(value?: number | null) {
+  if (value === null || value === undefined) return 'Veri yok'
+  if (value >= 80) return 'Guclu'
+  if (value >= 65) return 'Izlenebilir'
+  if (value >= 50) return 'Dikkat'
+  return 'Risk'
+}
+
+function kpiScoreBadgeClass(value?: number | null) {
+  if (value === null || value === undefined) return 'border border-slate-200 bg-white text-slate-500'
+  if (value >= 80) return 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+  if (value >= 65) return 'border border-blue-200 bg-blue-50 text-blue-700'
+  if (value >= 50) return 'border border-amber-200 bg-amber-50 text-amber-700'
+  return 'border border-rose-200 bg-rose-50 text-rose-700'
+}
+
+function kpiScoreBarClass(value?: number | null) {
+  if (value === null || value === undefined) return 'bg-slate-200'
+  if (value >= 80) return 'bg-emerald-500'
+  if (value >= 65) return 'bg-blue-500'
+  if (value >= 50) return 'bg-amber-500'
+  return 'bg-rose-500'
+}
+
 function formatPercent(value?: number | null) {
   if (value === null || value === undefined) return '-'
   return `${Math.round(value * 1000) / 10}%`
@@ -3646,7 +3912,24 @@ function employeeSubtitle(item: SoftwarePredictionResponse | null) {
 function narrativeSourceLabel(source?: unknown) {
   if (source === 'gemini') return 'LLM: Gemini'
   if (source === 'ollama') return 'LLM: Ollama'
-  return 'Deterministic'
+  if (source === 'analytic_narrative') return 'AI karar destek ozeti'
+  if (source === 'deterministic_llm_fallback') return 'AI karar destek ozeti'
+  if (source === 'deterministic') return 'AI karar destek ozeti'
+  return 'Karar destek ozeti'
+}
+
+function actionSourceLabel(source?: unknown) {
+  const value = String(source || '')
+  const [provider, type] = value.includes(':') ? value.split(':', 2) : ['', value]
+  if (provider === 'gemini') return 'Kaynak: AI icgoru (Gemini)'
+  if (provider === 'ollama') return 'Kaynak: AI icgoru (Ollama)'
+  if (type === 'team_breakdown' || value === 'team_breakdown') return 'Kaynak: takim skor kirilimi'
+  if (type === 'coverage' || value === 'coverage') return 'Kaynak: veri kapsami'
+  if (type === 'risk_overlap') return 'Kaynak: birlesik risk analizi'
+  if (type === 'performance_vs_health') return 'Kaynak: KPI + nabiz analizi'
+  if (type === 'trust_vs_execution') return 'Kaynak: KPI + 360 analizi'
+  if (type === 'balanced_signal') return 'Kaynak: hibrit skor analizi'
+  return 'Kaynak: karar destek analizi'
 }
 
 function narrativeFallbackReason(narrative?: Record<string, any> | null) {
@@ -4546,7 +4829,7 @@ async function loadOverview() {
   }
 }
 
-async function loadDepartmentDashboard(useLlm = false) {
+async function loadDepartmentDashboard(useLlm = true) {
   if (selectedDepartment.value !== 'software' || !mlUploadId.value) {
     departmentDashboard.value = null
     departmentDashboardError.value = null
@@ -4688,7 +4971,7 @@ watch(mlTargetColumn, () => {
   selectedTeamAnalysisName.value = ''
   selectedTeamDetailVisible.value = false
   if (activeAnalyticsSection.value === 'department') {
-    loadDepartmentDashboard(false)
+    loadDepartmentDashboard(true)
   }
 })
 
@@ -4728,7 +5011,7 @@ watch(mlUploadId, () => {
   selectedTeamDetailVisible.value = false
   loadDatasetEmployees()
   if (activeAnalyticsSection.value === 'department') {
-    loadDepartmentDashboard(false)
+    loadDepartmentDashboard(true)
   }
 })
 
@@ -4741,7 +5024,7 @@ watch([activeAnalyticsSection, mlUploadId], ([section, uploadId]) => {
 watch([activeAnalyticsSection, mlUploadId], ([section, uploadId]) => {
   if (section !== 'department') return
   if (!uploadId || departmentDashboard.value || departmentDashboardLoading.value) return
-  loadDepartmentDashboard(false)
+  loadDepartmentDashboard(true)
 })
 
 watch(
@@ -4770,7 +5053,7 @@ onMounted(async () => {
   await loadDatasetEmployees()
   await loadOverview()
   if (activeAnalyticsSection.value === 'department') {
-    await loadDepartmentDashboard(false)
+    await loadDepartmentDashboard(true)
   } else if (bulkSections.includes(activeAnalyticsSection.value)) {
     await loadBulkPredictions(false)
   }

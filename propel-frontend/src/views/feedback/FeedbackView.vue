@@ -77,7 +77,24 @@
             :class="getRiskBadgeClass(myNlpInsight.profile.flight_risk_level)"
           >
             Ucus riski: {{ getRiskLabel(myNlpInsight.profile.flight_risk_level) }}
+            <span v-if="myNlpInsight.profile.flight_risk_confidence != null">
+              · Guven {{ formatConfidence(myNlpInsight.profile.flight_risk_confidence) }}
+            </span>
           </span>
+        </div>
+
+        <div class="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Karar destek notu</p>
+              <p class="mt-1 text-sm text-amber-900">
+                Bu NLP sonucu otomatik uretilmis bir oneridir; performans karari veya aksiyon icin yonetici onayi gerekir.
+              </p>
+            </div>
+            <span class="self-start md:self-center rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-800">
+              {{ humanReviewStatusLabel }}
+            </span>
+          </div>
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
@@ -96,6 +113,23 @@
           <div class="rounded-lg bg-slate-50 p-4 border border-slate-100">
             <p class="text-xs text-slate-500">Geri bildirim sayisi</p>
             <p class="text-2xl font-bold text-slate-900">{{ myNlpInsight.profile.feedback_count }}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div class="rounded-lg bg-rose-50 p-4 border border-rose-100">
+            <p class="text-xs text-rose-700">Flight risk confidence</p>
+            <p class="mt-1 text-xl font-bold text-rose-800">
+              {{ formatConfidence(myNlpInsight.profile.flight_risk_confidence) }}
+            </p>
+            <p class="mt-1 text-xs text-rose-700">Kategori: {{ getRiskLabel(myNlpInsight.profile.flight_risk_level) }}</p>
+          </div>
+          <div class="rounded-lg bg-amber-50 p-4 border border-amber-100">
+            <p class="text-xs text-amber-700">Burnout risk confidence</p>
+            <p class="mt-1 text-xl font-bold text-amber-800">
+              {{ formatConfidence(myNlpInsight.profile.burnout_risk_confidence) }}
+            </p>
+            <p class="mt-1 text-xs text-amber-700">Kategori: {{ getRiskLabel(myNlpInsight.profile.burnout_risk_level) }}</p>
           </div>
         </div>
 
@@ -344,6 +378,12 @@ const progressPercent = computed(() => {
   return Math.min((completed_count / required_count) * 100, 100)
 })
 
+const humanReviewStatusLabel = computed(() => {
+  const role = authStore.user?.role
+  if (role === 'admin' || role === 'department_manager') return 'Yonetici onayi bekliyor'
+  return 'Yonetici dogrulamasi gerekli'
+})
+
 // ── Yardımcı fonksiyonlar ──────────────────────
 function getAvgScore(fb: FeedbackResponse): string | null {
   const scores = [fb.score_communication, fb.score_teamwork, fb.score_problem_solving, fb.score_leadership, fb.score_technical].filter(s => s != null) as number[]
@@ -391,6 +431,11 @@ function getBadgeDescription(badge: BadgeResponse | { badge_type: BadgeType; sou
 
 function formatScore(value?: number | null) {
   return value != null ? value.toFixed(1) : '—'
+}
+
+function formatConfidence(value?: number | null) {
+  if (value == null || Number.isNaN(Number(value))) return 'Belirsiz'
+  return `%${Math.round(Math.max(0, Math.min(1, Number(value))) * 100)}`
 }
 
 function getRiskLabel(level?: NLPRiskLevel) {

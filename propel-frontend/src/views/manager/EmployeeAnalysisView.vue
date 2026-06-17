@@ -4,7 +4,7 @@
       <div>
         <h2 class="text-2xl font-bold text-slate-900 tracking-tight">360 Calisan Raporu</h2>
         <p class="text-slate-500 mt-1">
-          Ekipteki calisanlarin yalnizca 360 derece feedback, NLP sinyali ve yonetici ozetlerini inceleyin.
+          Ekipteki calisanlarin KPI performansi, 360 feedback, NLP sinyali ve yonetici ozetlerini birlikte inceleyin.
         </p>
       </div>
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -182,6 +182,20 @@
                 <p class="text-slate-700 leading-relaxed text-sm md:text-base">
                   {{ renderText(selectedEmployeeReport.report_summary) }}
                 </p>
+
+                <div v-if="managerEvidenceSection?.items.length" class="mt-5 rounded-xl border border-indigo-100 bg-white p-4">
+                  <p class="text-[11px] font-bold uppercase tracking-widest text-indigo-600 mb-3">Veriye Dayalı Kanıtlar</p>
+                  <ul class="space-y-2">
+                    <li
+                      v-for="item in managerEvidenceSection.items.slice(0, 6)"
+                      :key="item"
+                      class="flex gap-2 text-sm text-slate-700"
+                    >
+                      <span class="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-indigo-500"></span>
+                      <span>{{ renderText(item) }}</span>
+                    </li>
+                  </ul>
+                </div>
                 
                 <div v-if="qualityWarningSection || biasWarningSection" class="mt-6 flex flex-wrap gap-4">
                   <div v-if="qualityWarningSection" class="flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-2 rounded-xl border border-amber-100 text-xs font-bold">
@@ -212,6 +226,45 @@
                    </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
+              <div>
+                <h4 class="text-lg font-bold text-slate-900">KPI / ML Performans Özeti</h4>
+                <p class="mt-1 text-sm text-slate-500">Seçili çalışanın canlı KPI performans özetinden gelen sinyaller.</p>
+              </div>
+              <span
+                class="w-fit rounded-full border px-3 py-1 text-xs font-bold"
+                :class="kpiStatusClass(selectedKpiRow?.status)"
+              >
+                {{ selectedKpiRow ? kpiStatusLabel(selectedKpiRow.status) : 'KPI verisi yok' }}
+              </span>
+            </div>
+
+            <div v-if="selectedKpiRow?.has_kpi_data" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-500">KPI Skoru</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ selectedKpiRow.kpi_score ?? '-' }}/100</p>
+              </div>
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Trend</p>
+                <p class="mt-2 text-2xl font-bold" :class="Number(selectedKpiRow.trend || 0) < 0 ? 'text-rose-600' : 'text-emerald-600'">
+                  {{ formatKpiTrend(selectedKpiRow.trend) }}
+                </p>
+              </div>
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Kayıt Sayısı</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ selectedKpiRow.record_count }}</p>
+              </div>
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Son Dönem</p>
+                <p class="mt-2 text-sm font-bold text-slate-900">{{ selectedKpiRow.latest_period || '-' }}</p>
+              </div>
+            </div>
+            <div v-else class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Bu çalışan için KPI kaydı bulunamadı. KPI analizi görünmüyorsa admin dataset/KPI kayıtlarını ve seçili departman kapsamını kontrol edin.
             </div>
           </div>
 
@@ -251,6 +304,33 @@
                     <div class="p-2 bg-rose-100 rounded-xl mb-3"><ExclamationCircleIcon class="w-5 h-5 text-rose-600" /></div>
                     <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Ayrılma Riski</p>
                     <p class="mt-2 text-2xl font-bold text-slate-900">{{ monthlyDeepAnalysis.flight_risk_score ?? '-' }}/10</p>
+                  </div>
+                </div>
+
+                <div v-if="burnoutDriverItems.length" class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                  <div class="flex items-start justify-between gap-4">
+                    <div>
+                      <h5 class="text-xs font-bold text-amber-700 uppercase tracking-widest">Burnout Risk Drivers</h5>
+                      <p class="mt-1 text-sm text-amber-900">
+                        Risk etiketi, tekrarlayan tema ve skor trendlerinden uretilen aciklanabilir sinyallerle desteklenir.
+                      </p>
+                    </div>
+                    <span
+                      v-if="monthlyDeepAnalysis.burnout_risk_level"
+                      class="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-bold text-amber-800"
+                    >
+                      {{ formatRiskLabel(monthlyDeepAnalysis.burnout_risk_level) }}
+                    </span>
+                  </div>
+                  <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div
+                      v-for="driver in burnoutDriverItems"
+                      :key="driver.label + driver.evidence"
+                      class="rounded-xl border border-amber-100 bg-white p-4"
+                    >
+                      <p class="text-sm font-bold text-slate-900">{{ renderText(driver.label) }}</p>
+                      <p class="mt-2 text-xs leading-5 text-slate-600">{{ renderText(driver.evidence) }}</p>
+                    </div>
                   </div>
                 </div>
 
@@ -447,9 +527,11 @@ import {
   type EmployeeMonthlyDeepAnalysisResponse,
   type EmployeeMonthlyRAGReportResponse,
   type EmployeeForFeedback,
+  type RiskDriver,
   type SummaryMetric,
 } from '@/services/api/feedback.api'
 import { employeeApi } from '@/services/api/employee.api'
+import { analyticsApi, type DepartmentPerformanceSummaryResponse, type PerformanceEmployeeRowResponse } from '@/services/api/analytics.api'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -466,6 +548,7 @@ const selectedEmployeeReport = ref<Employee360SummaryReportResponse | null>(null
 const monthlyDeepAnalysis = ref<EmployeeMonthlyDeepAnalysisResponse | null>(null)
 const monthlyRagReport = ref<EmployeeMonthlyRAGReportResponse | null>(null)
 const employeeReports = ref<Record<number, Employee360SummaryReportResponse>>({})
+const performanceSummary = ref<DepartmentPerformanceSummaryResponse | null>(null)
 let employeeReportRequestId = 0
 let monthlyAnalysisRequestId = 0
 const today = new Date()
@@ -569,12 +652,37 @@ const qualityWarningSection = computed(() =>
   selectedEmployeeReport.value?.sections.find((section) => section.title.toLowerCase().includes('veri kalitesi')) || null
 )
 
+const managerEvidenceSection = computed(() =>
+  selectedEmployeeReport.value?.sections.find((section) => section.title.toLowerCase().includes('yonetici kanitlari')) || null
+)
+
 const biasWarningSection = computed(() =>
   selectedEmployeeReport.value?.sections.find((section) => section.title.toLowerCase().includes('bias')) || null
 )
 
 const scoreMetricLabels = computed(() => scoreMetrics.value.map((metric) => metric.label))
 const scoreMetricValues = computed(() => scoreMetrics.value.map((metric) => metric.value ?? 0))
+
+const selectedKpiRow = computed<PerformanceEmployeeRowResponse | null>(() => {
+  if (!selectedEmployeeId.value) return null
+  return performanceSummary.value?.employees.find((employee) => employee.employee_id === selectedEmployeeId.value) || null
+})
+
+const burnoutMetric = computed(() =>
+  selectedEmployeeReport.value?.metrics.find((metric) => metric.label === 'Burnout Risk') || null
+)
+
+const burnoutDriverItems = computed<RiskDriver[]>(() => {
+  const monthlyDrivers = monthlyDeepAnalysis.value?.burnout_risk_drivers || []
+  if (monthlyDrivers.length) return monthlyDrivers
+  const metricDrivers = burnoutMetric.value?.drivers || []
+  if (metricDrivers.length) return metricDrivers
+  return (monthlyDeepAnalysis.value?.burnout_risk_evidence || []).map((item) => ({
+    label: 'Burnout risk evidence',
+    evidence: item,
+    severity: monthlyDeepAnalysis.value?.burnout_risk_level || null,
+  }))
+})
 
 function getPreviewSummary(employeeId: number) {
   const report = employeeReports.value[employeeId]
@@ -619,21 +727,46 @@ function formatTrend(value: string) {
 }
 
 async function loadData() {
-  try {
-    if (isAdmin.value) {
+  if (isAdmin.value) {
+    try {
       departments.value = await employeeApi.getDepartments()
+    } catch (error) {
+      console.warn('Departman listesi yüklenemedi:', error)
+      departments.value = []
     }
-    
-    const candidates = await feedbackApi.getFeedbackCandidates()
-    teamMembers.value = candidates.filter((employee) => employee.user.role === 'employee')
-    applyRouteSelection()
-
-    if (!selectedEmployeeId.value && teamMembers.value.length) {
-      selectedEmployeeId.value = teamMembers.value[0].id
-    }
-  } catch (error) {
-    console.error('Veriler yüklenemedi:', error)
   }
+
+  try {
+    const [employeeResult, summary] = await Promise.all([
+      employeeApi.getEmployees(),
+      analyticsApi.getPerformanceSummary().catch(() => null),
+    ])
+    performanceSummary.value = summary
+    setTeamMembers(employeeResult)
+  } catch (error) {
+    console.warn('Çalışan listesi /employees üzerinden yüklenemedi, feedback adaylarına düşülüyor:', error)
+    try {
+      const candidates = await feedbackApi.getFeedbackCandidates()
+      performanceSummary.value = await analyticsApi.getPerformanceSummary().catch(() => null)
+      setTeamMembers(candidates)
+    } catch (fallbackError) {
+      console.error('Veriler yüklenemedi:', fallbackError)
+      teamMembers.value = []
+    }
+  }
+
+  applyRouteSelection()
+
+  if (!selectedEmployeeId.value && teamMembers.value.length) {
+    selectedEmployeeId.value = teamMembers.value[0].id
+  }
+}
+
+function setTeamMembers(employees: EmployeeForFeedback[]) {
+  teamMembers.value = employees.filter((employee) => {
+    const role = employee.user?.role
+    return !role || role === 'employee'
+  })
 }
 
 async function loadEmployeeReport(employeeId: number) {
@@ -649,6 +782,27 @@ async function loadEmployeeReport(employeeId: number) {
     console.error('Rapor yüklenemedi:', error)
     selectedEmployeeReport.value = null
   }
+}
+
+function formatKpiTrend(value?: number | null) {
+  if (value === null || value === undefined) return 'Trend yok'
+  const rounded = Math.round(Number(value) * 10) / 10
+  return rounded > 0 ? `+${rounded}` : String(rounded)
+}
+
+function kpiStatusLabel(status?: string | null) {
+  if (status === 'risk') return 'Risk'
+  if (status === 'watch') return 'İzlemede'
+  if (status === 'stable') return 'Stabil'
+  if (status === 'no_data') return 'Veri yok'
+  return 'KPI verisi yok'
+}
+
+function kpiStatusClass(status?: string | null) {
+  if (status === 'risk') return 'border-rose-200 bg-rose-50 text-rose-700'
+  if (status === 'watch') return 'border-amber-200 bg-amber-50 text-amber-700'
+  if (status === 'stable') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  return 'border-slate-200 bg-slate-50 text-slate-600'
 }
 
 async function loadMonthlyDeepAnalysis(employeeId: number) {

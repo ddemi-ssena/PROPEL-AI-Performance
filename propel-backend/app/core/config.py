@@ -26,9 +26,12 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     ENABLE_LOCAL_SENTIMENT_MODEL: bool = False
     EMBEDDING_PROVIDER: str = "hash"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
+    SENTENCE_TRANSFORMER_MODEL: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     EMBEDDING_DIMENSION: int = 128
     ENABLE_PGVECTOR: bool = True
     PGVECTOR_INDEX_LISTS: int = 100

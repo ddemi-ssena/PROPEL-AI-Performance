@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload, Session
 
 from app.db.models.department import Department
 from app.db.models.employee import Employee
-from app.db.models.nlp import EmployeeNLPProfile, NLPPeriodType
+from app.db.models.nlp import EmployeeNLPProfile, EmployeeNLPReview, NLPPeriodType
 from app.db.models.survey_response import SurveyResponse
 from app.db.models.user import User
 from app.schemas.employee import (
@@ -172,6 +172,7 @@ class EmployeeService:
 
         latest_surveys = EmployeeService._latest_surveys_by_employee(db, employee_ids)
         latest_profiles = EmployeeService._latest_profiles_by_employee(db, employee_ids)
+        latest_reviews = EmployeeService._latest_reviews_by_employee(db, employee_ids)
 
         members: list[TeamHealthMember] = []
         for employee in employees:
@@ -180,6 +181,7 @@ class EmployeeService:
             ml_risk_score = EmployeeService._ml_risk_score(ml_prediction)
             survey = latest_surveys.get(employee.id)
             profile = latest_profiles.get(employee.id)
+            review = latest_reviews.get(employee.id)
             risk_score = EmployeeService._combined_risk_score(performance_row, survey, profile, ml_risk_score)
             risk_level = EmployeeService._risk_level_from_score(risk_score)
             data_sources = EmployeeService._data_sources(performance_row, survey, profile, ml_prediction)
@@ -204,7 +206,13 @@ class EmployeeService:
                     feedback_sentiment_score=round(float(profile.avg_sentiment_score), 2) if profile and profile.avg_sentiment_score is not None else None,
                     feedback_motivation_score=round(float(profile.avg_motivation_score), 2) if profile and profile.avg_motivation_score is not None else None,
                     feedback_flight_risk_level=profile.flight_risk_level.value if profile and profile.flight_risk_level else None,
+                    feedback_flight_risk_confidence=profile.flight_risk_confidence if profile else None,
                     feedback_burnout_risk_level=profile.burnout_risk_level.value if profile and profile.burnout_risk_level else None,
+                    feedback_burnout_risk_confidence=profile.burnout_risk_confidence if profile else None,
+                    nlp_review_status=review.status.value if review else None,
+                    nlp_review_note=review.note if review else None,
+                    nlp_reviewed_at=review.reviewed_at if review else None,
+                    nlp_reviewer_name=review.reviewer_name if review else None,
                     combined_risk_score=risk_score,
                     combined_risk_level=risk_level,
                     recommended_action=EmployeeService._recommended_action(risk_level, performance_row, survey, profile),
@@ -272,6 +280,27 @@ class EmployeeService:
         latest: dict[int, EmployeeNLPProfile] = {}
         for profile in profiles:
             latest.setdefault(profile.employee_id, profile)
+        return latest
+
+    @staticmethod
+    def _latest_reviews_by_employee(db: Session, employee_ids: list[int]) -> dict[int, EmployeeNLPReview]:
+        if not employee_ids:
+            return {}
+        reviews = (
+            db.query(EmployeeNLPReview)
+            .filter(EmployeeNLPReview.employee_id.in_(employee_ids))
+            .filter(EmployeeNLPReview.period_type == NLPPeriodType.weekly)
+            .order_by(
+                EmployeeNLPReview.period_year.desc(),
+                EmployeeNLPReview.period_month.desc(),
+                EmployeeNLPReview.period_week.desc(),
+                EmployeeNLPReview.reviewed_at.desc(),
+            )
+            .all()
+        )
+        latest: dict[int, EmployeeNLPReview] = {}
+        for review in reviews:
+            latest.setdefault(review.employee_id, review)
         return latest
 
     @staticmethod

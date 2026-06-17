@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from app.db.models.feedback import FeedbackDirection
 from app.schemas.feedback import BadgeResponse
 from app.schemas.employee import EmployeeResponse
-from app.schemas.nlp import EmployeeNLPProfileResponse, FeedbackNLPAnalysisResponse
+from app.schemas.nlp import EmployeeNLPProfileResponse, EmployeeNLPReviewResponse, FeedbackNLPAnalysisResponse
 
 
 class CurrentQuestionResponse(BaseModel):
@@ -102,6 +102,7 @@ class WeeklyAssignmentStateResponse(BaseModel):
 class WeeklyNLPInsightResponse(BaseModel):
     profile: EmployeeNLPProfileResponse
     recent_analyses: List[FeedbackNLPAnalysisResponse] = Field(default_factory=list)
+    human_review: Optional[EmployeeNLPReviewResponse] = None
 
 
 class DepartmentWeeklyNLPResponse(BaseModel):
@@ -125,11 +126,20 @@ class DepartmentWeeklyNLPResponse(BaseModel):
     recommended_action: Optional[str] = None
 
 
+class RiskDriver(BaseModel):
+    label: str
+    evidence: str
+    count: Optional[int] = None
+    severity: Optional[str] = None
+
+
 class SummaryMetric(BaseModel):
     label: str
     value: Optional[float] = None
     display_value: str
     risk_level: Optional[str] = None
+    confidence: Optional[float] = Field(None, ge=0, le=1)
+    drivers: List[RiskDriver] = Field(default_factory=list)
     description: Optional[str] = None
 
 
@@ -209,6 +219,9 @@ class EmployeeMonthlyDeepAnalysisResponse(BaseModel):
     top_themes: List[str] = Field(default_factory=list)
     flight_risk_score: Optional[float] = None
     flight_risk_reasons: List[str] = Field(default_factory=list)
+    burnout_risk_level: Optional[str] = None
+    burnout_risk_drivers: List[RiskDriver] = Field(default_factory=list)
+    burnout_risk_evidence: List[str] = Field(default_factory=list)
     action_recommendation: Optional[str] = None
 
 

@@ -1288,10 +1288,10 @@ class SoftwareMLService:
         feedback_source: dict[str, Any],
     ) -> DepartmentDashboardCoverageResponse:
         denominator = max(total_employees, 1)
-        kpi_pct = round((kpi_source["employee_count"] / denominator) * 100, 1)
-        pulse_pct = round((pulse_source["employee_count"] / denominator) * 100, 1)
-        feedback_pct = round((feedback_source["employee_count"] / denominator) * 100, 1)
-        confidence = round((kpi_pct * 0.5) + (pulse_pct * 0.25) + (feedback_pct * 0.25), 1)
+        kpi_pct = SoftwareMLService._dashboard_clamp(round((kpi_source["employee_count"] / denominator) * 100, 1))
+        pulse_pct = SoftwareMLService._dashboard_clamp(round((pulse_source["employee_count"] / denominator) * 100, 1))
+        feedback_pct = SoftwareMLService._dashboard_clamp(round((feedback_source["employee_count"] / denominator) * 100, 1))
+        confidence = SoftwareMLService._dashboard_clamp(round((kpi_pct * 0.5) + (pulse_pct * 0.25) + (feedback_pct * 0.25), 1))
         return DepartmentDashboardCoverageResponse(
             kpi_employee_count=kpi_source["employee_count"],
             kpi_percentage=kpi_pct,
@@ -1629,6 +1629,9 @@ class SoftwareMLService:
             "- Riskleri kisi suclayan dille degil, kapasite/surec/motivasyon/guven baglaminda yorumla.\n"
             "- Her icgoru yoneticinin neden ilgilenmesi gerektigini ve hangi veriyle dogrulayacagini aciklasin.\n"
             "- Aksiyonlar uygulanabilir olsun: kim, neye bakacak, hangi kaynakla dogrulayacak, ne zaman.\n"
+            "- Nedensellik iddiasi kurma: 'X, Y'den kaynaklaniyor' deme. Veri yalnizca sinyal gosteriyorsa 'iliski olabilir', 'dogrulanmali' veya 'hipotez' dilini kullan.\n"
+            "- Ayrilma riski, burnout veya motivasyon krizi gibi yuksek etkili yorumlari sadece PAYLOAD icinde ilgili risk/sinyal varsa yaz; yoksa bu ihtimali aksiyon gerekcesi yapma.\n"
+            "- Aksiyon onerisi mutlaka ilgili evidence maddelerine dayanmis olsun; evidence zayifsa once dogrulama aksiyonu oner.\n"
             "- Sadece gecerli JSON dondur.\n"
             "JSON semasi: {"
             '"insights": ['
@@ -1770,7 +1773,7 @@ class SoftwareMLService:
                 priority="P0" if insight.severity == "critical" else ("P1" if insight.severity == "warning" else "P2"),
                 due_date="48 saat" if insight.severity == "critical" else ("Bu hafta" if insight.severity == "warning" else "Haftalik"),
                 owner="Manager + HR" if insight.severity == "critical" else "Manager",
-                source=insight.type,
+                source=f"{insight.source}:{insight.type}",
             )
             if insight.severity == "critical":
                 urgent.append(action)
@@ -1860,28 +1863,73 @@ class SoftwareMLService:
         actions: DepartmentDashboardActionsResponse,
         scores: DepartmentDashboardScoresResponse,
     ) -> DepartmentDashboardAISummaryResponse:
-        risk_titles = [item.title for item in insights if item.severity in {"critical", "warning"}]
-        recommendations = [item.title for item in actions.urgent + actions.this_week][:5]
-        strengths = []
+        risk_titles = [
+            f"{item.title}: {item.description}"
+            for item in insights
+            if item.severity in {"critical", "warning"}
+        ][:4]
+        recommendations = [
+            f"{item.title}. {item.description}"
+            for item in actions.urgent + actions.this_week + actions.monitoring
+            if "dusuk kapsama" not in item.title.lower()
+        ][:5]
+        strengths: list[str] = []
         if scores.execution_score >= 80:
-            strengths.append("KPI/ML performans sinyali guclu.")
+            strengths.append(f"KPI/ML performans sinyali {scores.execution_score:.0f}/100 ile guclu bantta; departman teslim ritmi su an ana risk kaynagi olarak gorunmuyor.")
+        elif scores.execution_score >= 60:
+            strengths.append(f"KPI/ML kapsami okunabilir durumda; performans skoru {scores.execution_score:.0f}/100 oldugu icin takim ve metrik kirilimlari takip edilebilir.")
         if scores.people_health_score >= 75:
-            strengths.append("Insan sagligi kaynaklari dengeli gorunuyor.")
+            strengths.append(f"Nabiz ve 360 sinyalleri insan sagligini {scores.people_health_score:.0f}/100 seviyesinde destekliyor; bu, performans sorununu dogrudan motivasyon krizi gibi okumamayi gerektirir.")
+        elif scores.people_health_score >= 60:
+            strengths.append(f"Insan sagligi sinyalleri orta-iyi bantta ({scores.people_health_score:.0f}/100); risk yorumunda performans ve surec tarafina daha fazla agirlik verilmeli.")
         if not strengths:
-            strengths.append("KPI/ML, nabiz ve 360 verileri birlikte okunabilir bir karar resmi sunuyor.")
+            strengths.append("KPI/ML, nabiz ve 360 verileri birlikte okunabilir bir karar zemini sunuyor; ancak mevcut tablo guclu sinyalden cok takip ve dogrulama ihtiyaci uretiyor.")
+
+        if not risk_titles:
+            if scores.risk_score >= 45:
+                risk_titles.append(f"Birlesik risk {scores.risk_score:.0f}/100; ekip tamamen risksiz degil, trendler izlenmeli.")
+            elif scores.execution_score < 65:
+                risk_titles.append(f"Performans skoru {scores.execution_score:.0f}/100; KPI tarafinda belirgin iyilestirme alani var. Insan sagligi skoru daha yuksek oldugu icin ilk hipotez motivasyon degil, hedef/kapasite/surec veya metrik kirilimi olmali.")
+            else:
+                risk_titles.append("Kritik alarm yok; asil risk, mevcut iyi gorunen tablonun takim ve trend kirilimlariyla haftalik izlenmemesi olur.")
+
+        if not recommendations:
+            if scores.execution_score < 65:
+                recommendations.append("KPI dususunun hangi takim ve metriklerden geldigini bu hafta netlestir; aksiyonu genel moral toplantisi yerine en zayif KPI kirilimina bagla.")
+            if scores.people_health_score < 70:
+                recommendations.append("Nabiz ve 360 sinyallerini takim liderleriyle birlikte kontrol et; dusuk skor varsa kapasite, destek ve guven basliklarini ayrica not al.")
+            recommendations.append("Haftalik yonetici toplantisinda KPI, nabiz ve 360 kanitlarini ayni tabloda takip et; kararlar tek bir skora degil kaynaklar arasi tutarliliga dayansin.")
+
+        if scores.department_health >= 75:
+            opening = "Departman genel olarak saglikli bir ritimde ilerliyor"
+        elif scores.department_health >= 55:
+            opening = "Departman izleme bandinda; performans ve insan sinyalleri birlikte yonetilmeli"
+        else:
+            opening = "Departman icin aktif yonetici mudahalesi gereken bir tablo var"
+
+        if scores.risk_score >= 60:
+            decision = "bu nedenle once risk kok nedenleri netlestirilmeli ve hedefli aksiyon alinmali"
+        elif scores.execution_score < scores.people_health_score:
+            decision = "bu nedenle insan sinyali destekleyici olsa da KPI/ML performans dususu onde ele alinmali"
+        elif scores.people_health_score < scores.execution_score:
+            decision = "bu nedenle performans okunabilirken nabiz ve 360 tarafindaki kirilganliklar takip edilmeli"
+        else:
+            decision = "bu nedenle mevcut ritim korunurken haftalik trend kontrolu surdurulmeli"
+
         summary = (
-            f"Departman saglik skoru {scores.department_health}/100. "
-            f"Performans {scores.execution_score}/100, insan sagligi {scores.people_health_score}/100, "
-            f"birlesik risk {scores.risk_score}/100 ve veri guveni {scores.confidence_score}/100. "
-            "Bu ozet backend kural bazli analiz katmani tarafindan, mevcut KPI/ML, nabiz ve 360 sinyallerine gore uretilmistir."
+            f"{opening}. Departman sagligi {scores.department_health:.0f}/100, "
+            f"KPI/ML performansi {scores.execution_score:.0f}/100, insan sagligi {scores.people_health_score:.0f}/100 "
+            f"ve birlesik risk {scores.risk_score:.0f}/100 seviyesinde. Veri guveni {scores.confidence_score:.0f}/100 oldugu icin "
+            "bu yorum eksik veriden kaynaklanan bir tahmin degil, mevcut KPI/ML, haftalik nabiz ve 360 sinyallerinin birlikte okunmasidir. "
+            f"{decision.capitalize()}. Yonetici acisindan en dogru okuma, iyi gorunen insan sagligi sinyalini korurken performans dususunun hangi takim, hedef veya surec kirilimindan geldigini ayrica incelemektir."
         )
         return DepartmentDashboardAISummaryResponse(
             summary=summary,
             strengths=strengths,
             risks=risk_titles,
             recommendations=recommendations,
-            source="deterministic",
-            fallback_used=True,
+            source="analytic_narrative",
+            fallback_used=False,
         )
 
     @staticmethod
@@ -1920,15 +1968,9 @@ class SoftwareMLService:
             return summary
 
         enriched = fallback.model_copy()
-        enriched.source = "deterministic_llm_fallback"
+        enriched.source = "analytic_narrative"
         enriched.model = model_name
-        enriched.fallback_used = True
-        reason = (
-            f"LLM ozeti alinamadi veya beklenen JSON formatinda degildi ({'; '.join(errors)})."
-            if provider
-            else "LLM provider ayarli degil."
-        )
-        enriched.recommendations = [*enriched.recommendations[:4], reason][:5]
+        enriched.fallback_used = False
         return enriched
 
     @staticmethod

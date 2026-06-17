@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, Text, ForeignKey, Enum as SQLEnum, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, Text, ForeignKey, Enum as SQLEnum, UniqueConstraint, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import JSON
@@ -27,6 +27,13 @@ class SentimentLabel(str, enum.Enum):
 class NLPPeriodType(str, enum.Enum):
     weekly = "weekly"
     monthly = "monthly"
+
+
+class NLPReviewStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    false_alarm = "false_alarm"
+    follow_up_required = "follow_up_required"
 
 
 class FeedbackNLPAnalysis(BaseModel):
@@ -76,6 +83,31 @@ class FeedbackNLPAnalysis(BaseModel):
         UniqueConstraint("source_type", "classic_feedback_id", name="uq_feedback_nlp_classic_source"),
     )
 
+    @staticmethod
+    def _unit_interval(value) -> float | None:
+        if value is None:
+            return None
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return None
+        return round(max(0.0, min(1.0, numeric)), 2)
+
+    def _risk_confidence(self, risk_key: str) -> float | None:
+        raw = self.raw_analysis if isinstance(self.raw_analysis, dict) else {}
+        explicit = self._unit_interval(raw.get(f"{risk_key}_confidence"))
+        if explicit is not None:
+            return explicit
+        return self._unit_interval(raw.get("confidence"))
+
+    @property
+    def burnout_risk_confidence(self) -> float | None:
+        return self._risk_confidence("burnout_risk")
+
+    @property
+    def flight_risk_confidence(self) -> float | None:
+        return self._risk_confidence("flight_risk")
+
 
 class EmployeeNLPProfile(BaseModel):
     __tablename__ = "employee_nlp_profiles"
@@ -118,3 +150,76 @@ class EmployeeNLPProfile(BaseModel):
             name="uq_employee_nlp_profile_period",
         ),
     )
+
+    @staticmethod
+    def _score_confidence(score: float | None, risk_level: RiskLevel | None, feedback_count: int) -> float | None:
+        if score is None or risk_level is None or feedback_count <= 0:
+            return None
+
+        if risk_level == RiskLevel.low:
+            distance = max(float(score) - 4.0, 0.0) / 1.0
+        elif risk_level == RiskLevel.medium:
+            distance = min(abs(float(score) - 2.5), abs(float(score) - 4.0)) / 1.5
+        else:
+            distance = max(2.5 - float(score), 0.0) / 1.5
+
+        evidence = min(feedback_count, 5) / 5
+        confidence = 0.35 + (0.35 * evidence) + (0.30 * min(distance, 1.0))
+        return round(max(0.0, min(0.95, confidence)), 2)
+
+    @property
+    def burnout_risk_confidence(self) -> float | None:
+        return self._score_confidence(
+            self.avg_motivation_score,
+            self.burnout_risk_level,
+            self.feedback_count,
+        )
+
+    @property
+    def flight_risk_confidence(self) -> float | None:
+        return self._score_confidence(
+            self.avg_psychological_safety_score,
+            self.flight_risk_level,
+            self.feedback_count,
+        )
+
+
+class EmployeeNLPReview(BaseModel):
+    __tablename__ = "employee_nlp_reviews"
+
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    reviewer_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reviewer_employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
+
+    period_type = Column(SQLEnum(NLPPeriodType), nullable=False)
+    period_year = Column(Integer, nullable=False)
+    period_month = Column(Integer, nullable=False)
+    period_week = Column(Integer, nullable=True)
+
+    status = Column(SQLEnum(NLPReviewStatus), nullable=False, default=NLPReviewStatus.pending)
+    note = Column(Text, nullable=True)
+    manager_acknowledged = Column(Boolean, nullable=False, default=True)
+    reviewed_at = Column(DateTime, nullable=False)
+
+    employee = relationship("Employee", foreign_keys=[employee_id])
+    reviewer_user = relationship("User", foreign_keys=[reviewer_user_id])
+    reviewer_employee = relationship("Employee", foreign_keys=[reviewer_employee_id])
+    department = relationship("Department")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "employee_id",
+            "period_type",
+            "period_year",
+            "period_month",
+            "period_week",
+            name="uq_employee_nlp_review_period",
+        ),
+    )
+
+    @property
+    def reviewer_name(self) -> str | None:
+        if self.reviewer_user:
+            return self.reviewer_user.full_name
+        return None

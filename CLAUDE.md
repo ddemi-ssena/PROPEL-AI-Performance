@@ -1339,3 +1339,280 @@ Yazılım model F1 skorları (Random Forest, test_period_count=8):
 - Dogrulama:
   - `python -m py_compile propel-backend/scripts/seed_demo_360_history.py propel-backend/app/services/nlp_service.py propel-backend/app/schemas/feedbacks.py` basarili.
   - `npm.cmd run type-check` basarili.
+### 2026-06-07 Veritabanı ER Diyagramı Dokümantasyonu
+
+- `docs/sekil-3-3-veritabani-er-diyagrami.md` oluşturuldu.
+- SQLAlchemy modellerindeki gerçek tablolar ve ilişkiler temel alınarak Mermaid formatında detaylı "Şekil 3.3. Veritabanı Varlık-İlişki (ER) Diyagramı" hazırlandı.
+- Diyagram; kullanıcı, çalışan, departman, KPI, nabız anketi, 360 feedback, haftalık feedback, NLP/RAG, toplantı, bildirim ve veri yükleme tablolarını kapsıyor.
+- Kod değişikliği yapılmadığı için `py_compile`, frontend type-check veya container restart çalıştırılmadı.
+
+### 2026-06-15 NLP Kullanim Analizi ve Sunum Notlari
+
+- Kullanici projede NLP'nin teknik olarak nasil kullanildigini, hangi dosyalarda oldugunu, sunumda nasil anlatilabilecegini ve analizlerin dogrulugunu sordu.
+- Incelenen ana hat:
+  - `app/services/ai_service.py`: Gemini/Ollama/fallback uzerinden sentiment, motivasyon, burnout, flight risk, tema, entity, destek ihtiyaci ve yonetici ozeti uretimi.
+  - `app/services/feedback_service.py`: haftalik feedback ve klasik 360 feedback sonrasi NLP arka plan islemleri, dusuk kalite ve karsilikli puan bias kontrolleri.
+  - `app/services/nlp_service.py`: NLP sonuc kaydi, calisan profili, departman ozeti, chart, aylik deep analysis ve RAG raporlari.
+  - `app/services/rag_service.py` ve `app/db/models/rag.py`: feedback metinlerinin embedding hafizasi.
+  - `app/db/models/nlp.py`: `FeedbackNLPAnalysis` ve `EmployeeNLPProfile` kalici NLP tablolari.
+  - Frontend: `FeedbackView.vue`, `DepartmentAnalysisView.vue`, `SalesFeedbackView.vue`, `ManagerDashboard.vue`, `TeamManagement.vue`.
+- Tespit:
+  - NLP sadece metin ozetleme degil; sentiment/risk skorlari, tema cikarma, kalite sinyali, profil agregasyonu ve RAG hafizasi olarak kullaniliyor.
+  - Benchmark raporunda heuristik modda 50 ornekte exact match %68; sentiment %86, burnout %94, flight risk %84 dogruluk goruluyor. Bu nedenle analizler demo/karar-destek icin anlamli, fakat tek basina kesin IK karari olarak pazarlanmamali.
+- Kod degisikligi yapilmadi; `py_compile`, `npm.cmd run type-check` veya container restart calistirilmadi.
+
+### 2026-06-15 NLP Embedding, Confidence ve Insan Onayi Iyilestirmesi
+
+- Kullanici NLP analizleri icin hash embedding yerine gercek embedding, risklerde kategori + sayisal confidence ve insan onayi/karar destek uyarisi istedi.
+- Backend:
+  - `RAGService.generate_embedding()` provider katmani genisletildi; `hash` fallback korunarak `gemini`, `openai`, `sentence_transformer`/`local` ve `auto` secenekleri eklendi.
+  - Yeni config alanlari: `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL`, `SENTENCE_TRANSFORMER_MODEL`.
+  - Local sentence-transformer modeli servis icinde cache'lendi; paket/model yoksa servis hash fallback'e dusuyor.
+  - `FeedbackNLPAnalysisResponse` ve `EmployeeNLPProfileResponse` icin `burnout_risk_confidence` ve `flight_risk_confidence` eklendi; DB migration gerektirmeden model property'lerinden turetiliyor.
+  - Team health payload'una feedback flight/burnout risk confidence alanlari eklendi.
+  - 360 summary metric payload'larinda risk metrikleri icin `confidence` tasinmaya baslandi.
+- Frontend:
+  - `FeedbackView.vue` NLP kartinda flight/burnout risk confidence yuzdeleri gosterildi.
+  - NLP sonucunun otomatik uretilmis karar destek onerisi oldugu ve yonetici onayi gerektirdigi uyarisi eklendi.
+  - Feedback/employee API tipleri yeni confidence alanlariyla guncellendi.
+- Dogrulama:
+  - Kod degisikligi oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Kod degisikligi sonrasi `python -m py_compile propel-backend\app\core\config.py propel-backend\app\services\rag_service.py propel-backend\app\db\models\nlp.py propel-backend\app\schemas\nlp.py propel-backend\app\schemas\feedbacks.py propel-backend\app\schemas\employee.py propel-backend\app\services\employee_service.py propel-backend\app\services\nlp_service.py` basarili.
+  - Kod degisikligi sonrasi `npm.cmd run type-check` basarili.
+  - Container runtime smoke ve `docker restart propel_backend` denendi ancak Docker Desktop daemon pipe bulunamadigi icin calistirilamadi.
+
+### 2026-06-15 NLP Insan Onayi Faz 2 - Kalici Yonetici Incelemesi
+
+- Kullanici ikinci faza gecilmesini istedi; ilk fazdaki uyari/karar destek notu kalici DB/API akisi haline getirildi.
+- Backend:
+  - `EmployeeNLPReview` modeli ve `NLPReviewStatus` enum'u eklendi.
+  - Review kaydi calisan + NLP donemi bazinda unique tutuluyor; status degerleri `pending`, `approved`, `false_alarm`, `follow_up_required`.
+  - `GET /feedbacks/nlp/employee/{employee_id}/review` review durumunu okuyor.
+  - `PUT /feedbacks/nlp/employee/{employee_id}/review` admin/yonetici icin review upsert ediyor; departman yoneticisi yalnizca kendi departmanindaki calisan icin yazabiliyor.
+  - `WeeklyNLPInsightResponse` icine `human_review` eklendi.
+  - `employees/team-health` payload'una `nlp_review_status`, `nlp_review_note`, `nlp_reviewed_at`, `nlp_reviewer_name` alanlari eklendi.
+- Frontend:
+  - `TeamManagement.vue` 360/NLP hucresinde review rozeti ve `Onayla`, `Takip`, `Yanlis alarm` aksiyonlari eklendi.
+  - Aksiyonlar `PUT /feedbacks/nlp/employee/{id}/review` ile DB'ye yaziyor ve ardindan team-health tekrar yukleniyor.
+  - Feedback/employee API tipleri review status ve payload alanlariyla guncellendi.
+- Dogrulama:
+  - Kod degisikligi oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Kod degisikligi sonrasi `python -m py_compile propel-backend\app\db\models\nlp.py propel-backend\app\db\models\__init__.py propel-backend\app\schemas\nlp.py propel-backend\app\schemas\feedbacks.py propel-backend\app\schemas\employee.py propel-backend\app\services\nlp_service.py propel-backend\app\services\employee_service.py propel-backend\app\api\routers\feedbacks.py` basarili.
+  - Kod degisikligi sonrasi `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` tekrar denendi ancak Docker Desktop daemon pipe bulunamadigi icin container restart/runtime smoke calistirilamadi.
+
+### 2026-06-15 NLP Aciklanabilir Risk Driverlari - Faz 3
+
+- Kullanici raporlarda sadece `Burnout Risk = High` yazmasi yerine `neden high?` sorusunu cevaplayan driver ve kanit listesi istedi.
+- Backend:
+  - `RiskDriver` schema'si eklendi; risk metrikleri artik `drivers` listesi tasiyabiliyor.
+  - `NLPService._burnout_risk_drivers()` eklendi.
+  - Driverlar deterministik olarak mevcut NLP verisinden uretiliyor:
+    - haftalik motivasyon serisi dususu,
+    - psikolojik guven serisi dususu,
+    - tekrar eden is yuku/destek/sikayet temalari,
+    - tekil analizlerdeki explicit high burnout sinyalleri.
+  - `build_employee_360_summary_report()` icinde `Burnout Risk` metric'i driver listesi ve confidence ile donuyor.
+  - `build_employee_monthly_deep_analysis()` icinde `burnout_risk_level`, `burnout_risk_drivers`, `burnout_risk_evidence` alanlari donuyor.
+- Frontend:
+  - `EmployeeAnalysisView.vue` aylik derin analiz bolumune `Burnout Risk Drivers` paneli eklendi.
+  - Panel, ornek olarak `Motivasyon 4.2 -> 2.7 dustu` veya tekrar eden tema kanitlarini kartlar halinde gosteriyor.
+  - API tipleri `RiskDriver`, metric `drivers` ve monthly deep burnout alanlariyla guncellendi.
+- Dogrulama:
+  - Kod degisikligi oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Kod degisikligi sonrasi `python -m py_compile propel-backend\app\services\nlp_service.py propel-backend\app\schemas\feedbacks.py` basarili.
+  - Kod degisikligi sonrasi `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` denendi ancak Docker Desktop daemon pipe bulunamadigi icin container restart/runtime smoke calistirilamadi.
+
+### 2026-06-15 Calisan Analizi Liste ve KPI Gorunumu Duzeltmesi
+
+- Kullanici 360 Calisan Raporu ekraninda `Calisan Bulunamadi` gorundugunu ve KPI analizlerinin de gelmedigini bildirdi.
+- Tespit:
+  - `EmployeeAnalysisView.vue` calisan listesini yalnizca `feedback/candidates` endpoint'inden cekiyordu; bu endpoint feedback adayi amacli oldugu icin bazi yonetici/departman durumlarinda bos donebiliyor.
+  - Ekran metni ve veri modeli yalnizca 360 feedback/NLP raporuna odakliydi; KPI performans ozeti bu sayfada gosterilmiyordu.
+  - Backend restart sonrasi `app.schemas.feedbacks` import'u `NameError: RiskDriver is not defined` hatasiyla dusuyordu; `RiskDriver`, `SummaryMetric` icinde kullanilmadan once tanimlanacak sekilde siralandi.
+- Frontend:
+  - Calisan listesi birincil olarak `employeeApi.getEmployees()` ile gercek calisan endpoint'inden cekilmeye baslandi; hata durumunda eski `feedbackApi.getFeedbackCandidates()` fallback olarak korundu.
+  - Liste filtrelemesi `user.role` eksik oldugunda calisanlari yanlislikla dislamayacak hale getirildi.
+  - Departman, calisan ve KPI summary yukleme hatlari ayrildi; departman/analytics hatasi calisan listesini sifirlamiyor.
+  - `analyticsApi.getPerformanceSummary()` ayni yukleme akisine eklendi.
+  - Secili calisan icin `KPI / ML Performans Ozeti` karti eklendi; KPI skoru, trend, kayit sayisi, son donem ve durum rozeti gosteriliyor.
+  - Calisan icin KPI kaydi yoksa ekranda acik bir bos durum mesaji gosteriliyor.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend\app\services\nlp_service.py propel-backend\app\schemas\feedbacks.py` basarili.
+  - `git diff --check` whitespace hatasi vermedi; yalnizca mevcut Windows CRLF uyarilari goruldu.
+  - `docker restart propel_frontend` ve `docker restart propel_backend` basarili.
+  - Container icinde `python -c "import app.schemas.feedbacks"` basarili.
+  - Canli API smoke: `manager.yazilim@propel.com` ile `/employees/` 31 kayit, `/analytics/performance/summary` 30 KPI calisan kaydi dondurdu.
+  - Browser smoke: `/manager/feedback-reports/employees` ekraninda `30 calisan listeleniyor`, `Calisan Bulunamadi=false`, `KPI / ML Performans Ozeti=true`.
+
+### 2026-06-15 Calisan Analizi Kisisel Yonetici Ozeti
+
+- Kullanici haftalik yonetici ozetinde tum calisanlar icin ayni pozitif cumlenin gorundugunu ve sayfada gercek dataya dayali, kisiye ozel analiz istedigini bildirdi.
+- Tespit:
+  - `build_employee_360_summary_report()` rapor ozetinde `profile.manager_summary` alanini oncelikli kullaniyordu.
+  - Bu alan daha onceki NLP/seed akislariyla bircok calisan icin benzer sablon cumleye donusmustu; frontend de bu alanı dogrudan bastigi icin ekranda kisi adi degisen ayni yorum gorunuyordu.
+- Backend:
+  - `NLPService._latest_kpi_context()` eklendi; calisanin son KPI kayitlarindan KPI skoru, trend, son donem, kayit sayisi ve en guclu KPI sinyali hesaplanıyor.
+  - `NLPService._employee_manager_summary()` eklendi; ozet artik her istekte mevcut KPI, 360/NLP profil, risk confidence, burnout driver, rozet ve son feedback kanitlarindan deterministik olarak yeniden uretiliyor.
+  - Eski `profile.manager_summary` ana rapor ozeti olarak kullanilmiyor; seed kaynakli tekrar eden cumleler ekrana tasinmiyor.
+  - Response `sections` icine `Yonetici Kanitlari` eklendi.
+- Frontend:
+  - `EmployeeAnalysisView.vue` haftalik yonetici ozeti kutusuna `Veriye Dayali Kanitlar` paneli eklendi.
+  - Panel KPI skoru/trend, motivasyon, psikolojik guven, is birligi, guclu yon/risk/destek kanitlarini madde madde gosteriyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend\app\services\nlp_service.py propel-backend\app\schemas\feedbacks.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` basarili.
+  - Container icinde `python -c "import app.services.nlp_service"` basarili.
+  - Canli API smoke: Canan, Zeynep ve Burak rapor ozetleri farkli dondu; Burak icin `KPI skoru 58.6/100, +0.5 trend`, Zeynep icin `KPI skoru 56.0/100, -2.7 trend` gibi kisiye ozel kanitlar goruldu.
+
+### 2026-06-15 KPI ML Ekrani Durum Karti Tutarliligi
+
+- Kullanici KPI & ML Analizi ekraninda ustte `Veri bekleniyor` yazarken altta departman sagligi, KPI/ML skoru, 360 kapsamı gibi sayisal verilerin gorunmesini celiskili buldu.
+- Tespit:
+  - Ust metrik grid'i `overview.metrics` fallback'inden besleniyordu.
+  - Alttaki `Birlesik Departman ML Analizi` ise `departmentDashboard` endpoint'inden dolu veri gosteriyordu.
+  - Bu nedenle farkli kaynaklar ayni sayfada celiskili durum mesaji uretiyordu.
+- Frontend:
+  - `ManagerAnalyticsView.vue` icin `topStatusCards` computed'i eklendi.
+  - `departmentDashboard` doluysa ust kartlar artik dashboard ile ayni kaynaktan konusuyor:
+    - `Durum: Analiz hazir`
+    - KPI/ML kapsami
+    - Nabiz kapsami
+    - 360 kapsami
+    - Veri guveni
+  - Dashboard yok ama KPI summary varsa `KPI verisi hazir` mesaji gosteriliyor.
+  - Gercekten veri yoksa eski overview fallback metrikleri korunuyor.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` basarili.
+  - `git diff --check` whitespace hatasi vermedi; yalnizca mevcut Windows CRLF uyarilari goruldu.
+
+### 2026-06-15 Demo Haftalik Nabiz Seed
+
+- Kullanici demo haftasi icin eksik haftalik nabiz verilerinin sahte/gercekci yanitlarla tamamlanmasini istedi.
+- DB veri ekleme:
+  - `2026-06-15` tarihli `weekly_pulse` kayitlari olusturuldu.
+  - Mevcut kayitlar ezilmeden, yalnizca bu haftada kaydi olmayan calisanlara eklendi.
+  - Toplam 60 calisan icin kayit eklendi: 30 Yazilim, 30 Satis.
+  - Her kayitta `score`, `raw_data.q1-q6`, `mte_score`, `ars_score` alanlari dolduruldu.
+  - Cevaplar ekip/rol/employee id bazli deterministik ve farkli olacak sekilde uretildi; `raw_data.demo_seed=true` ile isaretlendi.
+- Ek duzeltme:
+  - Software dashboard coverage yuzdeleri 100 ustune cikabiliyordu (`360 Kapsami %103`, `Veri Guveni %100.8`).
+  - `SoftwareMLService._dashboard_coverage()` icinde KPI, nabiz, 360 ve confidence yuzdeleri `0-100` araligina clamp edildi.
+- Dogrulama:
+  - DB smoke: `2026-06-15` icin 60 pulse kaydi, 60 tekil calisan, ortalama skor 3.93/5.
+  - Yazilim dashboard API: `pulse_response_count=30`, `pulse_employee_count=30`, `pulse_percentage=100.0`.
+  - Yazilim dashboard API: `feedback_percentage=100.0`, `confidence_score=100.0`.
+  - `python -m py_compile propel-backend\app\services\software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` basarili.
+
+### 2026-06-15 KPI ML Yonetici Ozeti Dili
+
+- Kullanici KPI & ML dashboard yonetici ozeti bolumunde `Deterministic` etiketinin ve `backend kural bazli analiz katmani` ifadesinin sacma/teknik gorundugunu belirtti.
+- Backend:
+  - `SoftwareMLService._dashboard_ai_summary_fallback()` yonetici diliyle yeniden duzenlendi.
+  - Summary artik teknik kaynak aciklamasi yerine karar destek yorumu veriyor:
+    - departman sagligi,
+    - KPI/ML performansi,
+    - insan sagligi,
+    - birlesik risk,
+    - veri guveni,
+    - hangi aksiyonun onde oldugu.
+  - `strengths`, `risks`, `recommendations` bos kalmayacak sekilde skor tabanli fallback maddeleri eklendi.
+  - Coverage yuksekken yanlis bicimde gorunen `dusuk kapsama` onerisi filtrelendi.
+- Frontend:
+  - `narrativeSourceLabel()` icinde `deterministic` etiketi `Kural tabanli karar destegi` olarak gosteriliyor.
+  - `deterministic_llm_fallback` etiketi `Karar destek ozeti` olarak gosteriliyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend\app\services\software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` basarili.
+  - Canli dashboard API: summary dogal yonetici diliyle dondu; risk ve oneriler dolu geldi.
+
+### 2026-06-15 KPI ML Yonetici Ozeti Uzun AI Anlatim ve Alan Duzeni
+
+- Kullanici yonetici ozetinin deterministik olmamasini, daha mantikli/uzun cumleler kurmasini ve genis bos alanin kucultulmesini istedi.
+- Backend:
+  - `SoftwareMLService._dashboard_ai_summary_fallback()` daha detayli analitik anlatim uretecek sekilde genisletildi.
+  - Fallback source `analytic_narrative` oldu; kullaniciya `deterministic` kaynak etiketi tasinmiyor.
+  - LLM provider yoksa teknik `LLM provider ayarli degil` mesaji onerilere eklenmiyor.
+  - Riskler ve oneriler artik baslik seviyesinde kalmiyor; skor ve kaynak baglamini aciklayan daha uzun maddeler uretiyor.
+- Frontend:
+  - `loadDepartmentDashboard()` varsayilan olarak `use_llm=true` cagiriyor; Gemini/Ollama mevcutsa yonetici ozeti LLM ile zenginlesiyor.
+  - `narrativeSourceLabel()` icinde teknik deterministic etiketleri `AI karar destek ozeti` olarak gosteriliyor.
+  - Yonetici ozeti karti `self-start` ve daha kompakt padding ile sag aksiyon kolonunun boyuna esnemiyor.
+  - Summary metni `h3` yerine okunabilir paragraf olarak, `whitespace-pre-line` ve daha iyi satir araligi ile gosteriliyor.
+  - Guclu sinyal/risk/oneri kutularinin padding ve font boyutu sikilastirildi.
+- Dogrulama:
+  - `python -m py_compile propel-backend\app\services\software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` basarili.
+  - Canli dashboard API `use_llm=true` ile `source=gemini`, `fallback_used=false` dondu; summary, riskler ve oneriler detayli geldi.
+
+### 2026-06-15 Dashboard Aksiyon Kaynagi ve Kanit Dili
+
+- Kullanici KPI & ML dashboard aksiyonlarinin neye gore yazildigini ve gercek analizlere dayanip dayanmadigini sordu.
+- Tespit:
+  - Ilk aksiyonlar LLM/Gemini tarafindan dashboard payload'indaki KPI/ML, nabiz, 360, risk ve coverage verileri yorumlanarak uretiliyor.
+  - Takim bazli aksiyonlar backend tarafinda `team_breakdown` skor kirilimindan deterministik uretiliyor.
+  - UI bu ayrimi gostermedigi icin kullanici aksiyonun AI yorumu mu, takim skor kirilimi mi oldugunu anlayamiyordu.
+- Backend:
+  - `DepartmentDashboardActionResponse.source` artik insight kaynagini tasiyor (`gemini:critical`, `analytic_narrative:risk_overlap`, `team_breakdown`, `coverage`).
+  - LLM insight prompt'una nedensellik siniri eklendi:
+    - `X, Y'den kaynaklaniyor` gibi kesin neden-sonuc cumleleri kurma.
+    - Evidence zayifsa once dogrulama aksiyonu oner.
+    - Ayrilma riski/burnout/motivasyon krizi gibi yuksek etkili yorumlari sadece payload'da ilgili sinyal varsa yaz.
+- Frontend:
+  - Aksiyon kartlarina kaynak rozeti eklendi.
+  - `gemini:*` -> `Kaynak: AI icgoru (Gemini)`.
+  - `team_breakdown` -> `Kaynak: takim skor kirilimi`.
+  - `coverage` -> `Kaynak: veri kapsami`.
+- Dogrulama:
+  - `python -m py_compile propel-backend\app\services\software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` basarili.
+  - Canli dashboard API'de aksiyon source alanlari `gemini:critical`, `gemini:warning`, `gemini:info`, `team_breakdown` olarak dondu.
+
+### 2026-06-15 KPI ML Aksiyonlar Yatay Duzen
+
+- Kullanici KPI & ML dashboard'da aksiyon kartlarinin sagda dikey kolon olarak durdugunu, sol alanda buyuk bosluk yarattigini ve yatay duzen istedigini belirtti.
+- Frontend:
+  - `ManagerAnalyticsView.vue` yonetici ozeti + aksiyonlar bolumu iki kolonlu `xl:grid-cols-[minmax(0,1.2fr)_360px]` duzenden tek kolonlu `space-y-5` duzene alindi.
+  - Aksiyonlar sag aside kolonundan cikarilip yonetici ozetinin altinda responsive yatay grid olarak gosteriliyor.
+  - Grid `grid-cols-1 md:grid-cols-2 2xl:grid-cols-3`; aksiyon sayisi rozeti eklendi.
+  - Aksiyon kartlari kaynak/owner chiplerini koruyor ve `min-h-[180px]` ile dengeli gorunuyor.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` basarili.
+
+### 2026-06-16 KPI ML Rol/Takim Dashboard Okunurlugu
+
+- Kullanici KPI & ML sayfasindaki "Rol bazli performans ve trend" grafiginin profesyonel ve anlasilir durmadigini, sayilarin gercek analiz sonucuna dayanmasi gerektigini belirtti.
+- Tespit:
+  - Bolum `GET /api/v1/analytics/performance/summary` cevabindaki `roles` ve `teams` alanlarini kullaniyor.
+  - Backend `AnalyticsService` bu alanlari calisan KPI kayitlarindan hesapliyor; frontend tarafinda rastgele veya sabit sayi uretilmiyor.
+- Frontend:
+  - Cift eksenli Chart.js bar grafigi kaldirildi.
+  - Rol bazli gorunum, skor barlari, trend etiketi, analiz kapsami, en yuksek ve izlenecek calisan bilgilerini gosteren responsive kart dashboard'a donusturuldu.
+  - Takim KPI ozeti sag dikey listeden cikarilip yatay responsive kart grid'e alindi.
+  - Takim kartlari ortalama KPI, kapsam, trend ve dusus sayisini API verisiyle gosteriyor.
+  - UI'a veri kaynagi notu eklendi: `Kaynak: /analytics/performance/summary`.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` basarili.
+
+### 2026-06-16 KPI ML Teknik Omurga Yerine Yonetici Karar Paneli
+
+- Kullanici KPI & ML sayfasindaki "Analytics Omurgasi" ve "Sprint 1" bloklarinin manager icin ne anlattigini ve ne aksiyon urettigini sorguladi.
+- Frontend:
+  - Teknik mimari/sprint bloklari manager ekraninda gizlendi.
+  - Yerine "Yonetici Karar Paneli" eklendi.
+  - Panel kartlari `performance/summary` verisinden turetiliyor: KPI kapsami, oncelikli takim, izlenecek rol grubu ve guclu ornek takim.
+  - Kartlar manager'a dogrudan ne yapacagini soyluyor: eksik KPI kapsamini tamamlama, takim lideriyle blokaj/capacity gorusmesi, rol grubu icin mentorluk/review kontrolu, guclu takim pratiklerini yayma.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` basarili.
