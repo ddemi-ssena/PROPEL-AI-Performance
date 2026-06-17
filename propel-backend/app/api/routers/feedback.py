@@ -1,7 +1,7 @@
 # propel-backend/app/api/routers/feedback.py
 # 360° Geri Bildirim Modülü — API Endpoints
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
@@ -33,13 +33,19 @@ router = APIRouter()
 )
 def create_feedback(
     feedback_data: FeedbackCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_employee: Employee = Depends(get_current_employee_record)
 ):
     """
     Bir çalışana 360° geri bildirim gönder.
     """
-    return FeedbackService.create_feedback(db, feedback_data, current_employee.id)
+    feedback = FeedbackService.create_feedback(db, feedback_data, current_employee.id)
+    background_tasks.add_task(
+        FeedbackService.process_classic_feedback_analysis_in_background,
+        feedback.id,
+    )
+    return feedback
 
 
 @router.get(

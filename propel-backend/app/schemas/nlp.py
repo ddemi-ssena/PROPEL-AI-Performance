@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from app.db.models.nlp import NLPPeriodType, NLPSourceType, RiskLevel, SentimentLabel
+from app.db.models.nlp import NLPPeriodType, NLPReviewStatus, NLPSourceType, RiskLevel, SentimentLabel
 
 
 class FeedbackNLPAnalysisBase(BaseModel):
@@ -43,6 +43,8 @@ class FeedbackNLPAnalysisCreate(FeedbackNLPAnalysisBase):
 
 class FeedbackNLPAnalysisResponse(FeedbackNLPAnalysisBase):
     id: int
+    burnout_risk_confidence: Optional[float] = Field(None, ge=0, le=1)
+    flight_risk_confidence: Optional[float] = Field(None, ge=0, le=1)
     created_at: datetime
     updated_at: datetime
 
@@ -76,6 +78,40 @@ class EmployeeNLPProfileBase(BaseModel):
 
 class EmployeeNLPProfileResponse(EmployeeNLPProfileBase):
     id: int
+    burnout_risk_confidence: Optional[float] = Field(None, ge=0, le=1)
+    flight_risk_confidence: Optional[float] = Field(None, ge=0, le=1)
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EmployeeNLPReviewUpsert(BaseModel):
+    status: NLPReviewStatus
+    note: Optional[str] = Field(default=None, max_length=1000)
+    manager_acknowledged: bool = True
+    period_type: NLPPeriodType = NLPPeriodType.weekly
+    period_year: Optional[int] = None
+    period_month: Optional[int] = Field(default=None, ge=1, le=12)
+    period_week: Optional[int] = Field(default=None, ge=1, le=4)
+
+
+class EmployeeNLPReviewResponse(BaseModel):
+    id: int
+    employee_id: int
+    department_id: Optional[int] = None
+    reviewer_user_id: int
+    reviewer_employee_id: Optional[int] = None
+    reviewer_name: Optional[str] = None
+    period_type: NLPPeriodType
+    period_year: int
+    period_month: int
+    period_week: Optional[int] = None
+    status: NLPReviewStatus
+    note: Optional[str] = None
+    manager_acknowledged: bool
+    reviewed_at: datetime
     created_at: datetime
     updated_at: datetime
 

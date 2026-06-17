@@ -10,7 +10,7 @@ from .feedback import (
     FeedbackQuestion, FeedbackResponse, FeedbackDirection, FeedbackAssignment, FeedbackAssignmentType, FeedbackAssignmentStatus
 )
 from .nlp import (
-    FeedbackNLPAnalysis, EmployeeNLPProfile, NLPSourceType, RiskLevel, SentimentLabel, NLPPeriodType
+    FeedbackNLPAnalysis, EmployeeNLPProfile, EmployeeNLPReview, NLPReviewStatus, NLPSourceType, RiskLevel, SentimentLabel, NLPPeriodType
 )
 from .rag import FeedbackMemoryChunk, FeedbackMemorySourceType
 from .meeting import Meeting, MeetingAttendee, Notification
@@ -29,7 +29,7 @@ __all__ = [
     "SurveyResponse",
     "Feedback", "FeedbackRequest", "EmployeeBadge", "FeedbackType", "FeedbackStatus", "BadgeType", "BadgeLevel",
     "FeedbackQuestion", "FeedbackResponse", "FeedbackDirection", "FeedbackAssignment", "FeedbackAssignmentType", "FeedbackAssignmentStatus",
-    "FeedbackNLPAnalysis", "EmployeeNLPProfile", "NLPSourceType", "RiskLevel", "SentimentLabel", "NLPPeriodType",
+    "FeedbackNLPAnalysis", "EmployeeNLPProfile", "EmployeeNLPReview", "NLPReviewStatus", "NLPSourceType", "RiskLevel", "SentimentLabel", "NLPPeriodType",
     "FeedbackMemoryChunk", "FeedbackMemorySourceType",
     "Meeting", "MeetingAttendee", "Notification",
 ]

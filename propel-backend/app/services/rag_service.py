@@ -15,6 +15,8 @@ from app.db.models.rag import FeedbackMemoryChunk, FeedbackMemorySourceType
 
 
 class RAGService:
+    _sentence_transformer_cache: dict[str, Any] = {}
+
     @staticmethod
     def _vector_literal(vector: list[float]) -> str:
         return "[" + ",".join(f"{float(value):.6f}" for value in vector) + "]"
@@ -156,12 +158,74 @@ class RAGService:
             return None
 
     @staticmethod
+    def _generate_with_openai_embedding(text: str) -> Optional[tuple[list[float], str, str]]:
+        if not settings.OPENAI_API_KEY:
+            return None
+
+        try:
+            res = requests.post(
+                "https://api.openai.com/v1/embeddings",
+                headers={
+                    "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": settings.OPENAI_EMBEDDING_MODEL,
+                    "input": text,
+                },
+                timeout=20,
+            )
+            if not res.ok:
+                return None
+            data = res.json().get("data") or []
+            values = data[0].get("embedding") if data and isinstance(data[0], dict) else []
+            if not values:
+                return None
+            vector = [round(float(item), 6) for item in values]
+            return vector, "openai", settings.OPENAI_EMBEDDING_MODEL
+        except Exception:
+            return None
+
+    @staticmethod
+    def _generate_with_sentence_transformer(text: str) -> Optional[tuple[list[float], str, str]]:
+        try:
+            from sentence_transformers import SentenceTransformer
+        except Exception:
+            return None
+
+        try:
+            model_name = settings.SENTENCE_TRANSFORMER_MODEL
+            model = RAGService._sentence_transformer_cache.get(model_name)
+            if model is None:
+                model = SentenceTransformer(model_name)
+                RAGService._sentence_transformer_cache[model_name] = model
+            values = model.encode(text, normalize_embeddings=True).tolist()
+            if not values:
+                return None
+            vector = [round(float(item), 6) for item in values]
+            return vector, "sentence_transformer", model_name
+        except Exception:
+            return None
+
+    @staticmethod
     def generate_embedding(text: str) -> tuple[list[float], str, str, int]:
         provider = (settings.EMBEDDING_PROVIDER or "hash").lower().strip()
-        if provider == "gemini":
-            gemini_result = RAGService._generate_with_gemini_embedding(text)
-            if gemini_result:
-                vector, model_provider, model_name = gemini_result
+        provider_candidates = {
+            "gemini": [RAGService._generate_with_gemini_embedding],
+            "openai": [RAGService._generate_with_openai_embedding],
+            "sentence_transformer": [RAGService._generate_with_sentence_transformer],
+            "sentence-transformer": [RAGService._generate_with_sentence_transformer],
+            "local": [RAGService._generate_with_sentence_transformer],
+            "auto": [
+                RAGService._generate_with_sentence_transformer,
+                RAGService._generate_with_gemini_embedding,
+                RAGService._generate_with_openai_embedding,
+            ],
+        }
+        for generator in provider_candidates.get(provider, []):
+            result = generator(text)
+            if result:
+                vector, model_provider, model_name = result
                 return vector, model_provider, model_name, len(vector)
 
         dimension = max(int(settings.EMBEDDING_DIMENSION or 128), 32)

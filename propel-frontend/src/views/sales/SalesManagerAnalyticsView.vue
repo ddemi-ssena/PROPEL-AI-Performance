@@ -377,17 +377,17 @@
             <article class="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500">Risk Trendi</p>
-                  <h5 class="mt-1 text-lg font-bold text-slate-900">6 Aylik Satis Risk Trendi</h5>
-                  <p class="mt-2 text-sm leading-6 text-slate-500">Y ekseni 0-100 risk skoru; seri admin ensemble modelinin ay bazli takim sinyalinden gelir.</p>
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">Performans Trendi</p>
+                  <h5 class="mt-1 text-lg font-bold text-slate-900">6 Aylik Performans Trendi</h5>
+                  <p class="mt-2 text-sm leading-6 text-slate-500">Y ekseni 0-100 performans sagligi; admin ensemble risk serisinin ters cevrilmis takim performans sinyalidir.</p>
                 </div>
-                <span class="w-fit rounded-full bg-rose-50 px-3 py-1 text-sm font-bold text-rose-700">{{ selectedTeamTrendChangeLabel }}</span>
+                <span class="w-fit rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">{{ selectedTeamPerformanceChangeLabel }}</span>
               </div>
               <div class="mt-6 h-[260px] rounded-xl border border-slate-100 bg-slate-50 p-4">
                 <svg viewBox="0 0 600 220" class="h-full w-full" preserveAspectRatio="none">
                   <line v-for="tick in [0, 25, 50, 75, 100]" :key="tick" x1="28" :y1="trendY(tick)" x2="585" :y2="trendY(tick)" stroke="#E2E8F0" stroke-width="1" />
-                  <polyline :points="selectedTeamTrendPoints" fill="none" stroke="#F43F5E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                  <circle v-for="(point, index) in selectedTeamTrendCirclePoints" :key="index" :cx="point.x" :cy="point.y" r="4" fill="#F43F5E" />
+                  <polyline :points="selectedTeamPerformanceTrendPoints" fill="none" stroke="#10B981" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                  <circle v-for="(point, index) in selectedTeamPerformanceCirclePoints" :key="index" :cx="point.x" :cy="point.y" r="4" fill="#10B981" />
                 </svg>
               </div>
             </article>
@@ -410,6 +410,36 @@
                 </button>
               </div>
             </aside>
+          </div>
+
+          <div class="px-5 pb-5">
+            <section class="rounded-xl bg-slate-50 p-6">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p class="text-xl font-bold text-slate-950">Bu Hafta Konusulacak Konular</p>
+                  <p class="mt-1 text-sm text-slate-500">{{ selectedTeamTalkingPointItems.length }} oncelikli satis konusu belirlendi</p>
+                </div>
+                <span class="w-fit rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">Manager checklist</span>
+              </div>
+
+              <div class="mt-5 space-y-3">
+                <article v-for="item in selectedTeamTalkingPointItems" :key="item.id" class="rounded-xl border border-slate-200 bg-white p-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">{{ item.index }}</span>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-base font-bold text-slate-900">{{ item.title }}</p>
+                        <span class="w-fit rounded-full px-3 py-1 text-xs font-bold" :class="item.badgeClass">{{ item.priority }}</span>
+                      </div>
+                      <p class="mt-2 text-sm leading-6 text-slate-600">{{ item.detail }}</p>
+                      <ul class="mt-3 space-y-1 text-sm leading-6 text-slate-500">
+                        <li v-for="bullet in item.bullets" :key="bullet">- {{ bullet }}</li>
+                      </ul>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </section>
           </div>
 
           <div v-if="selectedTeamNarrative" class="mx-5 mb-5 rounded-xl border border-violet-100 bg-violet-50 p-4">
@@ -449,6 +479,9 @@
                   </div>
                   <p class="mt-3 text-xs leading-5 text-slate-500">{{ personTopDriver(person) }}</p>
                 </article>
+                <div v-if="!selectedTeamPeople.length" class="col-span-full rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-semibold text-slate-500">
+                  Bu takim icin admin bulk prediction sonucunda eslesen calisan bulunamadi. Dataset bolge/takim kodu ve calisan eslesmesi kontrol edilmeli.
+                </div>
               </div>
             </section>
           </div>
@@ -553,7 +586,175 @@
           Analizi Çalıştır
         </button>
       </div>
-      <div v-else class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div v-else class="space-y-6">
+        <div class="mb-4 border-b border-slate-100 pb-4">
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Calisan Analizi</p>
+              <h4 class="mt-1 text-lg font-bold text-slate-900">Calisan listesi ve bireysel analiz girisi</h4>
+              <p class="mt-2 text-sm leading-6 text-slate-500">
+                Kaynak: admin tarafinda egitilen current satis modelinin bulk prediction sonucu.
+              </p>
+            </div>
+            <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
+              <p class="font-bold">Admin model dogrulandi</p>
+              <p class="mt-1">
+                {{ targetLabel(currentTargetState?.target_column || targetColumn) }}
+                <span v-if="currentTargetState?.trained_at"> / {{ fmtDate(currentTargetState.trained_at) }}</span>
+                <span v-if="currentTargetState?.metrics?.weighted_f1"> / F1 {{ fmtPct(currentTargetState.metrics.weighted_f1) }}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+          <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm font-bold text-slate-900">
+                {{ filteredItems.length }} calisan icin {{ targetLabel(bulkResult.target_column) }}
+              </p>
+              <div class="relative">
+                <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input
+                  v-model="tableSearch"
+                  type="text"
+                  placeholder="Calisan ara..."
+                  class="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-4 text-sm text-slate-700 shadow-sm focus:outline-none sm:w-56"
+                />
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead>
+                  <tr class="text-left text-slate-500">
+                    <th class="pb-3 font-medium">Calisan</th>
+                    <th class="pb-3 font-medium">Takim / Pozisyon</th>
+                    <th class="pb-3 font-medium">Risk Durumu</th>
+                    <th class="pb-3 font-medium">Risk Skoru</th>
+                    <th class="pb-3 font-medium">KPI Trend</th>
+                    <th class="pb-3 font-medium">Ana Sinyal</th>
+                    <th class="pb-3 font-medium">Haftalik Odak</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr
+                    v-for="person in filteredItems"
+                    :key="person.employee_id"
+                    class="cursor-pointer align-top transition hover:bg-indigo-50/50"
+                    @click="openEmployeeAnalysis(person)"
+                  >
+                    <td class="py-3 pr-4">
+                      <p class="font-semibold text-slate-900">{{ displayName(person) }}</p>
+                      <p class="text-xs text-slate-500">{{ person.summary_payload?.external_employee_code || `Dataset #${person.employee_id}` }}</p>
+                    </td>
+                    <td class="py-3 pr-4 text-slate-600">{{ salesPersonRoleLabel(person) }}</td>
+                    <td class="py-3 pr-4">
+                      <span class="rounded-full border px-2.5 py-1 text-xs font-semibold" :class="bandClass(person.predicted_band, person.target_column)">
+                        {{ bandLabel(person.predicted_band, person.target_column) }}
+                      </span>
+                    </td>
+                    <td class="py-3 pr-4">
+                      <div class="flex min-w-[120px] items-center gap-2">
+                        <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            class="h-full rounded-full"
+                            :class="personRiskScore(person) >= 67 ? 'bg-rose-500' : personRiskScore(person) >= 34 ? 'bg-amber-400' : 'bg-emerald-500'"
+                            :style="{ width: `${personRiskScore(person)}%` }"
+                          ></div>
+                        </div>
+                        <span class="w-12 text-right font-bold text-slate-900">{{ personRiskScore(person) }}/100</span>
+                      </div>
+                    </td>
+                    <td class="py-3 pr-4 text-slate-600">{{ salesEmployeeTrendLabel(person) }}</td>
+                    <td class="py-3 pr-4 text-slate-600">{{ person.top_drivers?.[0]?.metric_name || 'KPI sinyali' }}</td>
+                    <td class="py-3 text-slate-600">{{ person.recommended_actions?.[0] || 'KPI kirilimi incelenmeli.' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <aside class="rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
+            <template v-if="predResult">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-500">Secili Calisan</p>
+                  <h4 class="mt-1 text-lg font-bold text-slate-900">{{ displayName(predResult) }}</h4>
+                  <p class="mt-1 text-sm text-slate-600">{{ salesPersonRoleLabel(predResult) }}</p>
+                </div>
+                <span class="rounded-full border px-2.5 py-1 text-xs font-semibold" :class="bandClass(predResult.predicted_band, predResult.target_column)">
+                  {{ bandLabel(predResult.predicted_band, predResult.target_column) }}
+                </span>
+              </div>
+
+              <p class="mt-5 text-sm leading-6 text-slate-800">
+                {{ predResult.narrative?.manager_summary || predResult.risk_summary }}
+              </p>
+
+              <div
+                v-if="predResult.narrative?.risk_interpretation"
+                class="mt-4 rounded-xl border border-indigo-200 bg-white p-4 text-sm leading-6 text-slate-700"
+              >
+                {{ predResult.narrative.risk_interpretation }}
+              </div>
+
+              <p class="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-500">Haftalik Manager Onerileri</p>
+              <div class="mt-3 space-y-3">
+                <div
+                  v-for="action in salesActionPlan(predResult).slice(0, 3)"
+                  :key="action.title"
+                  class="rounded-xl border border-emerald-100 bg-emerald-50 p-3"
+                >
+                  <p class="text-sm font-bold leading-5 text-emerald-950">{{ action.title }}</p>
+                  <p class="mt-1 text-xs leading-5 text-emerald-900">{{ action.reason }}</p>
+                  <p class="mt-2 text-xs font-semibold text-emerald-800">{{ action.owner }} / {{ action.timeframe }}</p>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-500">Calisan Detayi</p>
+              <h4 class="mt-2 text-lg font-bold text-slate-900">Listeden bir calisana tikla</h4>
+              <p class="mt-2 text-sm leading-6 text-slate-600">
+                Secilen calisanin KPI yorumu, risk nedeni ve haftalik yonetici onerileri burada acilacak.
+              </p>
+            </template>
+          </aside>
+        </div>
+
+        <div class="border-t border-slate-100 pt-5">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Oncelikli takip kartlari</p>
+          <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div
+              v-for="person in riskyPeople"
+              :key="person.employee_id"
+              class="rounded-2xl border border-slate-200 bg-white p-5 text-left transition hover:border-indigo-200 hover:bg-indigo-50/40"
+              role="button"
+              tabindex="0"
+              @click="openEmployeeAnalysis(person)"
+              @keydown.enter="openEmployeeAnalysis(person)"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-bold text-slate-900">{{ displayName(person) }}</p>
+                <span class="rounded-full border px-2.5 py-1 text-xs font-semibold" :class="bandClass(person.predicted_band, person.target_column)">
+                  {{ bandLabel(person.predicted_band, person.target_column) }}
+                </span>
+              </div>
+              <p class="mt-2 text-xs text-slate-500">{{ salesPersonRoleLabel(person) }}</p>
+              <p class="mt-4 text-xs font-semibold text-slate-500">Ana sinyal</p>
+              <p class="mt-1 text-sm text-slate-800">{{ person.top_drivers?.[0]?.metric_name || 'KPI sinyali' }}</p>
+              <p class="mt-3 text-xs leading-5 text-slate-600">
+                {{ person.top_drivers?.[0]?.threshold_status || 'Izleme gerekli' }}
+                <span v-if="person.top_drivers?.[0]?.trend_signal">
+                  / {{ person.top_drivers[0].trend_signal }}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="false" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Çalışan Listesi</p>
@@ -611,6 +812,167 @@
 
     <!-- ── Section: Teknik Detaylar ───────────────────────────── -->
     <template v-if="activeSection === 'technical'">
+      <div v-if="!modelStates.some(s => s.is_trained)"
+        class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+        Teknik detaylar icin admin tarafinda current satis modeli egitilmeli.
+      </div>
+      <template v-else>
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Aktif Model Ozeti</p>
+            <h4 class="mt-2 text-lg font-bold text-slate-900">{{ targetLabel(targetColumn) }}</h4>
+            <p class="mt-2 text-sm leading-6 text-slate-500">
+              Bu bolum kimin riskli oldugunu degil, ekrandaki tahminlerin hangi admin modeli ve dataset ile uretildigini gosterir.
+            </p>
+            <div class="mt-5 grid grid-cols-2 gap-3 text-sm">
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p class="text-xs font-semibold text-slate-400">Durum</p>
+                <p class="mt-1 font-bold" :class="currentTargetState ? 'text-emerald-700' : 'text-rose-700'">
+                  {{ currentTargetState ? 'Current model hazir' : 'Current model yok' }}
+                </p>
+              </div>
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p class="text-xs font-semibold text-slate-400">Model</p>
+                <p class="mt-1 font-bold text-slate-900">{{ currentTargetState?.model_name || '-' }}</p>
+              </div>
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p class="text-xs font-semibold text-slate-400">Son Egitim</p>
+                <p class="mt-1 font-bold text-slate-900">{{ fmtDate(currentTargetState?.trained_at) }}</p>
+              </div>
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p class="text-xs font-semibold text-slate-400">Prediction</p>
+                <p class="mt-1 font-bold text-slate-900">{{ bulkResult?.prediction_count || 0 }} calisan</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Dataset ve Artifact Eslesmesi</p>
+            <h4 class="mt-2 text-lg font-bold text-slate-900">Admin modeli bu dataset icin mi?</h4>
+            <div class="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div v-for="item in technicalAuditCards" :key="item.label" class="rounded-xl border p-4" :class="item.toneClass">
+                <p class="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">{{ item.label }}</p>
+                <p class="mt-2 text-xl font-black">{{ item.value }}</p>
+                <p class="mt-2 text-xs leading-5">{{ item.hint }}</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Target Bazli Model Performansi</p>
+              <h4 class="mt-2 text-lg font-bold text-slate-900">4 hedefin egitim ve kalite durumu</h4>
+            </div>
+            <span class="w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+              {{ trainedCurrentTargetCount }}/{{ modelStates.length }} current target
+            </span>
+          </div>
+          <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div
+              v-for="state in modelStates"
+              :key="state.target_column"
+              class="rounded-2xl border p-5"
+              :class="state.is_trained ? state.is_current_dataset ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <p class="text-sm font-bold leading-5 text-slate-900">{{ state.target_label }}</p>
+                <span
+                  class="rounded-full border bg-white px-2.5 py-1 text-xs font-semibold"
+                  :class="state.is_trained ? state.is_current_dataset ? 'border-emerald-200 text-emerald-700' : 'border-amber-200 text-amber-700' : 'border-slate-200 text-slate-500'"
+                >
+                  {{ state.is_trained ? (state.is_current_dataset ? 'Current' : 'Eski') : 'Yok' }}
+                </span>
+              </div>
+              <div class="mt-4 space-y-2 text-xs">
+                <div class="flex justify-between gap-3"><span class="text-slate-500">Model</span><span class="font-semibold text-slate-800">{{ state.model_name || '-' }}</span></div>
+                <div class="flex justify-between gap-3"><span class="text-slate-500">Weighted F1</span><span class="font-bold text-slate-900">{{ fmtPct(state.metrics?.weighted_f1) }}</span></div>
+                <div class="flex justify-between gap-3"><span class="text-slate-500">Accuracy</span><span class="font-semibold text-slate-800">{{ fmtPct(state.metrics?.accuracy) }}</span></div>
+                <div class="flex justify-between gap-3"><span class="text-slate-500">Train / Test</span><span class="font-semibold text-slate-800">{{ state.train_count || '-' }} / {{ state.test_count || '-' }}</span></div>
+                <div class="flex justify-between gap-3"><span class="text-slate-500">Son egitim</span><span class="font-semibold text-slate-800">{{ fmtDate(state.trained_at) }}</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">KPI Driver Ozeti</p>
+            <h4 class="mt-2 text-lg font-bold text-slate-900">Tahminleri en cok tasiyan sinyaller</h4>
+            <div v-if="technicalDriverRows.length" class="mt-5 space-y-4">
+              <div v-for="row in technicalDriverRows" :key="row.name">
+                <div class="mb-1 flex items-center justify-between gap-3 text-sm">
+                  <span class="font-semibold text-slate-800">{{ row.name }}</span>
+                  <span class="text-xs font-bold text-slate-500">{{ row.count }} calisan</span>
+                </div>
+                <div class="h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div class="h-full rounded-full bg-indigo-500" :style="{ width: `${row.width}%` }"></div>
+                </div>
+              </div>
+            </div>
+            <p v-else class="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+              Driver dagilimi icin once Toplu Tara calistirilmali.
+            </p>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Model Uyarilari</p>
+            <h4 class="mt-2 text-lg font-bold text-slate-900">Guven ve veri kalitesi kontrolu</h4>
+            <div class="mt-5 space-y-3">
+              <div v-for="warning in technicalWarnings" :key="warning.title" class="rounded-xl border p-4" :class="warning.toneClass">
+                <p class="text-sm font-bold">{{ warning.title }}</p>
+                <p class="mt-1 text-xs leading-5">{{ warning.body }}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <details class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <summary class="cursor-pointer text-sm font-semibold text-slate-700">
+            Ham prediction denetim tablosunu goster
+          </summary>
+          <div v-if="bulkResult" class="mt-5 overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+              <thead>
+                <tr class="text-left text-slate-500">
+                  <th class="pb-3 font-medium">Calisan</th>
+                  <th class="pb-3 font-medium">Takim / Rol</th>
+                  <th class="pb-3 font-medium">Sonuc</th>
+                  <th class="pb-3 font-medium">Guven</th>
+                  <th class="pb-3 font-medium">Risk Skoru</th>
+                  <th class="pb-3 font-medium">Ana Sinyal</th>
+                  <th class="pb-3 font-medium">Neden</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-for="item in bulkResult.items" :key="item.employee_id" class="align-top">
+                  <td class="py-3 pr-4 font-semibold text-slate-900">
+                    {{ displayName(item) }}
+                    <div class="text-xs text-slate-500">{{ item.summary_payload?.external_employee_code || `Dataset #${item.employee_id}` }}</div>
+                  </td>
+                  <td class="py-3 pr-4 text-slate-600">{{ salesPersonRoleLabel(item) }}</td>
+                  <td class="py-3 pr-4">
+                    <span class="rounded-full border px-2.5 py-1 text-xs font-semibold" :class="bandClass(item.predicted_band, item.target_column)">
+                      {{ bandLabel(item.predicted_band, item.target_column) }}
+                    </span>
+                  </td>
+                  <td class="py-3 pr-4 font-semibold text-slate-900">{{ fmtPct(item.confidence) }}</td>
+                  <td class="py-3 pr-4 font-semibold text-slate-900">{{ personRiskScore(item) }}/100</td>
+                  <td class="py-3 pr-4 text-slate-600">{{ item.top_drivers?.[0]?.metric_name || '-' }}</td>
+                  <td class="py-3 text-slate-600">{{ item.top_drivers?.[0]?.threshold_status || '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-else class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+            Ham prediction tablosu icin once Toplu Tara calistirilmali.
+          </p>
+        </details>
+      </template>
+    </template>
+
+    <template v-if="false && activeSection === 'technical'">
       <div v-if="!modelStates.some(s => s.is_trained)"
         class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
         Teknik detaylar icin admin tarafinda current satis modeli egitilmeli.
@@ -787,8 +1149,9 @@ const selectedTeamRow = computed(() => teamRows.value.find((row) => row.team ===
 
 const selectedTeamPeople = computed(() => {
   if (!selectedTeam.value || !bulkResult.value) return []
+  const selectedKey = normalizeSalesTeamKey(selectedTeam.value)
   return bulkResult.value.items.filter((i: SalesPredictionResponse) =>
-    (i.summary_payload?.region || i.summary_payload?.team || 'Genel') === selectedTeam.value
+    normalizeSalesTeamKey(salesItemTeamName(i)) === selectedKey
   )
 })
 
@@ -818,6 +1181,18 @@ const selectedTeamPressureScore = computed(() =>
 const selectedTeamRoleMix = computed(() => {
   const counts = selectedTeamRow.value?.roleCounts || {}
   const entries = Object.entries(counts).sort((a, b) => Number(b[1]) - Number(a[1]))
+  if (!entries.length && selectedTeamPeople.value.length) {
+    const personRoleCounts: Record<string, number> = {}
+    selectedTeamPeople.value.forEach((person) => {
+      const role = String(person.summary_payload?.position || person.summary_payload?.role || 'Rol yok')
+      personRoleCounts[role] = (personRoleCounts[role] || 0) + 1
+    })
+    return Object.entries(personRoleCounts)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .slice(0, 2)
+      .map(([role, count]) => `${count} ${role}`)
+      .join(', ')
+  }
   if (!entries.length) return 'Rol dagilimi dataset profilinden okunur'
   return entries.slice(0, 2).map(([role, count]) => `${count} ${role}`).join(', ')
 })
@@ -898,6 +1273,32 @@ const selectedTeamTrendPoints = computed(() =>
   selectedTeamTrendCirclePoints.value.map((point: { x: number; y: number }) => `${point.x},${point.y}`).join(' ')
 )
 
+const selectedTeamPerformanceValues = computed(() =>
+  selectedTeamTrendValues.value.map((value: number) => Math.max(0, Math.min(100, 100 - value)))
+)
+
+const selectedTeamPerformanceChangeLabel = computed(() => {
+  const values = selectedTeamPerformanceValues.value
+  if (values.length < 2) return 'Trend yeni olusuyor'
+  const diff = values[values.length - 1] - values[0]
+  if (diff > 0) return `+${diff} puan son 6 ayda`
+  if (diff < 0) return `${diff} puan son 6 ayda`
+  return 'Degisim yok'
+})
+
+const selectedTeamPerformanceCirclePoints = computed(() => {
+  const values = selectedTeamPerformanceValues.value
+  const step = values.length > 1 ? 540 / (values.length - 1) : 0
+  return values.map((value: number, index: number) => ({
+    x: 35 + index * step,
+    y: trendY(value),
+  }))
+})
+
+const selectedTeamPerformanceTrendPoints = computed(() =>
+  selectedTeamPerformanceCirclePoints.value.map((point: { x: number; y: number }) => `${point.x},${point.y}`).join(' ')
+)
+
 const selectedTeamSalesActions = computed(() => {
   const row = selectedTeamRow.value
   if (!row) return []
@@ -918,12 +1319,228 @@ const selectedTeamSalesActions = computed(() => {
   ]
 })
 
+const selectedTeamTalkingPointItems = computed(() => {
+  const row = selectedTeamRow.value
+  if (!row) return []
+  const pressure = selectedTeamPressureScore.value
+  const riskLabel = `${row.highCount} yuksek, ${row.mediumCount} orta riskli kisi`
+  const people = [...selectedTeamPeople.value].sort((a, b) => personRiskScore(b) - personRiskScore(a))
+  const highPeople = people.filter((person) => personRiskScore(person) >= 70)
+  const topPeople = highPeople.slice(0, 3)
+  const driverCounts: Record<string, number> = {}
+  people.forEach((person) => {
+    const driver = String(person.top_drivers?.[0]?.metric_name || row.topReason || 'KPI sinyali')
+    driverCounts[driver] = (driverCounts[driver] || 0) + 1
+  })
+  const driverEntries = Object.entries(driverCounts).sort((a, b) => b[1] - a[1])
+  const mainDriver = driverEntries[0]?.[0] || row.topReason || 'KPI sinyali'
+  const secondDriver = driverEntries.find(([driver]) => driver !== mainDriver)?.[0]
+  const trendValues = selectedTeamTrendValues.value
+  const trendDiff = trendValues.length > 1 ? trendValues[trendValues.length - 1] - trendValues[0] : 0
+  const trendText = trendDiff > 0 ? `son 6 ayda risk ${trendDiff} puan artmis` : trendDiff < 0 ? `son 6 ayda risk ${Math.abs(trendDiff)} puan azalmis` : 'son 6 ayda risk yatay'
+  const items = [
+    {
+      id: 'driver',
+      index: '01',
+      title: `${mainDriver} sinyalini kisi bazinda ayristir`,
+      priority: row.highCount ? 'Yuksek' : 'Orta',
+      badgeClass: row.highCount ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700',
+      detail: `${row.team} icin admin modeli ${row.riskScore}/100 takim risk skoru uretti; dagilim ${riskLabel}. En cok tekrar eden driver ${mainDriver}${secondDriver ? `, ikinci sinyal ${secondDriver}` : ''}. Bu haftaki gorusmede driver'i genel yorum olarak degil, kisi/hesap/teklif davranisina bagla.`,
+      bullets: [
+        topPeople.length ? `Once ${topPeople.map((person) => displayName(person)).join(', ')} icin ayni sinyalin neden tekrar ettigini kontrol et.` : 'Yuksek riskli kisi yoksa orta riskli kisilerde erken uyari sinyalini kontrol et.',
+        secondDriver ? `${mainDriver} ve ${secondDriver} ayni kisilerde mi, farkli alt gruplarda mi ayrisiyor?` : 'Tek ana driver yogunsa sebebi bireysel performans mi, bolge/pipeline kosulu mu ayristir.',
+      ],
+    },
+  ]
+
+  if (pressure >= 45 || mainDriver.toLowerCase().includes('pipeline') || mainDriver.toLowerCase().includes('takip') || mainDriver.toLowerCase().includes('crm')) {
+    items.push({
+      id: 'pipeline',
+      index: String(items.length + 1).padStart(2, '0'),
+      title: 'Pipeline, hedef ve takip disiplini dengelemesi',
+      priority: pressure >= 70 ? 'Kritik' : pressure >= 45 ? 'Izleme' : 'Normal',
+      badgeClass: pressure >= 70 ? 'bg-rose-50 text-rose-700' : pressure >= 45 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700',
+      detail: `Pipeline/hedef baskisi ${pressure}/100. Bu skor pipeline sagligi, pipeline yasi, takip disiplini ve CRM disiplininden uretilen takim baski okumasidir.`,
+      bullets: [
+        'Acil kapanis baskisi ile yeni firsat uretimi dengede mi?',
+        'Geciken follow-up veya eksik CRM kaydi tahmin riskini buyutuyor mu?',
+      ],
+    })
+  }
+
+  if (trendDiff >= 3 || trendDiff <= -3) {
+    items.push({
+      id: 'trend',
+      index: String(items.length + 1).padStart(2, '0'),
+      title: '6 aylik trendin yonunu haftalik plana cevir',
+      priority: trendDiff > 0 ? 'Risk artisi' : 'Iyilesme',
+      badgeClass: trendDiff > 0 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700',
+      detail: `${row.team} icin ${trendText}. Bu trend sadece bu haftanin sonucu degil, admin modelinin aylik takim risk serisinden okunuyor.`,
+      bullets: [
+        trendDiff > 0 ? 'Risk artisinin hangi ayda kirildigini ve o donemdeki pipeline/aktivite degisimini kontrol et.' : 'Iyilesen sinyali hangi davranisin tasidigini bulup takim geneline yay.',
+        'Trend yorumu ile bu haftaki kisi gorusmelerini ayni driver uzerinden bagla.',
+      ],
+    })
+  }
+
+  items.push({
+      id: 'people',
+      index: String(items.length + 1).padStart(2, '0'),
+      title: topPeople.length ? `${topPeople.length} oncelikli kisi icin satis destek plani` : 'Takim icin erken uyari kontrolu',
+      priority: row.highCount ? 'Ilk 48 saat' : 'Bu hafta',
+      badgeClass: row.highCount ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600',
+      detail: topPeople.length
+        ? `Oncelik ${topPeople.map((person) => `${displayName(person)} (${personRiskScore(person)}/100)`).join(', ')}. Amac performans etiketi koymak degil, her kisi icin satis engelini ve destek ihtiyacini netlestirmek.`
+        : 'Yuksek riskli kisi yoksa, orta risk sinyali bulunan kisilerde erken destek ihtiyacini kontrol et.',
+      bullets: [
+        'Her riskli kisi icin tek bir haftalik hedef, sahip ve kontrol tarihi belirle.',
+        `Gorusme acilisinda ana driver olarak ${mainDriver} kullanilsin; farkli driver varsa kisiye gore ayrilsin.`,
+      ],
+  })
+
+  return items
+})
+
 const filteredItems = computed(() => {
   const q = tableSearch.value.trim().toLowerCase()
   if (!bulkResult.value) return []
   return bulkResult.value.items.filter((i: SalesPredictionResponse) =>
-    !q || displayName(i).toLowerCase().includes(q)
+    !q
+    || displayName(i).toLowerCase().includes(q)
+    || salesPersonRoleLabel(i).toLowerCase().includes(q)
+    || String(i.summary_payload?.external_employee_code || '').toLowerCase().includes(q)
   )
+})
+
+const riskyPeople = computed(() =>
+  [...(bulkResult.value?.items || [])]
+    .sort((a, b) => personRiskScore(b) - personRiskScore(a))
+    .slice(0, 4)
+)
+
+const trainedCurrentTargetCount = computed(() =>
+  modelStates.value.filter((state) => state.is_trained && state.is_current_dataset).length
+)
+
+const selectedDataset = computed(() =>
+  datasets.value.find((dataset) => dataset.id === uploadId.value) || null
+)
+
+const technicalAuditCards = computed(() => {
+  const current = currentTargetState.value
+  const predictionCount = bulkResult.value?.prediction_count || 0
+  const datasetCount = datasetEmployees.value.length
+  const countsMatch = predictionCount > 0 && datasetCount > 0 && predictionCount === datasetCount
+
+  return [
+    {
+      label: 'Dataset',
+      value: selectedDataset.value ? `#${selectedDataset.value.id}` : '-',
+      hint: selectedDataset.value?.file_name || 'Secili dataset bulunamadi.',
+      toneClass: selectedDataset.value
+        ? 'border-slate-200 bg-slate-50 text-slate-800'
+        : 'border-rose-200 bg-rose-50 text-rose-800',
+    },
+    {
+      label: 'Artifact',
+      value: current?.is_current_dataset ? 'Eslesiyor' : 'Eslesmiyor',
+      hint: current?.is_current_dataset
+        ? 'Backend tahmin endpointleri bu upload ile egitilmis current artifact ister.'
+        : 'Bu target icin admin current modeli secili dataset ile eslesmiyor.',
+      toneClass: current?.is_current_dataset
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+        : 'border-rose-200 bg-rose-50 text-rose-800',
+    },
+    {
+      label: 'Kapsam',
+      value: predictionCount ? `${predictionCount}/${datasetCount || '?'}` : 'Bekliyor',
+      hint: countsMatch
+        ? 'Prediction sayisi dataset calisan sayisiyla eslesiyor.'
+        : 'Kapsam kontrolu icin Toplu Tara sonucu dataset calisan sayisiyla karsilastirilir.',
+      toneClass: countsMatch
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+        : 'border-amber-200 bg-amber-50 text-amber-800',
+    },
+  ]
+})
+
+const technicalDriverRows = computed(() => {
+  const counts: Record<string, number> = {}
+  ;(bulkResult.value?.items || []).forEach((item) => {
+    const driver = String(item.top_drivers?.[0]?.metric_name || item.top_features?.[0]?.feature || 'KPI sinyali')
+    counts[driver] = (counts[driver] || 0) + 1
+  })
+  const max = Math.max(...Object.values(counts), 1)
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([name, count]) => ({
+      name,
+      count,
+      width: Math.max(8, Math.round((count / max) * 100)),
+    }))
+})
+
+const technicalWarnings = computed(() => {
+  const warnings: Array<{ title: string; body: string; toneClass: string }> = []
+  const current = currentTargetState.value
+  const predictionCount = bulkResult.value?.prediction_count || 0
+  const datasetCount = datasetEmployees.value.length
+  const lowConfidenceCount = (bulkResult.value?.items || []).filter((item) => item.confidence < 0.65).length
+  const staleTargets = modelStates.value.filter((state) => state.is_trained && !state.is_current_dataset)
+  const untrainedTargets = modelStates.value.filter((state) => !state.is_trained)
+
+  if (!current) {
+    warnings.push({
+      title: 'Current model eksik',
+      body: 'Secili target icin admin tarafinda bu dataset ile eslesen current model yok. Tahmin ekranlari bu durumda calismamali.',
+      toneClass: 'border-rose-200 bg-rose-50 text-rose-800',
+    })
+  } else {
+    warnings.push({
+      title: 'Current model korumasi aktif',
+      body: 'Backend tahmin endpointleri artifact upload_id ile secili dataset upload_id eslesmesini zorunlu tutuyor.',
+      toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    })
+  }
+
+  if (!predictionCount) {
+    warnings.push({
+      title: 'Bulk prediction bekleniyor',
+      body: 'Driver dagilimi, risk skoru kapsami ve ham denetim tablosu icin Toplu Tara calistirilmali.',
+      toneClass: 'border-amber-200 bg-amber-50 text-amber-800',
+    })
+  } else if (datasetCount && predictionCount !== datasetCount) {
+    warnings.push({
+      title: 'Kapsam farki var',
+      body: `Dataset ${datasetCount} calisan iceriyor, bulk prediction ${predictionCount} calisan dondu. Employee id eslesmeleri kontrol edilmeli.`,
+      toneClass: 'border-amber-200 bg-amber-50 text-amber-800',
+    })
+  } else {
+    warnings.push({
+      title: 'Prediction kapsami tutarli',
+      body: `${predictionCount} calisan icin admin modelinden bulk prediction uretildi.`,
+      toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    })
+  }
+
+  if (lowConfidenceCount > 0) {
+    warnings.push({
+      title: 'Dusuk guvenli tahminler',
+      body: `${lowConfidenceCount} calisanin confidence degeri %65 altinda. Bu kisilerde karar yerine ek veri ve manager gorusmesi tercih edilmeli.`,
+      toneClass: 'border-amber-200 bg-amber-50 text-amber-800',
+    })
+  }
+
+  if (staleTargets.length || untrainedTargets.length) {
+    warnings.push({
+      title: 'Tum hedefler esit hazir degil',
+      body: `${staleTargets.length} hedef eski dataset modelinde, ${untrainedTargets.length} hedef egitimsiz gorunuyor.`,
+      toneClass: 'border-amber-200 bg-amber-50 text-amber-800',
+    })
+  }
+
+  return warnings
 })
 
 // ── Chart helpers (Departman section) ───────────────────────────
@@ -1027,6 +1644,24 @@ async function runPredict() {
   }
 }
 
+async function openEmployeeAnalysis(person: SalesPredictionResponse) {
+  if (!uploadId.value || !hasAdminCurrentModel.value) return
+  const employeeIdNum = Number(person.employee_id)
+  employeeId.value = employeeIdNum
+  predResult.value = person
+  mlError.value = null
+
+  try {
+    predResult.value = await analyticsApi.getLatestSalesPrediction({
+      upload_id: uploadId.value,
+      employee_id: employeeIdNum,
+      target_column: targetColumn.value,
+    })
+  } catch (e: any) {
+    mlError.value = e?.response?.data?.detail || e?.message || 'Calisan detayi alinamadi'
+  }
+}
+
 async function runBulk(withNarrative: boolean) {
   if (!uploadId.value) return
   if (!hasAdminCurrentModel.value) {
@@ -1042,6 +1677,7 @@ async function runBulk(withNarrative: boolean) {
       use_llm_narrative: withNarrative,
     })
     if (teamRows.value.length) selectedTeam.value = teamRows.value[0].team
+    if (bulkResult.value.items.length) predResult.value = bulkResult.value.items[0]
   } catch (e: any) {
     mlError.value = e?.response?.data?.detail || e?.message || 'Toplu tahmin hatası'
   } finally {
@@ -1068,6 +1704,7 @@ function teamDotClass(row: { riskScore: number; highCount: number; mediumCount: 
 }
 
 function personRiskScore(item: SalesPredictionResponse): number {
+  if (typeof item.risk_score === 'number') return Math.round(Math.max(0, Math.min(100, item.risk_score)))
   const probabilities = item.probabilities || {}
   const high = (probabilities.Yuksek ?? probabilities.Evet ?? probabilities['1'] ?? 0) * 100
   const medium = (probabilities.Orta ?? 0) * 55
@@ -1088,9 +1725,74 @@ function personTopDriver(item: SalesPredictionResponse): string {
   return [name, status, trend].filter(Boolean).join(' / ')
 }
 
+function salesEmployeeTrendLabel(item: SalesPredictionResponse): string {
+  const driver = item.top_drivers?.[0] || {}
+  const trend = driver.trend_signal || driver.trend
+  const status = driver.threshold_status || driver.status
+  if (trend && status) return `${trend} / ${status}`
+  if (trend) return String(trend)
+  if (status) return String(status)
+  if (personRiskScore(item) >= 67) return 'Negatif sinyal'
+  if (personRiskScore(item) >= 34) return 'Izleme gerekli'
+  return 'Stabil'
+}
+
+function salesActionPlan(item: SalesPredictionResponse): Array<{ title: string; reason: string; owner: string; timeframe: string }> {
+  const actions = item.recommended_actions || []
+  const drivers = item.top_drivers || []
+  const primaryDriver = drivers[0]
+  const primaryMetric = primaryDriver?.metric_name || primaryDriver?.feature || 'KPI sinyali'
+  const primaryReason = [
+    primaryDriver?.threshold_status,
+    primaryDriver?.trend_signal,
+    item.risk_summary,
+  ].filter(Boolean).join(' / ')
+
+  const plan = actions.slice(0, 3).map((action: string, index: number) => ({
+    title: action,
+    reason: index === 0
+      ? `${primaryMetric}: ${primaryReason || 'Admin ML modeli bu calisani izleme listesine tasidi.'}`
+      : `${primaryMetric} sinyali icin haftalik takip notu ac.`,
+    owner: 'Manager',
+    timeframe: index === 0 ? 'Bu hafta' : '7 gun',
+  }))
+
+  if (plan.length) return plan
+
+  return [
+    {
+      title: `${primaryMetric} icin satis destek gorusmesi`,
+      reason: primaryReason || 'Admin ML modeli bu calisan icin aksiyon gerektiren sinyal uretmedi, yine de KPI kirilimi kontrol edilmeli.',
+      owner: 'Manager',
+      timeframe: 'Bu hafta',
+    },
+  ]
+}
+
 function salesPersonRoleLabel(item: SalesPredictionResponse): string {
   const payload = item.summary_payload || {}
   return [payload.region || payload.team, payload.position || payload.role].filter(Boolean).join(' / ') || 'Satis ekibi'
+}
+
+function salesItemTeamName(item: SalesPredictionResponse): string {
+  return String(item.summary_payload?.region || item.summary_payload?.team || 'Genel')
+}
+
+function normalizeSalesTeamKey(value: string | null | undefined): string {
+  return String(value || 'Genel')
+    .toLowerCase()
+    .replace(/ä°|i̇/g, 'i')
+    .replace(/ä±/g, 'i')
+    .replace(/Ã¼|ã¼|ü/g, 'u')
+    .replace(/Ã¶|ã¶|ö/g, 'o')
+    .replace(/ÄŸ|ä|ğ/g, 'g')
+    .replace(/ÅŸ|åÿ|ş/g, 's')
+    .replace(/Ã§|ã§|ç/g, 'c')
+    .replace(/Ä|Äž|Ğ/g, 'g')
+    .replace(/İ/g, 'i')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '')
 }
 
 function initials(name: string): string {
@@ -1157,5 +1859,11 @@ function shortName(name: string): string {
 
 onMounted(async () => {
   await Promise.all([loadDatasets(), loadOverview()])
+})
+
+watch(targetColumn, () => {
+  predResult.value = null
+  bulkResult.value = null
+  tableSearch.value = ''
 })
 </script>

@@ -2692,3 +2692,588 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
 - Dogrulama:
   - `npm.cmd run type-check` basarili.
   - `python -m py_compile propel-backend/app/services/sales_ml_service.py` basarili.
+
+## 2026-06-06 Satis Takim Analizi Yazilim Sayfasi Bloklari ile Hizalama
+
+- Kullanici satis manager `Takim Analizi` ekraninda takimlar gorunmesine ragmen yazilim sayfasindaki `Bu Hafta Konusulacak Konular`, `Takim Uyeleri - Detayli Risk Analizi`, `6 Aylik Performans Trendi` gibi manager calisma bloklarinin eksik kaldigini belirtti.
+- Frontend duzeltmeleri:
+  - `SalesManagerAnalyticsView.vue` satis takim detayina `6 Aylik Performans Trendi` karti eklendi. Bu seri admin ensemble modelinin 6 aylik takim risk trendinden `100 - risk` olarak uretilen performans sagligi sinyalidir.
+  - `Bu Hafta Konusulacak Konular` bolumu eklendi; ana driver, pipeline/hedef baskisi ve riskli calisan destek plani satis KPI baglaminda uretilir.
+  - `Takim Uyeleri - Detayli Risk Analizi` bolumu bos eslesme durumunda da gorunur ve dataset bolge/takim eslesmesi kontrol mesaji verir.
+  - Mevcut AI aksiyon paneli ve uye kartlari admin bulk prediction `team_analytics` + `items` kaynagini kullanmaya devam eder.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/services/sales_ml_service.py` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+## Sonraki Adim
+
+- Satis `Takim Analizi` ekrani artik yazilim manager sayfasindaki ana calisma bolumleriyle uyumlu okunmalidir; sonraki inceleme satis `Calisan Analizi` tarafinda kisi bazli LLM/driver yorumlarinin ayni admin ML kaynagina baglanmasi olabilir.
+
+### 2026-06-06 Satis Takim Uyeleri Eslesme Duzeltmesi
+
+- Kullanici satis `Takim Uyeleri - Detayli Risk Analizi` bolumunde `6 kisi yuksek risk seviyesinde` yazarken `0 kisi listeleniyor` ve `admin bulk prediction sonucunda eslesen calisan bulunamadi` mesaji gorundugunu bildirdi.
+- Tespit:
+  - `team_analytics` takim adlari dataset tarafindan mojibake/Turkce karakterli geliyordu (`DoÄu Anadolu`, `GÃ¼neydoÄu Anadolu`, `Ä°Ã§ Anadolu`).
+  - Kisi kartlari ise DB employee profilinden ASCII takim adlari kullaniyordu (`Dogu Anadolu`, `Guneydogu Anadolu`, `Ic Anadolu`).
+  - Frontend birebir string karsilastirdigi icin takim agregasyonu 6 kisi bulsa da kisi listesi 0 gorunuyordu.
+- Frontend duzeltmesi:
+  - `SalesManagerAnalyticsView.vue` icinde `normalizeSalesTeamKey()` ve `salesItemTeamName()` helper'lari eklendi.
+  - `selectedTeamPeople` filtrelemesi artik takim adlarini normalize ederek eslestirir.
+  - Rol dagilimi `role_counts` bos gelirse eslesen `selectedTeamPeople` uzerinden hesaplanir.
+- Dogrulama:
+  - Normalize testi: `DoÄu Anadolu` / `Dogu Anadolu`, `GÃ¼neydoÄu Anadolu` / `Guneydogu Anadolu`, `Ä°Ã§ Anadolu` / `Ic Anadolu` ayni anahtara dustu.
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/services/sales_ml_service.py` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+### 2026-06-06 Satis Takim Analizi Sayisal Kaynak Audit'i
+
+- Kullanici satis manager `Takim Analizi` ekranindaki tum sayisal bilgilerin gercekten admin ML sonucundan gelip gelmedigini ve dogru analiz olup olmadigini sordu.
+- Tespit:
+  - Takim kartlari (`Toplam Kisi`, `Takim Riski`, `Yuksek Riskli`, `Pipeline/Hedef Baskisi`) `bulkResult.team_analytics` alanindan beslenir.
+  - `team_analytics` backend `SalesMLService._team_analytics()` icinde admin current artifact ile yapilan bulk prediction skorlarindan ve ayni upload feature satirlarindan uretilir.
+  - `6 Aylik Performans Trendi` dogrudan ham ML skoru degil; admin modelinin 6 aylik takim risk trendinden `100 - risk` olarak turetilen performans sagligi sinyalidir.
+  - `Bu Hafta Konusulacak Konular` sayisal ML sonucu degil; admin ML driver/risk/pressure degerlerinden uretilen deterministik manager checklist'idir.
+  - Kisi kartlarindaki risk skoru frontendde tekrar hesaplanmasin diye `SalesPredictionResponse.risk_score` backend alanina eklendi ve frontend `personRiskScore()` once bu alanı kullanacak sekilde guncellendi.
+- Smoke:
+  - `upload_id=10`, `Performance_Drop_Target`: `prediction_count=31`.
+  - Ilk takim `Doğu Anadolu`: `team_employee_count=7`, `team_high=6`, `team_risk_score=70`, `trend=71,75,69,72,72,70`, `matching_items=7`.
+  - Ilk kisi `Nihan Korkmaz`: `risk_score=89`, `predicted_band=1`, `top_driver=Tekliften Kazanima Donusum Orani`.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/schemas/analytics.py propel-backend/app/services/sales_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+### 2026-06-06 Satis Konusulacak Konular Dinamiklestirme
+
+- Kullanici `Bu Hafta Konusulacak Konular` bolumunun admin ML driver/risk/pressure degerlerinden uretilen deterministik checklist oldugunu duyunca bunun surekli ayni seyleri yazma riski tasidigini ve degistirilmeli mi diye sordu.
+- Karar:
+  - Sadece sabit 3 maddelik deterministik checklist manager icin zayif kalir.
+  - Otomatik Gemini cagrisi maliyet/gecikme yaratacagi icin deterministik fallback korunmali, fakat kisi/driver/trend/pressure verisine gore dinamiklesmelidir.
+- Frontend duzeltmesi:
+  - `selectedTeamTalkingPointItems` artik secili takim kisilerini risk skoruna gore siralar, top driver dagilimini sayar, 6 aylik trend farkini ve pipeline/hedef baskisini okur.
+  - Checklist sabit 3 madde yerine duruma gore 2-4 madde uretir.
+  - Maddelerde en riskli kisiler isimleri ve backend `risk_score` degerleriyle referanslanir; ana driver ve ikinci driver farklilasir.
+  - Pipeline maddesi sadece pressure/driver baglami anlamliysa eklenir; trend maddesi belirgin trend farkinda eklenir.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/schemas/analytics.py propel-backend/app/services/sales_ml_service.py` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+### 2026-06-06 Yazilim Calisan Analizi LLM/Fallback Yorum Iyilestirmesi
+
+- Kullanici yazilim KPI/ML `Calisan Analizi` ekraninda secili calisan icin LLM yaniti alinamadigini, yorumun yuzeysel kaldigini ve tum calisanlarda `trend olumsuzlesiyor` gibi benzer/anlasilmaz ifadeler gordugunu belirtti.
+- Tespit:
+  - Ekrandaki sari uyari Gemini tarafindan gelen `HTTP 429 quota exceeded` hatasiydi; yani LLM provider gecici/kota kaynakli cevap veremedi.
+  - Hata mesaji frontendde ham Gemini JSON metni gibi gorunuyordu.
+  - LLM fallback metinleri KPI threshold/trend etiketlerini fazla teknik ve tekrarli kullaniyordu.
+- Backend duzeltmeleri:
+  - `SoftwareNarrativeService._llm_fallback()` artik ham hata yerine kullanici dostu fallback reason doner: Gemini kotasi dolduysa bunu sade soyleyip admin ML + KPI driver kurallariyla analiz uretildigini belirtir.
+  - Bireysel deterministic fallback manager summary ve risk yorumlari daha acik hale getirildi.
+  - `trend olumsuzlesiyor` gibi ham etiketler `_human_trend_text()` ile `son 4 haftada yon kotulesiyor` gibi daha okunur dile cevrildi.
+  - Threshold etiketleri `_human_status_text()` ile manager diline cevrildi.
+  - Driver etkisi `_driver_manager_impact()` ile gorev/t teslim/bug/motivasyon/is yuku baglaminda aciklanir.
+  - Action plan tekrarlarini azaltmak icin ayni kok nedenleri `_plan_group_key()` ile gruplayip yinelenen aksiyonlar filtrelendi.
+- Smoke:
+  - `manager.yazilim@propel.com`, `upload_id=6`, `employee_id=6`, `target_column=performance_band`, `use_llm_narrative=true` ile tekil tahmin denendi.
+  - Son denemede Gemini cevap verdi (`fallback_reason=null`); onceki ekrandaki hata 429 kota durumundan kaynakliydi.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/software_narrative_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` calistirildi.
+
+### 2026-06-06 Satis Calisan Analizi Yazilim Gorunumu Uyumu
+
+- Kullanici satis manager KPI/ML `Calisan Analizi` sayfasindaki verilerin admin ekraninda egitilen model sonuclarindan gelip gelmedigini ve yazilim manager `Calisan Analizi` gorunumuyle ayni hizaya getirilmesini istedi.
+- Backend guvencesi:
+  - `SalesMLService._load_current_artifact_for_upload()` eklendi.
+  - `predict_latest_from_upload()` ve `predict_all_from_upload()` artik artifact metadata `upload_id` degeri secili dataset `upload_id` ile eslesmezse 409 doner.
+  - `predict_all_targets()` 409 gibi current dataset uyumsuzluklarini yutmaz; yalnizca eksik artifact 404 durumunda ilgili hedefi bos gecebilir.
+  - `get_my_performance()` mevcut calisan upload'i ile eslesen Performance_Drop artifact'i yoksa modeli sessizce yok sayar.
+- Frontend uyumu:
+  - `SalesManagerAnalyticsView.vue` watchlist bolumu yazilim manager ekranindaki duzene yaklastirildi: calisan listesi, risk skoru bar'i, KPI trend, ana sinyal, haftalik odak, sagda secili calisan detay paneli ve oncelikli takip kartlari.
+  - Liste satirina tiklayinca `getLatestSalesPrediction()` ile canli tekil satis tahmini cekilir; bulk sonucu ilk secim olarak paneli doldurur.
+  - Target degisince eski bulk/tekil tahmin state'i sifirlanir.
+  - Arama calisan adi, takim/rol ve external employee code uzerinden calisir.
+- Canli smoke:
+  - `manager.satis@propel.com` ile API login basarili.
+  - `upload_id=10`, `sales_dataset_v3.xlsx`, `Performance_Drop_Target`: current model true, trained_at `2026-06-05T10:27:27.773193+00:00`, weighted_f1 `0.75904`, `prediction_count=31`.
+  - Ilk bulk calisani `Burcu Arslan`, `risk_score=91`, `predicted_band=1`.
+  - Ortamda tek satis dataset'i oldugu icin 409 mismatch canli tetiklenemedi; kod path'i current artifact upload guard ile kapatildi.
+- Dogrulama:
+  - Baslangicta ve degisiklik sonrasi `python -m py_compile propel-backend/app/services/sales_ml_service.py propel-backend/app/schemas/analytics.py propel-backend/app/api/routers/analytics.py` basarili.
+  - Baslangicta ve degisiklik sonrasi `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+  - In-app Browser iki kez denenmesine ragmen `windows sandbox failed: spawn setup refresh` hatasiyla acilamadi; gorsel browser smoke tamamlanamadi.
+
+### 2026-06-06 Satis Teknik Detaylar Model Denetimi
+
+- Kullanici KPI/ML `Teknik Detaylar` sayfasinin neden gerekli oldugunu ve buraya ne konmasi gerektigini sordu; karar sayfanin kisi risk listesi degil model denetimi/guvenilirlik ekrani olmasi yonunde verildi.
+- Frontend duzeltmesi:
+  - `SalesManagerAnalyticsView.vue` teknik bolumu yeni `Model Denetimi` yapisina cevrildi.
+  - Ana bloklar: `Aktif Model Ozeti`, `Dataset ve Artifact Eslesmesi`, `Target Bazli Model Performansi`, `KPI Driver Ozeti`, `Model Uyarilari`.
+  - Ham prediction tablosu ana ekran olmaktan cikarildi ve en altta kapali `details` denetim tablosu olarak birakildi.
+  - `technicalAuditCards`, `technicalDriverRows`, `technicalWarnings`, `trainedCurrentTargetCount`, `selectedDataset` computed helper'lari eklendi.
+  - Sayfa artik manager'a "kim riskli?" yerine "bu model/dataset sonucu guvenilir mi, hangi driver'lar tahmini tasiyor?" sorusunu cevaplar.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/services/sales_ml_service.py propel-backend/app/schemas/analytics.py propel-backend/app/api/routers/analytics.py` basarili.
+  - `docker restart propel_frontend` calistirildi.
+  - In-app Browser tekrar denenmesine ragmen `windows sandbox failed: spawn setup refresh` hatasiyla acilamadi; gorsel browser smoke tamamlanamadi.
+
+### 2026-06-06 Yazilim Teknik Detaylar Model Denetimi Duzeltmesi
+
+- Kullanici ekranin hala degismedigini soyledi; tespit edilen sorun onceki degisikligin satis manager teknik sayfasina uygulanmis olmasi, kullanicinin ekran goruntusunun ise `Yazilim` secili `ManagerAnalyticsView.vue` teknik sayfasi olmasiydi.
+- Duzeltme:
+  - `propel-frontend/src/views/manager/ManagerAnalyticsView.vue` teknik bolumu guncellendi.
+  - Eski acik `Teknik detaylari ve kisi bazli tabloyu goster` ham tablo blogu `v-if=false` ile gizlendi.
+  - Yeni bloklar eklendi: `Aktif Model Ozeti`, `Dataset ve Artifact Eslesmesi`, `Target Bazli Model Performansi`, `KPI Driver Ozeti`, `Model Uyarilari`.
+  - Ham prediction tablosu ana ekran olmaktan cikarilip kapali `details` denetim tablosuna alindi.
+  - `softwareTechnicalAuditCards`, `softwareTechnicalDriverRows`, `softwareTechnicalWarnings`, `softwareCurrentTargetCount`, `selectedSoftwareUpload` computed helper'lari eklendi.
+  - Teknik detay meta basligi `Model denetimi ve veri kaynagi kontrolu` olarak degistirildi.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend/app/services/sales_ml_service.py propel-backend/app/schemas/analytics.py propel-backend/app/api/routers/analytics.py` basarili.
+  - `docker restart propel_frontend` calistirildi.
+
+### 2026-06-06 Klasik 360 Feedback NLP Entegrasyonu
+
+- Kullanici haftalik feedback/nabiz ile klasik 360 feedback ayrimini sordu ve tezde 360 derece feedback icin NLP analizi anlatildigi icin klasik 360 tarafindaki eksikligin hemen kapatilmasini istedi.
+- Tespit:
+  - Dinamik haftalik feedback (`/api/v1/feedbacks/submit`) zaten `AIService.analyze_weekly_feedback`, `FeedbackNLPAnalysis`, `EmployeeNLPProfile` ve RAG hafiza hattina bagliydi.
+  - Klasik 360 feedback (`/api/v1/feedback/`) sadece `Feedback` kaydi olusturuyordu; `NLPService.save_classic_feedback_analysis()` ve `RAGService.upsert_classic_feedback_memory()` hazir olmasina ragmen cagrilmiyordu.
+- Duzeltme:
+  - `feedback.py` klasik feedback create endpoint'ine `BackgroundTasks` eklendi; her 360 feedback kaydindan sonra `process_classic_feedback_analysis_in_background()` tetikleniyor.
+  - `FeedbackService.process_classic_feedback_analysis()` eklendi.
+  - Klasik 360 metin alanlari (`strength_text`, `improvement_text`, `general_comment`) tek NLP girdisine donusturuluyor.
+  - Mevcut AI analiz kontrati kullaniliyor; sonuc `source_type=classic_feedback` olarak `feedback_nlp_analyses` tablosuna yaziliyor.
+  - `feedback.nlp_result`, calisan NLP profili, aylik rozetler ve `feedback_memory_chunks` RAG hafizasi guncelleniyor.
+  - `NLPService` 360 calisan/departman ozetleri, NLP chart/deep analysis ve RAG raporlarinda artik sadece `weekly_feedback` degil klasik 360 analizlerini de kapsiyor.
+- Canli smoke:
+  - `developer1@propel.com` ile API login yapildi.
+  - `/api/v1/feedback/` uzerinden Alper Sen icin klasik 360 feedback olusturuldu (`feedback_id=1`, `reviewee_id=408`).
+  - DB dogrulamasi: `feedback_nlp_analyses` icinde `source_type=classic_feedback`, `classic_feedback_id=1`, `model_provider=gemini`, `model_name=gemini-2.5-flash-lite`, `sentiment_label=positive`, `has_summary=true`.
+  - DB dogrulamasi: `feedback_memory_chunks` icinde `source_type=classic_feedback`, `classic_feedback_id=1`, `embedding_provider=hash`, `embedding_dimension=128`.
+  - DB dogrulamasi: `employee_nlp_profiles` icinde `employee_id=408`, `period_year=2026`, `period_month=6`, `period_week=1`, `feedback_count=2`.
+  - `manager.yazilim@propel.com` ile `/api/v1/feedbacks/reports/employee/408` cagrildi; rapor `report_summary`, `recommended_action`, 5 metrik ve guclu/risk/destek bolumlerini dondu.
+- Dogrulama:
+  - Baslangicta `python -m py_compile propel-backend/app/api/routers/feedback.py propel-backend/app/services/feedback_service.py propel-backend/app/services/nlp_service.py propel-backend/app/services/ai_service.py` basarili.
+  - Baslangicta `npm.cmd run type-check` basarili.
+  - Degisiklik sonrasi ayni backend `py_compile` basarili.
+  - Degisiklik sonrasi `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` calistirildi.
+
+### 2026-06-06 Calisan 360 Analizinde Tekrarlayan RAG Metni Duzeltmesi
+
+- Kullanici `Calisan Analizi` ekraninda farkli calisanlarda ayni aylik/RAG metinlerinin gorundugunu, Cenk Uysal ekraninda Alper Sen metninin belirdigini bildirdi.
+- Koken neden:
+  - DB'de calisan bazli NLP kayitlari dogru filtreleniyordu; Cenk, Asli ve Alper kayitlari kendi `employee_id` degerleriyle duruyordu.
+  - Cogu calisanda yalnizca 1 NLP kaydi oldugu icin seed/veri temalari dogal olarak benzerdi.
+  - `build_employee_monthly_rag_report()` benzer RAG bellegi 0 olsa bile LLM raporu uretmeye devam ediyordu; bu durumda model onceki/benzer isimli metni karistirabiliyordu.
+  - Frontend calisan degistiginde eski monthly/RAG state'ini hemen temizlemiyor ve gec gelen istekler secili calisani ezebiliyordu.
+- Duzeltme:
+  - `NLPService.build_employee_monthly_rag_report()` icinde `retrieved_memories` bos ise LLM cagrisi kapatildi.
+  - Bos RAG bellegi durumunda deterministik, kisi adini backend employee kaydindan alan ve "kisiyi ayirt edecek kadar zengin 360 NLP hafizasi olusmadi" diyen rapor donuyor.
+  - Tekil feedbackli calisanlarda yonetici aksiyonu "ek 360 feedback toplayin" olarak veriliyor.
+  - `EmployeeAnalysisView.vue` calisan degisiminde `selectedEmployeeReport`, `monthlyDeepAnalysis`, `monthlyRagReport` state'lerini hemen temizliyor.
+  - `employeeReportRequestId` ve `monthlyAnalysisRequestId` eklendi; gec gelen eski istekler artik yeni secili calisanin state'ini ezmiyor.
+- Canli smoke:
+  - `manager.yazilim@propel.com` ile Cenk Uysal (`employee_id=411`), Alper Sen (`408`) ve Asli Cetin (`421`) icin `/monthly-rag` cagrildi.
+  - Cenk ve Asli raporlari `model_provider=deterministic`, `retrieved_memory_count=0` ve kendi calisan adlariyla dondu; Alper metni artik Cenk ekranina sizmiyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/nlp_service.py propel-backend/app/api/routers/feedbacks.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` calistirildi.
+
+### 2026-06-06 3 Aylik Kapsamli 360 Feedback/NLP Demo Verisi
+
+- Kullanici 360 derece feedback calisan analizinde `Motivasyon: Stabil`, `Duygu Trendi: Stabil`, `Ayrilma Risk: -/10` gibi zayif/eksik analiz gorundugunu soyledi; her calisana 3 ay boyunca haftada 3 adet cesitli feedback uretmeyi istedi.
+- Yeni script:
+  - `propel-backend/scripts/seed_demo_360_history.py` eklendi.
+  - Varsayilan plan: `--department all --weeks 12 --feedbacks-per-week 3`.
+  - Yazilim ve satis departmanlarini otomatik buluyor.
+  - Her calisan icin haftada 3 farkli feedback uretir: ayni takim, capraz takim ve manager/upward senaryolari.
+  - Konular haftalara yayilir: teslim/planlama, kalite, is birligi, liderlik, gelisim, risk.
+  - NLP payload sentetik demo icin dogrudan cesitlendirilir: motivation_score, sentiment_score, flight_risk_score, complaint_topics, praise_topics, support_needs, theme_labels.
+  - Her feedback icin `FeedbackResponse`, `FeedbackNLPAnalysis`, `FeedbackMemoryChunk` RAG hafizasi ve haftalik `EmployeeNLPProfile` guncellenir.
+  - Reset varsayilan olarak onceki `synthetic_seed_360_history` kayitlarini temizler.
+- Analiz duzeltmeleri:
+  - `EmployeeMonthlyRAGReportResponse.flight_risk_score` int yerine float kabul edecek sekilde guncellendi; ortalama risk skorlarinda `5.2` gibi degerler 500 hatasi vermiyor.
+  - `build_employee_monthly_rag_report()` RAG esigi nedeniyle 0 sonuc alirsa ayni calisan icin `min_score=0.0` fallback retrieval yapar.
+  - Synthetic history verisi kullaniliyorsa aylik RAG raporu Gemini/Ollama beklemeden yerel deterministic fallback ile uretilir; ornek 3 calisan sorgusu 888ms civarina indi.
+  - Aylik trend hesaplamasi tek tek feedback sirasi yerine haftalik ortalama serisine gore yapiliyor; ay icindeki karisik feedbackler net yukselis/dusus sinyalini bastirmiyor.
+- Canli seed:
+  - Dry-run: 2 departman, 62 calisan, 2208 planlanan feedback.
+  - Gercek run: 2208 eski synthetic history kaydi temizlendi, 2208 yeni feedback/NLP/RAG kaydi yazildi.
+  - DB dogrulamasi: `feedback_nlp_analyses` icinde 2208 kayit, 62 calisan, tarih araligi `2026-04-08` - `2026-06-24`.
+  - DB dogrulamasi: `feedback_memory_chunks` icinde 2208 RAG hafiza kaydi olustu.
+  - API smoke (`manager.yazilim@propel.com`, Haziran 2026): Elif Ozturk ve Alper Sen `motivation_trend_direction=yukselis`; Cenk Uysal, Asli Cetin ve Kaan Oz `dusus`; flight risk skorlari dolu (`4.2`-`5.5` araligi); RAG memory 1-5 arasi donuyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend/scripts/seed_demo_360_history.py propel-backend/app/services/nlp_service.py propel-backend/app/schemas/feedbacks.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` calistirildi.
+
+### 2026-06-07 360 Analiz Basliklarinda Kisi Bazli NER/Topic Cesitliligi
+
+- Kullanici `Sikayet Konulari`, `Guclu Alanlar`, `One Cikan Temalar` altinda herkes icin `blokajlarin gec paylasilmasi`, `ekip ici iletisim kopuklugu`, `Backend`, `Mid Backend Engineer` gibi ayni/sinirli ifadelerin gorundugunu soyledi ve bunlarin kisiye verilen feedbacklerden NER/topic extraction mantigiyla gelmesi gerektigini belirtti.
+- Tespit:
+  - Seed verisi once sinirli `complaint_map/praise_map` listelerinden uretiliyordu; bu yuzden dominant topic secimi ayni basliklara yigiliyordu.
+  - `NLPService._analysis_text_blob()` feedback cevap metnini yeterince kullanmiyor, daha cok raw list alanlarina bakiyordu.
+  - `top_themes` icine `Backend`, `QA`, `Mid Backend Engineer` gibi entity/rol etiketleri tema gibi girebiliyordu.
+- Duzeltme:
+  - `seed_demo_360_history.py` icinde `personal_patterns()` eklendi.
+  - Yazilim calisanlari artik takim/role gore ayri persona aliyor: Backend -> code review/API, QA -> test otomasyonu/regresyon, DevOps -> deploy/monitoring, Frontend -> arayuz/tasarim, Yonetim -> mentorluk/karar netligi.
+  - Satis icin de bolge/role gore musteri takip, CRM, sikayet, quota ve ekip destegi persona setleri eklendi.
+  - Feedback metinlerine kisiye ozel guclu alan, sikayet ve tema ifadeleri enjekte edildi.
+  - NLP payload icinde `complaint_topics`, `praise_topics`, `key_strengths`, `theme_labels`, `entity_mentions`, `flight_risk_reasons`, `support_needs` kisi personasina gore cesitlendirildi.
+  - `NLPService._analysis_text_blob()` artik weekly/classic feedback ham metinlerini de okuyor.
+  - `NLPService._distinctive_feedback_phrases()` eklendi; feedback metninden NER/topic benzeri ayirt edici ifadeleri yakalayip aylik basliklarin onune aliyor.
+  - `NLPService._filter_topic_items()` eklendi; `Backend`, `Frontend`, `QA`, pozisyon adi ve calisan adi gibi rol/entity etiketlerini tema listesinden filtreliyor.
+- Canli seed ve smoke:
+  - `docker exec propel_backend python scripts/seed_demo_360_history.py --department all --weeks 12 --feedbacks-per-week 3` calistirildi; 2208 eski synthetic kayit temizlendi, 2208 yeni feedback/NLP/RAG kaydi uretildi.
+  - `manager.yazilim@propel.com` ile Haziran 2026 employee monthly-deep smoke:
+    - Elif Ozturk: sikayet `blokaj eskalasyonu gecikmesi`, `dokumantasyon eksigi`, `api bagimliligi gec bildirme`; guclu alan `code review sahiplenmesi`, `api entegrasyon takibi`.
+    - Alper Sen/Kaan Oz: DevOps odakli `deploy sonrasi takip eksigi`, `alarm onceligi belirsizligi`; guclu alan `deploy sorumlulugu`, `ortam stabilitesi takibi`.
+    - Cenk Uysal: QA odakli `test kapsaminda acik`, `regresyon senaryosu gecikmesi`; guclu alan `test otomasyonu disiplini`.
+    - Baris Eren: Frontend odakli `arayuz kabul kriteri belirsizligi`, `tasarim revizyonu gecikmesi`; guclu alan `arayuz detay kalitesi`.
+  - Tema listelerinde rol/takim etiketi yerine `code review`, `api entegrasyonu`, `deploy stabilitesi`, `test otomasyonu`, `arayuz teslimi`, `mentorluk` gibi konu ifadeleri donuyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend/scripts/seed_demo_360_history.py propel-backend/app/services/nlp_service.py propel-backend/app/schemas/feedbacks.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` calistirildi.
+
+### 2026-06-07 Frontend Takiminda Kisi Bazli 360 Baslik Ayrisma Duzeltmesi
+
+- Kullanici ayni takim icindeki Frontend calisanlarinda bile `Sikayet Konulari`, `Guclu Alanlar`, `One Cikan Temalar` basliklarinin ayni kaldigini ve sahte gorundugunu belirtti.
+- Tespit:
+  - Onceki seed takim/role persona kullaniyordu; bu nedenle ayni Frontend takimindaki calisanlar ayni arayuz/tasarim basliklarina yigiliyordu.
+  - Aylik analizde sabit pattern listeleri raw feedback topic'lerinden once baskin cikabiliyordu.
+- Duzeltme:
+  - `seed_demo_360_history.py` icinde `individual_focus()` eklendi.
+  - Frontend calisanlari icin explicit kisi->odak eslemesi yapildi; her Frontend calisaninin ilk sikayet/guclu alan/tema basligi ayriliyor.
+  - Ornek bireysel odaklar: `pr dokumantasyonu`, `edge case sahiplenme`, `bagimlilik yonetimi`, `erisilebilirlik`, `kullanici senaryolari`, `refactor kapsami`, `release iletisimi`, `urun analitigi`, `test verisi cesitliligi`.
+  - `NLPService._raw_dominant_items()` eklendi; aylik analiz raw `complaint_topics`, `praise_topics`, `key_strengths`, `theme_labels`, `entity_mentions` alanlarini sabit patternlerden once degerlendiriyor.
+- Canli smoke:
+  - `docker exec propel_backend python scripts/seed_demo_360_history.py --department all --weeks 12 --feedbacks-per-week 3` calistirildi; 2208 eski synthetic kayit temizlendi, 2208 yeni feedback/NLP/RAG kaydi uretildi.
+  - `manager.yazilim@propel.com` ile Haziran 2026 Frontend takimi kontrol edildi:
+    - Murat Kaya: `acceptance criteria sorularini gec netlestirme` / `pull request aciklama kalitesi` / `pr dokumantasyonu`
+    - Zeynep Celik: `edge case senaryolarini sprint sonuna birakma` / `karmasik buglari sade anlatma` / `edge case sahiplenme`
+    - Emre Kilic: `bagimli ekiplerden onay beklerken sessiz kalma` / `cross-team bagimlilik takibi` / `bagimlilik yonetimi`
+    - Derya Koc: `risk etkisini sayisal olarak ifade etmeme` / `teknik riskleri erken isaretleme` / `erisilebilirlik`
+    - Merve Tetik: `happy path disi akislarin gec test edilmesi` / `kullanici senaryosu dusunme` / `kullanici senaryolari`
+    - Kerem Tunc: `refactor kapsam sinirini net cizememe` / `refactor firsatlarini yakalama` / `refactor kapsami`
+    - Baris Eren: `release etkisini paydaslara gec duyurma` / `release notu hazirlama` / `release iletisimi`
+    - Yigit Ari: `olcumleme eventlerini sonradan ekleme` / `analitik event takibi` / `urun analitigi`
+    - Deniz Soylu: `mock veri varyasyonlarini sinirli tutma` / `test verisi hazirlama` / `test verisi cesitliligi`
+- Dogrulama:
+  - `python -m py_compile propel-backend/scripts/seed_demo_360_history.py propel-backend/app/services/nlp_service.py propel-backend/app/schemas/feedbacks.py` basarili.
+  - `npm.cmd run type-check` basarili.
+### 2026-06-07 Veritabanı ER Diyagramı Dokümantasyonu
+
+- `docs/sekil-3-3-veritabani-er-diyagrami.md` oluşturuldu.
+- SQLAlchemy modellerindeki gerçek tablolar ve ilişkiler temel alınarak Mermaid formatında detaylı "Şekil 3.3. Veritabanı Varlık-İlişki (ER) Diyagramı" hazırlandı.
+- Diyagram; kullanıcı, çalışan, departman, KPI, nabız anketi, 360 feedback, haftalık feedback, NLP/RAG, toplantı, bildirim ve veri yükleme tablolarını kapsıyor.
+- Kod değişikliği yapılmadığı için `py_compile`, frontend type-check veya container restart çalıştırılmadı.
+
+### 2026-06-15 NLP Kullanim Analizi ve Sunum Notlari
+
+- Kullanici projede NLP'nin teknik olarak nasil kullanildigini, hangi dosyalarda oldugunu, sunumda nasil anlatilabilecegini ve analizlerin dogrulugunu sordu.
+- Incelenen ana hat:
+  - `app/services/ai_service.py`: Gemini/Ollama/fallback uzerinden sentiment, motivasyon, burnout, flight risk, tema, entity, destek ihtiyaci ve yonetici ozeti uretimi.
+  - `app/services/feedback_service.py`: haftalik feedback ve klasik 360 feedback sonrasi NLP arka plan islemleri, dusuk kalite ve karsilikli puan bias kontrolleri.
+  - `app/services/nlp_service.py`: NLP sonuc kaydi, calisan profili, departman ozeti, chart, aylik deep analysis ve RAG raporlari.
+  - `app/services/rag_service.py` ve `app/db/models/rag.py`: feedback metinlerinin embedding hafizasi.
+  - `app/db/models/nlp.py`: `FeedbackNLPAnalysis` ve `EmployeeNLPProfile` kalici NLP tablolari.
+  - Frontend: `FeedbackView.vue`, `DepartmentAnalysisView.vue`, `SalesFeedbackView.vue`, `ManagerDashboard.vue`, `TeamManagement.vue`.
+- Tespit:
+  - NLP sadece metin ozetleme degil; sentiment/risk skorlari, tema cikarma, kalite sinyali, profil agregasyonu ve RAG hafizasi olarak kullaniliyor.
+  - Benchmark raporunda heuristik modda 50 ornekte exact match %68; sentiment %86, burnout %94, flight risk %84 dogruluk goruluyor. Bu nedenle analizler demo/karar-destek icin anlamli, fakat tek basina kesin IK karari olarak pazarlanmamali.
+- Kod degisikligi yapilmadi; `py_compile`, `npm.cmd run type-check` veya container restart calistirilmadi.
+
+### 2026-06-15 NLP Embedding, Confidence ve Insan Onayi Iyilestirmesi
+
+- Kullanici NLP analizleri icin hash embedding yerine gercek embedding, risklerde kategori + sayisal confidence ve insan onayi/karar destek uyarisi istedi.
+- Backend:
+  - `RAGService.generate_embedding()` provider katmani genisletildi; `hash` fallback korunarak `gemini`, `openai`, `sentence_transformer`/`local` ve `auto` secenekleri eklendi.
+  - Yeni config alanlari: `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL`, `SENTENCE_TRANSFORMER_MODEL`.
+  - Local sentence-transformer modeli servis icinde cache'lendi; paket/model yoksa servis hash fallback'e dusuyor.
+  - `FeedbackNLPAnalysisResponse` ve `EmployeeNLPProfileResponse` icin `burnout_risk_confidence` ve `flight_risk_confidence` eklendi; DB migration gerektirmeden model property'lerinden turetiliyor.
+  - Team health payload'una feedback flight/burnout risk confidence alanlari eklendi.
+  - 360 summary metric payload'larinda risk metrikleri icin `confidence` tasinmaya baslandi.
+- Frontend:
+  - `FeedbackView.vue` NLP kartinda flight/burnout risk confidence yuzdeleri gosterildi.
+  - NLP sonucunun otomatik uretilmis karar destek onerisi oldugu ve yonetici onayi gerektirdigi uyarisi eklendi.
+  - Feedback/employee API tipleri yeni confidence alanlariyla guncellendi.
+- Dogrulama:
+  - Kod degisikligi oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Kod degisikligi sonrasi `python -m py_compile propel-backend\app\core\config.py propel-backend\app\services\rag_service.py propel-backend\app\db\models\nlp.py propel-backend\app\schemas\nlp.py propel-backend\app\schemas\feedbacks.py propel-backend\app\schemas\employee.py propel-backend\app\services\employee_service.py propel-backend\app\services\nlp_service.py` basarili.
+  - Kod degisikligi sonrasi `npm.cmd run type-check` basarili.
+  - Container runtime smoke ve `docker restart propel_backend` denendi ancak Docker Desktop daemon pipe bulunamadigi icin calistirilamadi.
+
+### 2026-06-15 NLP Insan Onayi Faz 2 - Kalici Yonetici Incelemesi
+
+- Kullanici ikinci faza gecilmesini istedi; ilk fazdaki uyari/karar destek notu kalici DB/API akisi haline getirildi.
+- Backend:
+  - `EmployeeNLPReview` modeli ve `NLPReviewStatus` enum'u eklendi.
+  - Review kaydi calisan + NLP donemi bazinda unique tutuluyor; status degerleri `pending`, `approved`, `false_alarm`, `follow_up_required`.
+  - `GET /feedbacks/nlp/employee/{employee_id}/review` review durumunu okuyor.
+  - `PUT /feedbacks/nlp/employee/{employee_id}/review` admin/yonetici icin review upsert ediyor; departman yoneticisi yalnizca kendi departmanindaki calisan icin yazabiliyor.
+  - `WeeklyNLPInsightResponse` icine `human_review` eklendi.
+  - `employees/team-health` payload'una `nlp_review_status`, `nlp_review_note`, `nlp_reviewed_at`, `nlp_reviewer_name` alanlari eklendi.
+- Frontend:
+  - `TeamManagement.vue` 360/NLP hucresinde review rozeti ve `Onayla`, `Takip`, `Yanlis alarm` aksiyonlari eklendi.
+  - Aksiyonlar `PUT /feedbacks/nlp/employee/{id}/review` ile DB'ye yaziyor ve ardindan team-health tekrar yukleniyor.
+  - Feedback/employee API tipleri review status ve payload alanlariyla guncellendi.
+- Dogrulama:
+  - Kod degisikligi oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Kod degisikligi sonrasi `python -m py_compile propel-backend\app\db\models\nlp.py propel-backend\app\db\models\__init__.py propel-backend\app\schemas\nlp.py propel-backend\app\schemas\feedbacks.py propel-backend\app\schemas\employee.py propel-backend\app\services\nlp_service.py propel-backend\app\services\employee_service.py propel-backend\app\api\routers\feedbacks.py` basarili.
+  - Kod degisikligi sonrasi `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` tekrar denendi ancak Docker Desktop daemon pipe bulunamadigi icin container restart/runtime smoke calistirilamadi.
+
+### 2026-06-15 NLP Aciklanabilir Risk Driverlari - Faz 3
+
+- Kullanici raporlarda sadece `Burnout Risk = High` yazmasi yerine `neden high?` sorusunu cevaplayan driver ve kanit listesi istedi.
+- Backend:
+  - `RiskDriver` schema'si eklendi; risk metrikleri artik `drivers` listesi tasiyabiliyor.
+  - `NLPService._burnout_risk_drivers()` eklendi.
+  - Driverlar deterministik olarak mevcut NLP verisinden uretiliyor:
+    - haftalik motivasyon serisi dususu,
+    - psikolojik guven serisi dususu,
+    - tekrar eden is yuku/destek/sikayet temalari,
+    - tekil analizlerdeki explicit high burnout sinyalleri.
+  - `build_employee_360_summary_report()` icinde `Burnout Risk` metric'i driver listesi ve confidence ile donuyor.
+  - `build_employee_monthly_deep_analysis()` icinde `burnout_risk_level`, `burnout_risk_drivers`, `burnout_risk_evidence` alanlari donuyor.
+- Frontend:
+  - `EmployeeAnalysisView.vue` aylik derin analiz bolumune `Burnout Risk Drivers` paneli eklendi.
+  - Panel, ornek olarak `Motivasyon 4.2 -> 2.7 dustu` veya tekrar eden tema kanitlarini kartlar halinde gosteriyor.
+  - API tipleri `RiskDriver`, metric `drivers` ve monthly deep burnout alanlariyla guncellendi.
+- Dogrulama:
+  - Kod degisikligi oncesi `py_compile` ve `npm.cmd run type-check` basarili.
+  - Kod degisikligi sonrasi `python -m py_compile propel-backend\app\services\nlp_service.py propel-backend\app\schemas\feedbacks.py` basarili.
+  - Kod degisikligi sonrasi `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` denendi ancak Docker Desktop daemon pipe bulunamadigi icin container restart/runtime smoke calistirilamadi.
+
+### 2026-06-15 Calisan Analizi Liste ve KPI Gorunumu Duzeltmesi
+
+- Kullanici 360 Calisan Raporu ekraninda `Calisan Bulunamadi` gorundugunu ve KPI analizlerinin de gelmedigini bildirdi.
+- Tespit:
+  - `EmployeeAnalysisView.vue` calisan listesini yalnizca `feedback/candidates` endpoint'inden cekiyordu; bu endpoint feedback adayi amacli oldugu icin bazi yonetici/departman durumlarinda bos donebiliyor.
+  - Ekran metni ve veri modeli yalnizca 360 feedback/NLP raporuna odakliydi; KPI performans ozeti bu sayfada gosterilmiyordu.
+  - Backend restart sonrasi `app.schemas.feedbacks` import'u `NameError: RiskDriver is not defined` hatasiyla dusuyordu; `RiskDriver`, `SummaryMetric` icinde kullanilmadan once tanimlanacak sekilde siralandi.
+- Frontend:
+  - Calisan listesi birincil olarak `employeeApi.getEmployees()` ile gercek calisan endpoint'inden cekilmeye baslandi; hata durumunda eski `feedbackApi.getFeedbackCandidates()` fallback olarak korundu.
+  - Liste filtrelemesi `user.role` eksik oldugunda calisanlari yanlislikla dislamayacak hale getirildi.
+  - Departman, calisan ve KPI summary yukleme hatlari ayrildi; departman/analytics hatasi calisan listesini sifirlamiyor.
+  - `analyticsApi.getPerformanceSummary()` ayni yukleme akisine eklendi.
+  - Secili calisan icin `KPI / ML Performans Ozeti` karti eklendi; KPI skoru, trend, kayit sayisi, son donem ve durum rozeti gosteriliyor.
+  - Calisan icin KPI kaydi yoksa ekranda acik bir bos durum mesaji gosteriliyor.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `python -m py_compile propel-backend\app\services\nlp_service.py propel-backend\app\schemas\feedbacks.py` basarili.
+  - `git diff --check` whitespace hatasi vermedi; yalnizca mevcut Windows CRLF uyarilari goruldu.
+  - `docker restart propel_frontend` ve `docker restart propel_backend` basarili.
+  - Container icinde `python -c "import app.schemas.feedbacks"` basarili.
+  - Canli API smoke: `manager.yazilim@propel.com` ile `/employees/` 31 kayit, `/analytics/performance/summary` 30 KPI calisan kaydi dondurdu.
+  - Browser smoke: `/manager/feedback-reports/employees` ekraninda `30 calisan listeleniyor`, `Calisan Bulunamadi=false`, `KPI / ML Performans Ozeti=true`.
+
+### 2026-06-15 Calisan Analizi Kisisel Yonetici Ozeti
+
+- Kullanici haftalik yonetici ozetinde tum calisanlar icin ayni pozitif cumlenin gorundugunu ve sayfada gercek dataya dayali, kisiye ozel analiz istedigini bildirdi.
+- Tespit:
+  - `build_employee_360_summary_report()` rapor ozetinde `profile.manager_summary` alanini oncelikli kullaniyordu.
+  - Bu alan daha onceki NLP/seed akislariyla bircok calisan icin benzer sablon cumleye donusmustu; frontend de bu alanı dogrudan bastigi icin ekranda kisi adi degisen ayni yorum gorunuyordu.
+- Backend:
+  - `NLPService._latest_kpi_context()` eklendi; calisanin son KPI kayitlarindan KPI skoru, trend, son donem, kayit sayisi ve en guclu KPI sinyali hesaplanıyor.
+  - `NLPService._employee_manager_summary()` eklendi; ozet artik her istekte mevcut KPI, 360/NLP profil, risk confidence, burnout driver, rozet ve son feedback kanitlarindan deterministik olarak yeniden uretiliyor.
+  - Eski `profile.manager_summary` ana rapor ozeti olarak kullanilmiyor; seed kaynakli tekrar eden cumleler ekrana tasinmiyor.
+  - Response `sections` icine `Yonetici Kanitlari` eklendi.
+- Frontend:
+  - `EmployeeAnalysisView.vue` haftalik yonetici ozeti kutusuna `Veriye Dayali Kanitlar` paneli eklendi.
+  - Panel KPI skoru/trend, motivasyon, psikolojik guven, is birligi, guclu yon/risk/destek kanitlarini madde madde gosteriyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend\app\services\nlp_service.py propel-backend\app\schemas\feedbacks.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` basarili.
+  - Container icinde `python -c "import app.services.nlp_service"` basarili.
+  - Canli API smoke: Canan, Zeynep ve Burak rapor ozetleri farkli dondu; Burak icin `KPI skoru 58.6/100, +0.5 trend`, Zeynep icin `KPI skoru 56.0/100, -2.7 trend` gibi kisiye ozel kanitlar goruldu.
+
+### 2026-06-15 KPI ML Ekrani Durum Karti Tutarliligi
+
+- Kullanici KPI & ML Analizi ekraninda ustte `Veri bekleniyor` yazarken altta departman sagligi, KPI/ML skoru, 360 kapsamı gibi sayisal verilerin gorunmesini celiskili buldu.
+- Tespit:
+  - Ust metrik grid'i `overview.metrics` fallback'inden besleniyordu.
+  - Alttaki `Birlesik Departman ML Analizi` ise `departmentDashboard` endpoint'inden dolu veri gosteriyordu.
+  - Bu nedenle farkli kaynaklar ayni sayfada celiskili durum mesaji uretiyordu.
+- Frontend:
+  - `ManagerAnalyticsView.vue` icin `topStatusCards` computed'i eklendi.
+  - `departmentDashboard` doluysa ust kartlar artik dashboard ile ayni kaynaktan konusuyor:
+    - `Durum: Analiz hazir`
+    - KPI/ML kapsami
+    - Nabiz kapsami
+    - 360 kapsami
+    - Veri guveni
+  - Dashboard yok ama KPI summary varsa `KPI verisi hazir` mesaji gosteriliyor.
+  - Gercekten veri yoksa eski overview fallback metrikleri korunuyor.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` basarili.
+  - `git diff --check` whitespace hatasi vermedi; yalnizca mevcut Windows CRLF uyarilari goruldu.
+
+### 2026-06-15 Demo Haftalik Nabiz Seed
+
+- Kullanici demo haftasi icin eksik haftalik nabiz verilerinin sahte/gercekci yanitlarla tamamlanmasini istedi.
+- DB veri ekleme:
+  - `2026-06-15` tarihli `weekly_pulse` kayitlari olusturuldu.
+  - Mevcut kayitlar ezilmeden, yalnizca bu haftada kaydi olmayan calisanlara eklendi.
+  - Toplam 60 calisan icin kayit eklendi: 30 Yazilim, 30 Satis.
+  - Her kayitta `score`, `raw_data.q1-q6`, `mte_score`, `ars_score` alanlari dolduruldu.
+  - Cevaplar ekip/rol/employee id bazli deterministik ve farkli olacak sekilde uretildi; `raw_data.demo_seed=true` ile isaretlendi.
+- Ek duzeltme:
+  - Software dashboard coverage yuzdeleri 100 ustune cikabiliyordu (`360 Kapsami %103`, `Veri Guveni %100.8`).
+  - `SoftwareMLService._dashboard_coverage()` icinde KPI, nabiz, 360 ve confidence yuzdeleri `0-100` araligina clamp edildi.
+- Dogrulama:
+  - DB smoke: `2026-06-15` icin 60 pulse kaydi, 60 tekil calisan, ortalama skor 3.93/5.
+  - Yazilim dashboard API: `pulse_response_count=30`, `pulse_employee_count=30`, `pulse_percentage=100.0`.
+  - Yazilim dashboard API: `feedback_percentage=100.0`, `confidence_score=100.0`.
+  - `python -m py_compile propel-backend\app\services\software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` basarili.
+
+### 2026-06-15 KPI ML Yonetici Ozeti Dili
+
+- Kullanici KPI & ML dashboard yonetici ozeti bolumunde `Deterministic` etiketinin ve `backend kural bazli analiz katmani` ifadesinin sacma/teknik gorundugunu belirtti.
+- Backend:
+  - `SoftwareMLService._dashboard_ai_summary_fallback()` yonetici diliyle yeniden duzenlendi.
+  - Summary artik teknik kaynak aciklamasi yerine karar destek yorumu veriyor:
+    - departman sagligi,
+    - KPI/ML performansi,
+    - insan sagligi,
+    - birlesik risk,
+    - veri guveni,
+    - hangi aksiyonun onde oldugu.
+  - `strengths`, `risks`, `recommendations` bos kalmayacak sekilde skor tabanli fallback maddeleri eklendi.
+  - Coverage yuksekken yanlis bicimde gorunen `dusuk kapsama` onerisi filtrelendi.
+- Frontend:
+  - `narrativeSourceLabel()` icinde `deterministic` etiketi `Kural tabanli karar destegi` olarak gosteriliyor.
+  - `deterministic_llm_fallback` etiketi `Karar destek ozeti` olarak gosteriliyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend\app\services\software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` basarili.
+  - Canli dashboard API: summary dogal yonetici diliyle dondu; risk ve oneriler dolu geldi.
+
+### 2026-06-15 KPI ML Yonetici Ozeti Uzun AI Anlatim ve Alan Duzeni
+
+- Kullanici yonetici ozetinin deterministik olmamasini, daha mantikli/uzun cumleler kurmasini ve genis bos alanin kucultulmesini istedi.
+- Backend:
+  - `SoftwareMLService._dashboard_ai_summary_fallback()` daha detayli analitik anlatim uretecek sekilde genisletildi.
+  - Fallback source `analytic_narrative` oldu; kullaniciya `deterministic` kaynak etiketi tasinmiyor.
+  - LLM provider yoksa teknik `LLM provider ayarli degil` mesaji onerilere eklenmiyor.
+  - Riskler ve oneriler artik baslik seviyesinde kalmiyor; skor ve kaynak baglamini aciklayan daha uzun maddeler uretiyor.
+- Frontend:
+  - `loadDepartmentDashboard()` varsayilan olarak `use_llm=true` cagiriyor; Gemini/Ollama mevcutsa yonetici ozeti LLM ile zenginlesiyor.
+  - `narrativeSourceLabel()` icinde teknik deterministic etiketleri `AI karar destek ozeti` olarak gosteriliyor.
+  - Yonetici ozeti karti `self-start` ve daha kompakt padding ile sag aksiyon kolonunun boyuna esnemiyor.
+  - Summary metni `h3` yerine okunabilir paragraf olarak, `whitespace-pre-line` ve daha iyi satir araligi ile gosteriliyor.
+  - Guclu sinyal/risk/oneri kutularinin padding ve font boyutu sikilastirildi.
+- Dogrulama:
+  - `python -m py_compile propel-backend\app\services\software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` basarili.
+  - Canli dashboard API `use_llm=true` ile `source=gemini`, `fallback_used=false` dondu; summary, riskler ve oneriler detayli geldi.
+
+### 2026-06-15 Dashboard Aksiyon Kaynagi ve Kanit Dili
+
+- Kullanici KPI & ML dashboard aksiyonlarinin neye gore yazildigini ve gercek analizlere dayanip dayanmadigini sordu.
+- Tespit:
+  - Ilk aksiyonlar LLM/Gemini tarafindan dashboard payload'indaki KPI/ML, nabiz, 360, risk ve coverage verileri yorumlanarak uretiliyor.
+  - Takim bazli aksiyonlar backend tarafinda `team_breakdown` skor kirilimindan deterministik uretiliyor.
+  - UI bu ayrimi gostermedigi icin kullanici aksiyonun AI yorumu mu, takim skor kirilimi mi oldugunu anlayamiyordu.
+- Backend:
+  - `DepartmentDashboardActionResponse.source` artik insight kaynagini tasiyor (`gemini:critical`, `analytic_narrative:risk_overlap`, `team_breakdown`, `coverage`).
+  - LLM insight prompt'una nedensellik siniri eklendi:
+    - `X, Y'den kaynaklaniyor` gibi kesin neden-sonuc cumleleri kurma.
+    - Evidence zayifsa once dogrulama aksiyonu oner.
+    - Ayrilma riski/burnout/motivasyon krizi gibi yuksek etkili yorumlari sadece payload'da ilgili sinyal varsa yaz.
+- Frontend:
+  - Aksiyon kartlarina kaynak rozeti eklendi.
+  - `gemini:*` -> `Kaynak: AI icgoru (Gemini)`.
+  - `team_breakdown` -> `Kaynak: takim skor kirilimi`.
+  - `coverage` -> `Kaynak: veri kapsami`.
+- Dogrulama:
+  - `python -m py_compile propel-backend\app\services\software_ml_service.py` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` ve `docker restart propel_frontend` basarili.
+  - Canli dashboard API'de aksiyon source alanlari `gemini:critical`, `gemini:warning`, `gemini:info`, `team_breakdown` olarak dondu.
+
+### 2026-06-15 KPI ML Aksiyonlar Yatay Duzen
+
+- Kullanici KPI & ML dashboard'da aksiyon kartlarinin sagda dikey kolon olarak durdugunu, sol alanda buyuk bosluk yarattigini ve yatay duzen istedigini belirtti.
+- Frontend:
+  - `ManagerAnalyticsView.vue` yonetici ozeti + aksiyonlar bolumu iki kolonlu `xl:grid-cols-[minmax(0,1.2fr)_360px]` duzenden tek kolonlu `space-y-5` duzene alindi.
+  - Aksiyonlar sag aside kolonundan cikarilip yonetici ozetinin altinda responsive yatay grid olarak gosteriliyor.
+  - Grid `grid-cols-1 md:grid-cols-2 2xl:grid-cols-3`; aksiyon sayisi rozeti eklendi.
+  - Aksiyon kartlari kaynak/owner chiplerini koruyor ve `min-h-[180px]` ile dengeli gorunuyor.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` basarili.
+
+### 2026-06-16 KPI ML Rol/Takim Dashboard Okunurlugu
+
+- Kullanici KPI & ML sayfasindaki "Rol bazli performans ve trend" grafiginin profesyonel ve anlasilir durmadigini, sayilarin gercek analiz sonucuna dayanmasi gerektigini belirtti.
+- Tespit:
+  - Bolum `GET /api/v1/analytics/performance/summary` cevabindaki `roles` ve `teams` alanlarini kullaniyor.
+  - Backend `AnalyticsService` bu alanlari calisan KPI kayitlarindan hesapliyor; frontend tarafinda rastgele veya sabit sayi uretilmiyor.
+- Frontend:
+  - Cift eksenli Chart.js bar grafigi kaldirildi.
+  - Rol bazli gorunum, skor barlari, trend etiketi, analiz kapsami, en yuksek ve izlenecek calisan bilgilerini gosteren responsive kart dashboard'a donusturuldu.
+  - Takim KPI ozeti sag dikey listeden cikarilip yatay responsive kart grid'e alindi.
+  - Takim kartlari ortalama KPI, kapsam, trend ve dusus sayisini API verisiyle gosteriyor.
+  - UI'a veri kaynagi notu eklendi: `Kaynak: /analytics/performance/summary`.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` basarili.
+
+### 2026-06-16 KPI ML Teknik Omurga Yerine Yonetici Karar Paneli
+
+- Kullanici KPI & ML sayfasindaki "Analytics Omurgasi" ve "Sprint 1" bloklarinin manager icin ne anlattigini ve ne aksiyon urettigini sorguladi.
+- Frontend:
+  - Teknik mimari/sprint bloklari manager ekraninda gizlendi.
+  - Yerine "Yonetici Karar Paneli" eklendi.
+  - Panel kartlari `performance/summary` verisinden turetiliyor: KPI kapsami, oncelikli takim, izlenecek rol grubu ve guclu ornek takim.
+  - Kartlar manager'a dogrudan ne yapacagini soyluyor: eksik KPI kapsamini tamamlama, takim lideriyle blokaj/capacity gorusmesi, rol grubu icin mentorluk/review kontrolu, guclu takim pratiklerini yayma.
+- Dogrulama:
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_frontend` basarili.
+
+### 2026-06-17 PR 40 Master Merge Conflict Cozumu
+
+- `pr-40` branch'ine `origin/master` merge edilirken olusan conflictler cozuldu.
+- Conflict dosyalari:
+  - `propel-backend/app/services/nlp_service.py`
+  - `propel-frontend/src/services/api/feedback.api.ts`
+  - `propel-frontend/src/views/manager/EmployeeAnalysisView.vue`
+- Cozum:
+  - 360 employee summary backend'inde PR 40 burnout/risk driver akisina master'dan gelen gercek 1-5 `skill_scores` hesaplamasi eklendi.
+  - Duplicate badge sorgusu tekrar edilmeden mevcut badge akisi korundu.
+  - Frontend API tiplerinde `RiskDriver` ve `SkillScore` birlikte tutuldu.
+  - Manager employee analysis ekraninda KPI row/burnout driver computed'lari ile gercek yetenek skoru computed'lari birlikte korundu.
+  - Merge sonrasi type-check'te yakalanan `EmployeeManagement.vue` `survey_ars` null durumu UI'da tire fallback'iyle duzeltildi.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/nlp_service.py propel-backend/app/schemas/feedbacks.py` basarili.
+  - `npm.cmd run type-check` basarili.
+
+### 2026-06-17 PR 40 Guncel Master Conflict Cozumu
+
+- `origin/master` yeni commitlerle ilerledigi icin GitHub PR yeniden conflict gosterdi; `pr-40` branch'i guncel `origin/master` ile tekrar merge edildi.
+- Lokal merge conflictleri:
+  - `CLAUDE.md`
+  - `propel-frontend/src/views/admin/EmployeeManagement.vue`
+- Cozum:
+  - `CLAUDE.md`, otomatik temiz birlesen `AGENTS.MD` ile senkronlandi; iki agent gunlugu tekrar ayni hale getirildi.
+  - `EmployeeManagement.vue` icinde `survey_ars` null ise `0%` gostermek yerine `-` fallback'i korundu.
+  - GitHub'in onceki conflict listesinde gorunen backend/software/sales dosyalari guncel merge'de otomatik birlesti.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/api/routers/admin_uploads.py propel-backend/app/services/software_ml_service.py propel-backend/scripts/generate_software_dataset.py propel-backend/scripts/seed_360_yazilim.py` basarili.
+  - `npm.cmd run type-check` basarili.

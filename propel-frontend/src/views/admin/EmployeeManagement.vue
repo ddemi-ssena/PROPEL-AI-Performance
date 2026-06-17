@@ -609,9 +609,10 @@
                     </div>
                     <div class="flex items-center gap-2">
                       <span class="text-[10px] text-slate-400 w-20 shrink-0">ARS Riski</span>
-                      <span class="text-sm font-bold" :class="arsColor(emp.survey_ars)">
-                        {{ ((emp.survey_ars ?? 0) * 100).toFixed(0) }}<span class="text-xs font-normal text-slate-400">%</span>
+                      <span v-if="emp.survey_ars !== null" class="text-sm font-bold" :class="arsColor(emp.survey_ars)">
+                        {{ (emp.survey_ars * 100).toFixed(0) }}<span class="text-xs font-normal text-slate-400">%</span>
                       </span>
+                      <span v-else class="text-sm font-bold text-slate-400">-</span>
                     </div>
                   </div>
                   <span v-else class="text-xs text-slate-300">—</span>

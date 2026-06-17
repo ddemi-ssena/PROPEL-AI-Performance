@@ -455,6 +455,7 @@ export interface SalesPredictionResponse {
   predicted_band: string
   confidence: number
   probabilities: Record<string, number>
+  risk_score?: number | null
   top_features: Array<Record<string, any>>
   risk_summary: string
   top_drivers: Array<Record<string, any>>

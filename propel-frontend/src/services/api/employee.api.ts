@@ -37,7 +37,13 @@ export interface TeamHealthMember {
   feedback_sentiment_score?: number | null
   feedback_motivation_score?: number | null
   feedback_flight_risk_level?: string | null
+  feedback_flight_risk_confidence?: number | null
   feedback_burnout_risk_level?: string | null
+  feedback_burnout_risk_confidence?: number | null
+  nlp_review_status?: string | null
+  nlp_review_note?: string | null
+  nlp_reviewed_at?: string | null
+  nlp_reviewer_name?: string | null
   combined_risk_score: number
   combined_risk_level: 'Low' | 'Medium' | 'High' | string
   recommended_action: string

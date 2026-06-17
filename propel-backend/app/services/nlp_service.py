@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import date, datetime
 from math import ceil
+import re
 from typing import Any, Dict, Iterable, Optional
 
 from sqlalchemy.orm import Session
@@ -10,16 +11,20 @@ from sqlalchemy.orm import Session
 from app.db.models.department import Department
 from app.db.models.employee import Employee
 from app.db.models.feedback import Feedback, FeedbackResponse, EmployeeBadge, BadgeType, BadgeLevel
+from app.db.models.kpi import KPIRecord
 from app.db.models.nlp import (
     EmployeeNLPProfile,
+    EmployeeNLPReview,
     FeedbackNLPAnalysis,
     NLPPeriodType,
+    NLPReviewStatus,
     NLPSourceType,
     RiskLevel,
     SentimentLabel,
 )
 from app.schemas.nlp import FeedbackNLPAnalysisCreate
 from app.services.ai_service import AIService
+from app.services.analytics_service import AnalyticsService
 from app.services.rag_service import RAGService
 from app.schemas.feedback import BadgeResponse
 
@@ -189,12 +194,9 @@ class NLPService:
         positive_steps = sum(1 for item in deltas if item > 0.12)
         negative_steps = sum(1 for item in deltas if item < -0.12)
 
-        if positive_steps and negative_steps:
-            return "stabil"
-
-        if delta > 0.35 and average_delta > 0.18:
+        if delta > 0.35 and average_delta > 0.08 and positive_steps >= negative_steps:
             return "yukselis"
-        if delta < -0.35 and average_delta < -0.18:
+        if delta < -0.35 and average_delta < -0.08 and negative_steps >= positive_steps:
             return "dusus"
         return "stabil"
 
@@ -214,6 +216,142 @@ class NLPService:
         return round(total / weight_total, 1)
 
     @staticmethod
+    def _weekly_average_series(analyses: list[FeedbackNLPAnalysis], field_name: str) -> list[float]:
+        grouped: dict[int, list[float]] = {}
+        for analysis in analyses:
+            value = getattr(analysis, field_name)
+            if value is None:
+                continue
+            week = NLPService._week_of_month_from_datetime(analysis.created_at)
+            grouped.setdefault(week, []).append(float(value))
+        return [
+            round(sum(values) / len(values), 2)
+            for week, values in sorted(grouped.items())
+            if values
+        ]
+
+    @staticmethod
+    def _count_raw_items(analyses: list[FeedbackNLPAnalysis], keys: list[str], limit: int = 5) -> list[tuple[str, int]]:
+        counter: Counter[str] = Counter()
+        for analysis in analyses:
+            raw = analysis.raw_analysis or {}
+            for key in keys:
+                value = raw.get(key)
+                if not isinstance(value, list):
+                    continue
+                for item in value:
+                    normalized = " ".join(str(item).strip().lower().split())
+                    if normalized:
+                        counter[normalized] += 1
+        return counter.most_common(limit)
+
+    @staticmethod
+    def _risk_level_from_driver_count(driver_count: int) -> Optional[str]:
+        if driver_count >= 3:
+            return "high"
+        if driver_count >= 2:
+            return "medium"
+        if driver_count == 1:
+            return "low"
+        return None
+
+    @staticmethod
+    def _burnout_risk_drivers(
+        analyses: list[FeedbackNLPAnalysis],
+        *,
+        motivation_trend: list[float] | None = None,
+        safety_trend: list[float] | None = None,
+        top_complaints: list[str] | None = None,
+    ) -> tuple[list[dict[str, Any]], list[str], Optional[str]]:
+        trusted = NLPService._trusted_analyses(analyses)
+        motivation_series = motivation_trend if motivation_trend is not None else NLPService._weekly_average_series(trusted, "motivation_score")
+        safety_series = safety_trend if safety_trend is not None else NLPService._weekly_average_series(trusted, "psychological_safety_score")
+        drivers: list[dict[str, Any]] = []
+        evidence: list[str] = []
+
+        if len(motivation_series) >= 2:
+            first = motivation_series[0]
+            last = motivation_series[-1]
+            delta = round(last - first, 2)
+            if delta <= -0.5:
+                text = f"Son {len(motivation_series)} haftada motivasyon {first:.1f} -> {last:.1f} dustu."
+                drivers.append({
+                    "label": "Motivasyon dususu",
+                    "evidence": text,
+                    "severity": "high" if delta <= -1.0 else "medium",
+                })
+                evidence.append(text)
+
+        if len(safety_series) >= 2:
+            first = safety_series[0]
+            last = safety_series[-1]
+            delta = round(last - first, 2)
+            if delta <= -0.4:
+                text = f"Psikolojik guven {first:.1f} -> {last:.1f} geriledi."
+                drivers.append({
+                    "label": "Psikolojik guven azalmasi",
+                    "evidence": text,
+                    "severity": "high" if delta <= -0.8 else "medium",
+                })
+                evidence.append(text)
+
+        workload_terms = {
+            "is yuku",
+            "asiri yuk",
+            "kapasite",
+            "toplanti yogunlugu",
+            "deadline",
+            "quota baskisi",
+            "blokaj",
+            "oncelik",
+            "stres",
+            "yorgunluk",
+            "burnout",
+            "tukenmislik",
+            "tukennislik",
+        }
+        counted_topics = NLPService._count_raw_items(
+            trusted,
+            ["complaint_topics", "support_needs", "risk_flags", "theme_labels"],
+            limit=12,
+        )
+        visible_complaints = set(top_complaints or [])
+        for topic, count in counted_topics:
+            normalized = topic.lower()
+            if not any(term in normalized for term in workload_terms) and topic not in visible_complaints:
+                continue
+            if count < 2:
+                continue
+            text = f"'{topic}' temasi {count} kez tekrarlandi."
+            drivers.append({
+                "label": "Tekrarlayan is yuku veya destek ihtiyaci",
+                "evidence": text,
+                "count": count,
+                "severity": "high" if count >= 5 else "medium",
+            })
+            evidence.append(text)
+            break
+
+        explicit_burnout = sum(1 for analysis in trusted if analysis.burnout_risk == RiskLevel.high)
+        if explicit_burnout:
+            text = f"{explicit_burnout} geri bildirim kaydinda burnout riski high isaretlendi."
+            drivers.append({
+                "label": "Tekil NLP burnout sinyali",
+                "evidence": text,
+                "count": explicit_burnout,
+                "severity": "high" if explicit_burnout >= 2 else "medium",
+            })
+            evidence.append(text)
+
+        if not drivers:
+            return [], [], None
+
+        high_count = sum(1 for item in drivers if item.get("severity") == "high")
+        medium_count = sum(1 for item in drivers if item.get("severity") == "medium")
+        risk_level = "high" if high_count >= 1 or len(drivers) >= 3 else "medium" if medium_count or len(drivers) >= 2 else "low"
+        return drivers[:4], evidence[:4], risk_level
+
+    @staticmethod
     def _badge_level_for_unique_reviewers(unique_reviewer_count: int) -> Optional[BadgeLevel]:
         if unique_reviewer_count >= 4:
             return BadgeLevel.gold
@@ -228,11 +366,23 @@ class NLPService:
         parts: list[str] = []
         parts.extend([str(item) for item in (analysis.key_strengths or [])])
         parts.extend([str(item) for item in (analysis.keywords or [])])
+        if analysis.weekly_feedback and analysis.weekly_feedback.response_text:
+            parts.append(str(analysis.weekly_feedback.response_text))
+        if analysis.classic_feedback:
+            parts.extend(
+                [
+                    str(analysis.classic_feedback.strength_text or ""),
+                    str(analysis.classic_feedback.improvement_text or ""),
+                    str(analysis.classic_feedback.general_comment or ""),
+                ]
+            )
 
         raw = analysis.raw_analysis or {}
         if isinstance(raw, dict):
             for key in [
                 "praise_topics",
+                "complaint_topics",
+                "flight_risk_reasons",
                 "theme_labels",
                 "entity_mentions",
                 "dominant_emotions",
@@ -247,6 +397,186 @@ class NLPService:
                     parts.append(value)
 
         return " ".join(" ".join(parts).lower().split())
+
+    @staticmethod
+    def _distinctive_feedback_phrases(
+        analyses: list[FeedbackNLPAnalysis],
+        *,
+        kind: str,
+        limit: int = 3,
+    ) -> list[str]:
+        positive_patterns = [
+            "code review sahiplenmesi",
+            "test otomasyonu disiplini",
+            "api entegrasyon takibi",
+            "deploy sorumlulugu",
+            "arayuz detay kalitesi",
+            "bilgi paylasimi",
+            "musteri takip disiplini",
+            "crm kayit kalitesi",
+            "pipeline onceliklendirme",
+            "sikayet kapatma hizi",
+            "mentorluk katkisi",
+            "net durum guncellemesi",
+            "sorumluluk alma",
+            "psikolojik guven",
+        ]
+        negative_patterns = [
+            "blokaj eskalasyonu gecikmesi",
+            "test kapsaminda acik",
+            "dokumantasyon eksigi",
+            "deploy sonrasi takip eksigi",
+            "arayuz kabul kriteri belirsizligi",
+            "api bagimliligi gec bildirme",
+            "crm guncelleme gecikmesi",
+            "pipeline yaslanmasi",
+            "quota baskisi",
+            "musteri itirazlarini gec kapatma",
+            "destek talebini gec acma",
+            "oncelik degisikliklerinde zorlanma",
+            "toplanti yogunlugu",
+            "motivasyon dususu",
+        ]
+        theme_patterns = [
+            "code review",
+            "test otomasyonu",
+            "api entegrasyonu",
+            "deploy stabilitesi",
+            "arayuz teslimi",
+            "sprint planlama",
+            "musteri takip",
+            "crm disiplini",
+            "pipeline sagligi",
+            "quota yonetimi",
+            "sikayet yonetimi",
+            "mentorluk",
+            "ekip koordinasyonu",
+            "psikolojik guven",
+        ]
+        patterns = {
+            "positive": positive_patterns,
+            "negative": negative_patterns,
+            "theme": theme_patterns,
+        }[kind]
+        generic = {
+            "backend",
+            "frontend",
+            "qa",
+            "devops",
+            "junior",
+            "mid",
+            "senior",
+            "engineer",
+            "rol",
+            "genel",
+            "delivery",
+            "quality",
+            "growth",
+            "risk",
+            "leadership",
+            "collaboration",
+        }
+
+        counter: Counter[str] = Counter()
+        for analysis in analyses:
+            blob = NLPService._analysis_text_blob(analysis)
+            raw = analysis.raw_analysis or {}
+            if kind == "negative":
+                for key in ("complaint_topics", "flight_risk_reasons", "support_needs"):
+                    for item in raw.get(key) or []:
+                        normalized = " ".join(str(item).strip().lower().split())
+                        if normalized:
+                            counter[normalized] += 3
+            if kind == "positive":
+                for item in list(raw.get("praise_topics") or []) + list(analysis.key_strengths or []):
+                    normalized = " ".join(str(item).strip().lower().split())
+                    if normalized:
+                        counter[normalized] += 3
+            if kind == "theme":
+                for item in raw.get("entity_mentions") or []:
+                    normalized = " ".join(str(item).strip().lower().split())
+                    if len(normalized) < 4 or normalized in generic:
+                        continue
+                    if re.fullmatch(r"[a-z]+", normalized) and normalized in generic:
+                        continue
+                    counter[normalized] += 3
+
+            for pattern in patterns:
+                if pattern in blob:
+                    counter[pattern] += 1
+
+        return [item for item, _ in counter.most_common(limit)]
+
+    @staticmethod
+    def _filter_topic_items(items: list[str], employee: Optional[Employee] = None, limit: int = 5) -> list[str]:
+        generic = {
+            "backend",
+            "frontend",
+            "qa",
+            "devops",
+            "junior",
+            "mid",
+            "senior",
+            "engineer",
+            "developer",
+            "rol",
+            "genel",
+            "delivery",
+            "quality",
+            "growth",
+            "risk",
+            "leadership",
+            "collaboration",
+        }
+        blocked: set[str] = set(generic)
+        if employee:
+            blocked.add(" ".join((employee.team or "").strip().lower().split()))
+            blocked.add(" ".join((employee.position or "").strip().lower().split()))
+            if employee.user:
+                blocked.add(" ".join((employee.user.full_name or "").strip().lower().split()))
+
+        filtered: list[str] = []
+        for item in items:
+            normalized = " ".join(str(item).strip().lower().split())
+            if not normalized or normalized in blocked:
+                continue
+            if any(token in generic for token in normalized.split()) and len(normalized.split()) <= 3:
+                continue
+            if normalized not in filtered:
+                filtered.append(normalized)
+            if len(filtered) >= limit:
+                break
+        return filtered
+
+    @staticmethod
+    def _filter_generic_items(items: list[str], generic_items: set[str], limit: int = 5) -> list[str]:
+        specific: list[str] = []
+        generic: list[str] = []
+        for item in items:
+            normalized = " ".join(str(item).strip().lower().split())
+            if not normalized:
+                continue
+            target = generic if normalized in generic_items else specific
+            if normalized not in target:
+                target.append(normalized)
+        return (specific + generic)[:limit]
+
+    @staticmethod
+    def _raw_dominant_items(
+        analyses: list[FeedbackNLPAnalysis],
+        keys: list[str],
+        *,
+        limit: int = 3,
+    ) -> list[str]:
+        counter: Counter[str] = Counter()
+        for analysis in analyses:
+            raw = analysis.raw_analysis or {}
+            for key in keys:
+                for item in raw.get(key) or []:
+                    normalized = " ".join(str(item).strip().lower().split())
+                    if normalized:
+                        counter[normalized] += 1
+        return [item for item, _ in counter.most_common(limit)]
 
     @staticmethod
     def _matching_badge_analyses(
@@ -587,6 +917,87 @@ class NLPService:
         )
 
     @staticmethod
+    def get_employee_nlp_review(
+        db: Session,
+        *,
+        employee_id: int,
+        period_type: NLPPeriodType,
+        period_year: int,
+        period_month: int,
+        period_week: Optional[int] = None,
+    ) -> Optional[EmployeeNLPReview]:
+        return db.query(EmployeeNLPReview).filter(
+            EmployeeNLPReview.employee_id == employee_id,
+            EmployeeNLPReview.period_type == period_type,
+            EmployeeNLPReview.period_year == period_year,
+            EmployeeNLPReview.period_month == period_month,
+            EmployeeNLPReview.period_week == period_week,
+        ).first()
+
+    @staticmethod
+    def upsert_employee_nlp_review(
+        db: Session,
+        *,
+        employee_id: int,
+        department_id: Optional[int],
+        reviewer_user_id: int,
+        reviewer_employee_id: Optional[int],
+        period_type: NLPPeriodType,
+        period_year: int,
+        period_month: int,
+        period_week: Optional[int],
+        status: NLPReviewStatus,
+        note: Optional[str] = None,
+        manager_acknowledged: bool = True,
+    ) -> EmployeeNLPReview:
+        existing = NLPService.get_employee_nlp_review(
+            db,
+            employee_id=employee_id,
+            period_type=period_type,
+            period_year=period_year,
+            period_month=period_month,
+            period_week=period_week,
+        )
+
+        payload = {
+            "employee_id": employee_id,
+            "department_id": department_id,
+            "reviewer_user_id": reviewer_user_id,
+            "reviewer_employee_id": reviewer_employee_id,
+            "period_type": period_type,
+            "period_year": period_year,
+            "period_month": period_month,
+            "period_week": period_week,
+            "status": status,
+            "note": note,
+            "manager_acknowledged": manager_acknowledged,
+            "reviewed_at": datetime.utcnow(),
+        }
+
+        if existing:
+            for field, value in payload.items():
+                setattr(existing, field, value)
+            review = existing
+        else:
+            review = EmployeeNLPReview(**payload)
+            db.add(review)
+
+        db.commit()
+        db.refresh(review)
+        return review
+
+    @staticmethod
+    def get_recent_360_analyses(
+        db: Session,
+        *,
+        employee_id: int,
+        limit: int = 10,
+    ) -> list[FeedbackNLPAnalysis]:
+        return db.query(FeedbackNLPAnalysis).filter(
+            FeedbackNLPAnalysis.employee_id == employee_id,
+        ).order_by(FeedbackNLPAnalysis.created_at.desc()).limit(limit).all()
+
+    @staticmethod
     def get_recent_weekly_analyses(
         db: Session,
         *,
@@ -704,6 +1115,194 @@ class NLPService:
         return f"{value:.1f}{suffix}" if value is not None else "-"
 
     @staticmethod
+    def _short_text(value: Optional[str], limit: int = 140) -> str:
+        text = " ".join((value or "").split())
+        if len(text) <= limit:
+            return text
+        return text[: limit - 3].rstrip() + "..."
+
+    @staticmethod
+    def _score_phrase(label: str, value: Optional[float]) -> Optional[str]:
+        if value is None:
+            return None
+        return f"{label} {value:.1f}/5"
+
+    @staticmethod
+    def _latest_feedback_quote(analyses: list[FeedbackNLPAnalysis]) -> Optional[str]:
+        for analysis in analyses:
+            if analysis.weekly_feedback and analysis.weekly_feedback.response_text:
+                return NLPService._short_text(analysis.weekly_feedback.response_text, 150)
+            if analysis.classic_feedback:
+                parts = [
+                    analysis.classic_feedback.strength_text,
+                    analysis.classic_feedback.improvement_text,
+                    analysis.classic_feedback.general_comment,
+                ]
+                for part in parts:
+                    if part:
+                        return NLPService._short_text(part, 150)
+        return None
+
+    @staticmethod
+    def _latest_kpi_context(db: Session, employee_id: int) -> dict[str, Any]:
+        records = (
+            db.query(KPIRecord)
+            .filter(KPIRecord.employee_id == employee_id)
+            .order_by(KPIRecord.period_date.asc())
+            .all()
+        )
+        if not records:
+            return {
+                "has_data": False,
+                "score": None,
+                "trend": None,
+                "status": "no_data",
+                "record_count": 0,
+                "latest_period": None,
+                "strongest_label": None,
+            }
+
+        periods = sorted({record.period_date for record in records if record.period_date})
+        latest_period = periods[-1] if periods else None
+        last_four_periods = periods[-4:]
+        latest_records = [record for record in records if record.period_date == latest_period]
+
+        score = AnalyticsService._performance_score_for_records(latest_records)
+        sparkline_values: list[float] = []
+        for period in last_four_periods:
+            period_score = AnalyticsService._performance_score_for_records([
+                record for record in records if record.period_date == period
+            ])
+            if period_score is not None:
+                sparkline_values.append(period_score)
+
+        trend = None
+        if len(sparkline_values) >= 2:
+            trend = round(sparkline_values[-1] - sparkline_values[0], 1)
+
+        strongest_label = None
+        if latest_records:
+            scored_records = []
+            for record in latest_records:
+                label = record.kpi.name if record.kpi else f"KPI #{record.kpi_id}"
+                scored_records.append((AnalyticsService._normalize_kpi_value(float(record.value)), label))
+            if scored_records:
+                strongest_label = sorted(scored_records, key=lambda item: item[0], reverse=True)[0][1]
+
+        return {
+            "has_data": True,
+            "score": score,
+            "trend": trend,
+            "status": AnalyticsService._status_for(score, trend),
+            "record_count": len(records),
+            "latest_period": latest_period,
+            "strongest_label": strongest_label,
+        }
+
+    @staticmethod
+    def _employee_manager_summary(
+        *,
+        employee: Employee,
+        profile: EmployeeNLPProfile,
+        analyses: list[FeedbackNLPAnalysis],
+        kpi_context: dict[str, Any],
+        burnout_evidence: list[str],
+        badge_titles: list[str],
+        low_quality_count: int,
+        bias_count: int,
+    ) -> tuple[str, list[str], str]:
+        employee_name = employee.user.full_name if employee.user else f"Calisan #{employee.id}"
+        first_name = employee_name.split()[0] if employee_name else "Calisan"
+
+        evidence: list[str] = []
+        score = kpi_context.get("score")
+        trend = kpi_context.get("trend")
+        if score is not None:
+            trend_text = "trend yok"
+            if trend is not None:
+                trend_text = f"{trend:+.1f} trend"
+            evidence.append(f"KPI skoru {score:.1f}/100, {trend_text}.")
+        if kpi_context.get("strongest_label"):
+            evidence.append(f"En guclu KPI sinyali: {kpi_context['strongest_label']}.")
+
+        for item in [
+            NLPService._score_phrase("Motivasyon", profile.avg_motivation_score),
+            NLPService._score_phrase("psikolojik guven", profile.avg_psychological_safety_score),
+            NLPService._score_phrase("is birligi", profile.avg_collaboration_score),
+        ]:
+            if item:
+                evidence.append(item + ".")
+
+        if profile.top_strengths:
+            evidence.append(f"Tekrarlayan guclu yon: {profile.top_strengths[0]}.")
+        if profile.top_risk_areas:
+            evidence.append(f"One cikan risk alani: {profile.top_risk_areas[0]}.")
+        if profile.top_support_needs:
+            evidence.append(f"Destek ihtiyaci: {profile.top_support_needs[0]}.")
+        if profile.flight_risk_level:
+            confidence = f" ({profile.flight_risk_confidence:.0%} guven)" if profile.flight_risk_confidence is not None else ""
+            evidence.append(f"Flight risk {profile.flight_risk_level.value}{confidence}.")
+        if profile.burnout_risk_level:
+            confidence = f" ({profile.burnout_risk_confidence:.0%} guven)" if profile.burnout_risk_confidence is not None else ""
+            evidence.append(f"Burnout risk {profile.burnout_risk_level.value}{confidence}.")
+        if burnout_evidence:
+            evidence.append(burnout_evidence[0])
+        if badge_titles:
+            evidence.append(f"Kazandigi rozetler: {', '.join(badge_titles[:3])}.")
+
+        quote = NLPService._latest_feedback_quote(analyses)
+        if quote:
+            evidence.append(f"Son geri bildirim kaniti: \"{quote}\"")
+
+        if low_quality_count:
+            evidence.append(f"{low_quality_count} kayitta veri kalitesi uyarisi var.")
+        if bias_count:
+            evidence.append(f"{bias_count} kayitta karsilikli bias supheleri var.")
+
+        risk_signals = [
+            bool(score is not None and score < 80),
+            bool(trend is not None and trend < -1),
+            bool(profile.avg_motivation_score is not None and profile.avg_motivation_score < 3),
+            bool(profile.avg_psychological_safety_score is not None and profile.avg_psychological_safety_score < 3),
+            bool(profile.flight_risk_level and profile.flight_risk_level.value in {"medium", "high"}),
+            bool(profile.burnout_risk_level and profile.burnout_risk_level.value in {"medium", "high"}),
+        ]
+        positive_signals = [
+            bool(score is not None and score >= 85),
+            bool(trend is not None and trend > 0),
+            bool(profile.avg_motivation_score is not None and profile.avg_motivation_score >= 4),
+            bool(profile.avg_collaboration_score is not None and profile.avg_collaboration_score >= 4),
+            bool(badge_titles),
+        ]
+
+        risk_count = sum(1 for item in risk_signals if item)
+        positive_count = sum(1 for item in positive_signals if item)
+
+        if not evidence:
+            summary = (
+                f"{employee_name} icin bu hafta guvenilir bir 360/KPI sinyali henuz olusmadi. "
+                "Yonetici yorumu uretmek icin once KPI kaydi veya geri bildirim verisi artirilmalidir."
+            )
+            return summary, [], "Veri topla"
+
+        if risk_count >= 3:
+            opening = f"{employee_name} icin bu hafta yakin yonetici takibi gerektiren bir tablo var."
+            action = "Bu hafta bire bir gorusme planla; motivasyon, is yuku ve destek ihtiyacini ayni gorusmede netlestir."
+        elif risk_count >= 1:
+            opening = f"{employee_name} icin tablo karisik; performans ve insan sinyalleri birlikte izlenmeli."
+            action = "Kisa bir kontrol gorusmesiyle risk alanini dogrula ve bir sonraki hafta ayni metrikleri takip et."
+        elif positive_count >= 3:
+            opening = f"{employee_name} bu hafta guclu ve istikrarli katkilar gosteriyor."
+            action = "Mevcut guclu alani gorunur kil; ekip icinde bilgi paylasimi veya mentorluk firsati ver."
+        else:
+            opening = f"{employee_name} icin bu hafta belirgin bir kritik risk yok, ancak takip gerektiren sinyaller var."
+            action = "Duzenli takip yeterli; ozellikle tekrar eden tema ve KPI trendi bir sonraki hafta yeniden kontrol edilmeli."
+
+        evidence_sentence = " ".join(evidence[:4])
+        summary = f"{opening} Kanitlar: {evidence_sentence} Yonetici aksiyonu: {action}"
+        return summary, evidence[:8], action
+
+    @staticmethod
     def build_employee_360_summary_report(
         db: Session,
         *,
@@ -724,7 +1323,7 @@ class NLPService:
             period_month=period_month,
             period_week=period_week,
         )
-        recent_analyses = NLPService.get_recent_weekly_analyses(db, employee_id=employee_id, limit=8)
+        recent_analyses = NLPService.get_recent_360_analyses(db, employee_id=employee_id, limit=8)
 
         quality_items = []
         bias_items = []
@@ -750,6 +1349,30 @@ class NLPService:
                     bias_items.extend([str(reason) for reason in reasons[:2]])
                 else:
                     bias_items.append("ayni hafta karsilikli puan supheleri")
+
+        burnout_drivers, burnout_evidence, burnout_driver_level = NLPService._burnout_risk_drivers(
+            recent_analyses,
+            top_complaints=profile.top_risk_areas or [],
+        )
+        kpi_context = NLPService._latest_kpi_context(db, employee_id)
+
+        period_date = datetime(period_year, period_month, 1).date()
+        badges = db.query(EmployeeBadge).filter(
+            EmployeeBadge.employee_id == employee.id,
+            EmployeeBadge.period_date == period_date,
+        ).order_by(EmployeeBadge.created_at.desc()).all()
+        if not badges:
+            latest_period = NLPService._get_latest_badge_period(db, employee.id)
+            if latest_period:
+                badges = db.query(EmployeeBadge).filter(
+                    EmployeeBadge.employee_id == employee.id,
+                    EmployeeBadge.period_date == latest_period,
+                ).order_by(EmployeeBadge.created_at.desc()).all()
+
+        badge_titles = [
+            NLPService.MONTHLY_BADGE_RULES.get(item.badge_type, {}).get("title", item.badge_type.value)
+            for item in badges
+        ]
 
         metrics = [
             {
@@ -778,35 +1401,29 @@ class NLPService:
                 "value": None,
                 "display_value": (profile.flight_risk_level.value if profile.flight_risk_level else "unknown").upper(),
                 "risk_level": profile.flight_risk_level.value if profile.flight_risk_level else None,
+                "confidence": profile.flight_risk_confidence,
                 "description": "Aidiyet ve kopma sinyallerinin seviye ozeti",
             },
             {
                 "label": "Burnout Risk",
                 "value": None,
                 "display_value": (profile.burnout_risk_level.value if profile.burnout_risk_level else "unknown").upper(),
-                "risk_level": profile.burnout_risk_level.value if profile.burnout_risk_level else None,
+                "risk_level": burnout_driver_level or (profile.burnout_risk_level.value if profile.burnout_risk_level else None),
+                "confidence": profile.burnout_risk_confidence,
+                "drivers": burnout_drivers,
                 "description": "Yorgunluk ve tukennislik sinyallerinin seviye ozeti",
             },
         ]
 
-        summary_parts = []
-        if profile.avg_motivation_score is not None:
-            summary_parts.append(f"motivasyon skoru {profile.avg_motivation_score:.1f}/5")
-        if profile.flight_risk_level:
-            summary_parts.append(f"flight risk seviyesi {profile.flight_risk_level.value}")
-        if profile.top_support_needs:
-            summary_parts.append(f"en belirgin destek ihtiyaci {profile.top_support_needs[0]}")
-        if low_quality_count:
-            summary_parts.append(f"veri kalitesi uyarisi {low_quality_count} kayitta goruldu")
-        if bias_count:
-            summary_parts.append(f"karsilikli bias supheleri {bias_count} kayitta izlendi")
-
-        summary = profile.manager_summary or (
-            f"Bu haftaki 360 feedback ozetine gore {employee.user.full_name} icin "
-            + ", ".join(summary_parts)
-            + "."
-            if summary_parts
-            else f"Bu hafta {employee.user.full_name} icin anlamli bir 360 feedback sinyali henuz olusmadi."
+        summary, manager_evidence, recommended_action = NLPService._employee_manager_summary(
+            employee=employee,
+            profile=profile,
+            analyses=recent_analyses,
+            kpi_context=kpi_context,
+            burnout_evidence=burnout_evidence,
+            badge_titles=badge_titles,
+            low_quality_count=low_quality_count,
+            bias_count=bias_count,
         )
 
         sections = [
@@ -814,6 +1431,16 @@ class NLPService:
             {"title": "Risk Alanlari", "items": profile.top_risk_areas or []},
             {"title": "Destek Ihtiyaclari", "items": profile.top_support_needs or []},
         ]
+        if manager_evidence:
+            sections.insert(0, {
+                "title": "Yonetici Kanitlari",
+                "items": manager_evidence,
+            })
+        if burnout_evidence:
+            sections.append({
+                "title": "Burnout Risk Drivers",
+                "items": burnout_evidence,
+            })
         if low_quality_count:
             sections.append({
                 "title": "Veri Kalitesi Uyarilari",
@@ -824,19 +1451,6 @@ class NLPService:
                 "title": "Bias Supheleri",
                 "items": [f"{bias_count} kayitta karsilikli puanlama supheleri izlendi."] + NLPService._dominant_items([bias_items], limit=3),
             })
-
-        period_date = datetime(period_year, period_month, 1).date()
-        badges = db.query(EmployeeBadge).filter(
-            EmployeeBadge.employee_id == employee.id,
-            EmployeeBadge.period_date == period_date,
-        ).order_by(EmployeeBadge.created_at.desc()).all()
-        if not badges:
-            latest_period = NLPService._get_latest_badge_period(db, employee.id)
-            if latest_period:
-                badges = db.query(EmployeeBadge).filter(
-                    EmployeeBadge.employee_id == employee.id,
-                    EmployeeBadge.period_date == latest_period,
-                ).order_by(EmployeeBadge.created_at.desc()).all()
 
         # Gerçek 1-5 yetenek skorları: bu çalışana verilen FeedbackResponse kayıtlarından
         received_responses = (
@@ -868,7 +1482,7 @@ class NLPService:
             "period_week": period_week,
             "report_title": "Kisisel 360 Feedback Summary",
             "report_summary": summary,
-            "recommended_action": profile.recommended_action,
+            "recommended_action": profile.recommended_action or recommended_action,
             "badges": [BadgeResponse.model_validate(item) for item in badges],
             "metrics": metrics,
             "sections": sections,
@@ -906,7 +1520,6 @@ class NLPService:
         }
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         analyses = [
             item for item in analyses
@@ -1076,7 +1689,6 @@ class NLPService:
 
         risk_analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         risk_analyses = [
             analysis for analysis in risk_analyses
@@ -1127,7 +1739,6 @@ class NLPService:
 
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.employee_id == employee_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         analyses = [
             item for item in analyses
@@ -1136,14 +1747,47 @@ class NLPService:
         analyses.sort(key=lambda item: item.created_at)
         trusted_analyses = NLPService._trusted_analyses(analyses)
 
-        motivation_trend = [item.motivation_score for item in trusted_analyses]
-        sentiment_trend = [item.sentiment_score for item in trusted_analyses]
+        motivation_trend = NLPService._weekly_average_series(trusted_analyses, "motivation_score")
+        sentiment_trend = NLPService._weekly_average_series(trusted_analyses, "sentiment_score")
         top_complaints = NLPService._dominant_items(
             NLPService._raw_list_item(item, "complaint_topics") for item in trusted_analyses
         )
+        distinctive_complaints = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="negative",
+            limit=3,
+        )
+        top_complaints = list(dict.fromkeys(distinctive_complaints + top_complaints))[:5]
+        raw_complaints = NLPService._raw_dominant_items(
+            trusted_analyses,
+            ["complaint_topics", "flight_risk_reasons"],
+            limit=4,
+        )
+        top_complaints = list(dict.fromkeys(raw_complaints + top_complaints))[:5]
         top_praises = NLPService._dominant_items(
             NLPService._raw_list_item(item, "praise_topics") + list(item.key_strengths or [])
             for item in trusted_analyses
+        )
+        distinctive_praises = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="positive",
+            limit=3,
+        )
+        top_praises = list(dict.fromkeys(distinctive_praises + top_praises))[:5]
+        top_praises = NLPService._filter_generic_items(
+            top_praises,
+            {"psikolojik guven", "sorumluluk alma", "is birligi", "gelisime aciklik", "liderlik destegi"},
+            limit=5,
+        )
+        raw_praises = NLPService._raw_dominant_items(
+            trusted_analyses,
+            ["praise_topics", "key_strengths"],
+            limit=4,
+        )
+        top_praises = NLPService._filter_generic_items(
+            list(dict.fromkeys(raw_praises + top_praises)),
+            {"psikolojik guven", "sorumluluk alma", "is birligi", "gelisime aciklik", "liderlik destegi"},
+            limit=5,
         )
         top_themes = NLPService._dominant_items(
             ((
@@ -1153,6 +1797,19 @@ class NLPService:
             for item in trusted_analyses),
             limit=5,
         )
+        distinctive_themes = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="theme",
+            limit=4,
+        )
+        top_themes = list(dict.fromkeys(distinctive_themes + top_themes))[:6]
+        raw_themes = NLPService._raw_dominant_items(
+            trusted_analyses,
+            ["theme_labels", "entity_mentions"],
+            limit=5,
+        )
+        top_themes = list(dict.fromkeys(raw_themes + top_themes))[:8]
+        top_themes = NLPService._filter_topic_items(top_themes, employee, limit=6)
         avg_flight_score = NLPService._weighted_numeric_average(
             (
                 NLPService._extract_float(item.raw_analysis or {}, "flight_risk_score") if isinstance(item.raw_analysis, dict) else None,
@@ -1167,6 +1824,13 @@ class NLPService:
                 if isinstance(item.raw_analysis, dict) and (item.raw_analysis or {}).get("action_recommendation")
             ),
             None,
+        )
+        safety_trend = NLPService._weekly_average_series(trusted_analyses, "psychological_safety_score")
+        burnout_drivers, burnout_evidence, burnout_risk_level = NLPService._burnout_risk_drivers(
+            trusted_analyses,
+            motivation_trend=motivation_trend,
+            safety_trend=safety_trend,
+            top_complaints=top_complaints,
         )
 
         return {
@@ -1184,6 +1848,9 @@ class NLPService:
             "flight_risk_reasons": NLPService._dominant_items(
                 NLPService._raw_list_item(item, "flight_risk_reasons") for item in trusted_analyses
             ),
+            "burnout_risk_level": burnout_risk_level,
+            "burnout_risk_drivers": burnout_drivers,
+            "burnout_risk_evidence": burnout_evidence,
             "action_recommendation": action_recommendation,
         }
 
@@ -1209,7 +1876,6 @@ class NLPService:
         }
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         analyses = [
             item for item in analyses
@@ -1219,14 +1885,31 @@ class NLPService:
         analyses.sort(key=lambda item: item.created_at)
         trusted_analyses = NLPService._trusted_analyses(analyses)
 
-        motivation_trend = [item.motivation_score for item in trusted_analyses]
-        sentiment_trend = [item.sentiment_score for item in trusted_analyses]
+        motivation_trend = NLPService._weekly_average_series(trusted_analyses, "motivation_score")
+        sentiment_trend = NLPService._weekly_average_series(trusted_analyses, "sentiment_score")
         top_complaints = NLPService._dominant_items(
             NLPService._raw_list_item(item, "complaint_topics") for item in trusted_analyses
         )
+        distinctive_complaints = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="negative",
+            limit=4,
+        )
+        top_complaints = list(dict.fromkeys(distinctive_complaints + top_complaints))[:6]
         top_praises = NLPService._dominant_items(
             NLPService._raw_list_item(item, "praise_topics") + list(item.key_strengths or [])
             for item in trusted_analyses
+        )
+        distinctive_praises = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="positive",
+            limit=4,
+        )
+        top_praises = list(dict.fromkeys(distinctive_praises + top_praises))[:6]
+        top_praises = NLPService._filter_generic_items(
+            top_praises,
+            {"psikolojik guven", "sorumluluk alma", "is birligi", "gelisime aciklik", "liderlik destegi"},
+            limit=6,
         )
         top_themes = NLPService._dominant_items(
             ((
@@ -1236,6 +1919,12 @@ class NLPService:
             for item in trusted_analyses),
             limit=6,
         )
+        distinctive_themes = NLPService._distinctive_feedback_phrases(
+            trusted_analyses,
+            kind="theme",
+            limit=5,
+        )
+        top_themes = list(dict.fromkeys(distinctive_themes + top_themes))[:7]
         top_flight_risk_reasons = NLPService._dominant_items(
             NLPService._raw_list_item(item, "flight_risk_reasons") for item in trusted_analyses
         )
@@ -1295,7 +1984,6 @@ class NLPService:
         )
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.employee_id == employee_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         analyses = [
             item for item in analyses
@@ -1317,6 +2005,101 @@ class NLPService:
             employee_id=employee_id,
             limit=5,
         )
+        if not retrieved_memories:
+            retrieved_memories = RAGService.retrieve_similar_memories(
+                db,
+                query_text=query_text,
+                employee_id=employee_id,
+                limit=5,
+                min_score=0.0,
+            )
+
+        if not retrieved_memories:
+            top_complaints = deep_analysis.get("top_complaint_topics") or []
+            top_praises = deep_analysis.get("top_praise_topics") or []
+            key_takeaways = deep_analysis.get("top_themes") or []
+            risk_score = deep_analysis.get("flight_risk_score")
+            if risk_score is None:
+                retention_level = "unknown"
+            elif risk_score >= 7:
+                retention_level = "high"
+            elif risk_score >= 4:
+                retention_level = "medium"
+            else:
+                retention_level = "low"
+
+            if deep_analysis.get("feedback_count", 0) <= 1:
+                report_summary = (
+                    f"{employee.user.full_name} icin bu ay kisiyi ayirt edecek kadar zengin 360 NLP hafizasi olusmadi. "
+                    "Ekrandaki sinyaller yalnizca mevcut tekil feedback analizinden uretilmistir."
+                )
+                trend_summary = (
+                    "Benzer gecmis kayit bulunmadigi icin RAG karsilastirmasi yapilmadi; trend yorumu sinirli guvenle okunmalidir."
+                )
+            else:
+                report_summary = (
+                    f"{employee.user.full_name} icin bu ay RAG belleğinde benzer kayit bulunmadi; "
+                    "ozet mevcut 360 NLP analizlerinin toplu sinyallerinden olusturuldu."
+                )
+                trend_summary = (
+                    f"Motivasyon trendi {deep_analysis.get('motivation_trend_direction')}, "
+                    f"duygu trendi {deep_analysis.get('sentiment_trend_direction')} gorunuyor."
+                )
+
+            return {
+                "employee_id": employee.id,
+                "employee_name": employee.user.full_name,
+                "department_id": employee.department_id,
+                "department_name": employee.department.name if employee.department else None,
+                "team": employee.team,
+                "period_year": period_year,
+                "period_month": period_month,
+                "report_summary": report_summary,
+                "trend_summary": trend_summary,
+                "flight_risk_score": risk_score,
+                "retention_risk_level": retention_level,
+                "top_complaint_topics": top_complaints,
+                "top_praise_topics": top_praises,
+                "key_takeaways": key_takeaways,
+                "action_recommendation": deep_analysis.get("action_recommendation") or "Daha guvenilir analiz icin bu calisan hakkinda ek 360 feedback toplayin.",
+                "retrieved_memory_count": 0,
+                "retrieved_memory_summaries": [],
+                "model_provider": "deterministic",
+                "model_name": "no-rag-memory-v1",
+                "confidence": 0.35 if deep_analysis.get("feedback_count", 0) <= 1 else 0.55,
+            }
+
+        if any(item.model_provider == "synthetic_seed_360_history" for item in analyses):
+            rag_payload = AIService._fallback_monthly_rag_report(
+                subject_label=employee.user.full_name,
+                deep_analysis=deep_analysis,
+                retrieved_memories=retrieved_memories,
+            )
+            return {
+                "employee_id": employee.id,
+                "employee_name": employee.user.full_name,
+                "department_id": employee.department_id,
+                "department_name": employee.department.name if employee.department else None,
+                "team": employee.team,
+                "period_year": period_year,
+                "period_month": period_month,
+                "report_summary": rag_payload.get("report_summary"),
+                "trend_summary": rag_payload.get("trend_summary"),
+                "flight_risk_score": rag_payload.get("flight_risk_score"),
+                "retention_risk_level": rag_payload.get("retention_risk_level"),
+                "top_complaint_topics": rag_payload.get("top_complaint_topics") or deep_analysis.get("top_complaint_topics") or [],
+                "top_praise_topics": rag_payload.get("top_praise_topics") or deep_analysis.get("top_praise_topics") or [],
+                "key_takeaways": rag_payload.get("key_takeaways") or deep_analysis.get("top_themes") or [],
+                "action_recommendation": rag_payload.get("action_recommendation") or deep_analysis.get("action_recommendation"),
+                "retrieved_memory_count": len(retrieved_memories),
+                "retrieved_memory_summaries": [
+                    item.get("content_summary") or item.get("content_text", "")[:180]
+                    for item in retrieved_memories
+                ],
+                "model_provider": "heuristic",
+                "model_name": "synthetic-history-rag-fallback-v1",
+                "confidence": rag_payload.get("confidence"),
+            }
 
         rag_payload, provider, model_name = AIService.analyze_monthly_rag_report(
             subject_label=employee.user.full_name,
@@ -1381,7 +2164,6 @@ class NLPService:
         }
         analyses = db.query(FeedbackNLPAnalysis).filter(
             FeedbackNLPAnalysis.department_id == department_id,
-            FeedbackNLPAnalysis.source_type == NLPSourceType.weekly_feedback,
         ).all()
         analyses = [
             item for item in analyses
