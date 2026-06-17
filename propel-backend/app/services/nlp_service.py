@@ -1452,6 +1452,24 @@ class NLPService:
                 "items": [f"{bias_count} kayitta karsilikli puanlama supheleri izlendi."] + NLPService._dominant_items([bias_items], limit=3),
             })
 
+        # Gerçek 1-5 yetenek skorları: bu çalışana verilen FeedbackResponse kayıtlarından
+        received_responses = (
+            db.query(FeedbackResponse)
+            .filter(FeedbackResponse.receiver_id == employee.id)
+            .all()
+        )
+
+        def _avg_score(field: str) -> float | None:
+            vals = [getattr(r, field) for r in received_responses if getattr(r, field) is not None]
+            return round(sum(vals) / len(vals), 2) if vals else None
+
+        skill_scores = [
+            {"label": "İletişim",       "value": _avg_score("score_communication")},
+            {"label": "Takım Çalışması","value": _avg_score("score_teamwork")},
+            {"label": "Liderlik",       "value": _avg_score("score_leadership")},
+            {"label": "Teknik Beceri",  "value": _avg_score("score_technical")},
+        ]
+
         return {
             "employee_id": employee.id,
             "employee_name": employee.user.full_name,
@@ -1468,6 +1486,7 @@ class NLPService:
             "badges": [BadgeResponse.model_validate(item) for item in badges],
             "metrics": metrics,
             "sections": sections,
+            "skill_scores": skill_scores,
         }
 
     @staticmethod

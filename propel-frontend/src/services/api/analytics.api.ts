@@ -585,7 +585,7 @@ export const analyticsApi = {
     const { data } = await apiClient.post<SoftwareModelTrainResponse>(
       '/analytics/departments/software/models/train',
       {
-        model_name: 'random_forest',
+        model_name: 'stacking_lgbm_xgb_rf_lr',
         test_period_count: 8,
         ...payload,
       }

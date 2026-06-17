@@ -338,6 +338,11 @@ export interface RiskDriver {
   severity?: string | null
 }
 
+export interface SkillScore {
+  label: string
+  value: number | null
+}
+
 export interface Employee360SummaryReportResponse {
   employee_id: number
   employee_name: string
@@ -354,6 +359,7 @@ export interface Employee360SummaryReportResponse {
   badges: BadgeResponse[]
   metrics: SummaryMetric[]
   sections: SummarySection[]
+  skill_scores?: SkillScore[]
 }
 
 export interface Department360SummaryReportResponse {

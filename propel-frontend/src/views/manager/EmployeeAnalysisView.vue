@@ -448,9 +448,9 @@
                  </div>
                  <div class="h-64">
                     <BarChart
-                      :labels="scoreMetricLabels"
-                      :data="scoreMetricValues"
-                      label="Skorlar"
+                      :labels="skillScoreLabels.length ? skillScoreLabels : scoreMetricLabels"
+                      :data="skillScoreLabels.length ? skillScoreValues : scoreMetricValues"
+                      label="Yetenek Puanı (1-5)"
                       color="#4f46e5"
                     />
                  </div>
@@ -683,6 +683,11 @@ const burnoutDriverItems = computed<RiskDriver[]>(() => {
     severity: monthlyDeepAnalysis.value?.burnout_risk_level || null,
   }))
 })
+
+// Yetenek Dağılımı — gerçek 1-5 peer puanları
+const skillScores = computed(() => selectedEmployeeReport.value?.skill_scores ?? [])
+const skillScoreLabels = computed(() => skillScores.value.map((s) => s.label))
+const skillScoreValues = computed(() => skillScores.value.map((s) => s.value ?? 0))
 
 function getPreviewSummary(employeeId: number) {
   const report = employeeReports.value[employeeId]
