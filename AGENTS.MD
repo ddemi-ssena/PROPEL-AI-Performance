@@ -3277,3 +3277,21 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
 - Dogrulama:
   - `python -m py_compile propel-backend/app/api/routers/admin_uploads.py propel-backend/app/services/software_ml_service.py propel-backend/scripts/generate_software_dataset.py propel-backend/scripts/seed_360_yazilim.py` basarili.
   - `npm.cmd run type-check` basarili.
+
+### 2026-06-17 Yazilim Manager 360 Feedback Kisi/Soru Listesi
+
+- Kullanici yazilim manager hesabinda 360 feedback verirken "Kisi Sec" listesinin bos geldigini ve haftalik sorunun yuklenmedigini bildirdi.
+- Tespit:
+  - `/api/v1/feedback/candidates` yazilim manager icin 30 kisi donduruyordu.
+  - `/api/v1/feedbacks/assignment` ise `current_slot=completed` iken `available_candidates=[]` dondurdugu icin frontend bos listeyi tercih ediyor, kisi secimi bos gorunuyordu.
+  - Kisi fallback ile secilse bile `/api/v1/feedbacks/current-question` backend tarafinda haftalik tekrar/slot kuralindan dolayi soruyu reddediyordu.
+- Cozum:
+  - `FeedbackView.vue` icinde assignment listesi bos ise genel `/feedback/candidates` listesine dusen fallback eklendi.
+  - `FeedbackService.get_weekly_assignment_state` icinde `completed` slotu, haftalik 3 zorunlu feedback tamamlandiktan sonra gonullu ek feedback icin departman ici adaylari dondurecek sekilde duzeltildi.
+  - `get_current_weekly_question` secilebilir aday kontrolu ile guvenceye alindi; submit tarafinda tamamlanmis slotta gonullu ek feedback eski blok kontrolune takilmiyor.
+- Dogrulama:
+  - `python -m py_compile propel-backend/app/services/feedback_service.py` basarili.
+  - `python -m compileall -q propel-backend/app` basarili.
+  - `npm.cmd run type-check` basarili.
+  - `docker restart propel_backend` basarili.
+  - `manager.yazilim@propel.com` ile smoke test: `candidate_count=30`, `assignment_available_count=30`, `current_slot=completed`, `current-question` soru metni dondu.
