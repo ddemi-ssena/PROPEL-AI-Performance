@@ -596,6 +596,12 @@ class FeedbackService:
             available_candidates = [candidate for candidate in department_candidates if not mandatory_assignment or candidate.id != mandatory_assignment.target_id]
         elif current_slot == "cross_functional":
             available_candidates = department_candidates
+        elif current_slot == "completed":
+            available_candidates = [
+                candidate
+                for candidate in all_candidates
+                if candidate.department_id == current_employee.department_id
+            ]
         else:
             available_candidates = department_candidates
 
@@ -626,6 +632,25 @@ class FeedbackService:
     # ──────────────────────────────────────────────
     # FEEDBACK — Listeleme
     # ──────────────────────────────────────────────
+
+    @staticmethod
+    def _assert_weekly_receiver_selectable(
+        *,
+        state: dict,
+        receiver_employee_id: int,
+    ) -> None:
+        available_candidates: List[Employee] = state.get("available_candidates") or []
+        if any(candidate.id == receiver_employee_id for candidate in available_candidates):
+            return
+
+        current_slot = state.get("current_slot")
+        if current_slot == "mandatory_random":
+            detail = "Bu hafta once sistemin atadigi zorunlu kisiyi tamamlamalisiniz."
+        elif current_slot in {"department_internal", "cross_functional"}:
+            detail = "Bu asamadaki feedback hakki sadece secilebilir departman ici kisiler icin kullanilabilir."
+        else:
+            detail = "Bu kisi bu hafta secilemez. Sistem ardisik hafta, tekrar veya haftalik slot kurali nedeniyle engelledi."
+        raise HTTPException(status_code=400, detail=detail)
 
     @staticmethod
     def get_received_feedbacks(
@@ -918,6 +943,15 @@ class FeedbackService:
         if sender.id == receiver.id:
             raise HTTPException(status_code=400, detail="Kendinize geri bildirim veremezsiniz")
 
+        state = FeedbackService.get_weekly_assignment_state(
+            db,
+            current_employee_id=sender_employee_id,
+        )
+        FeedbackService._assert_weekly_receiver_selectable(
+            state=state,
+            receiver_employee_id=receiver_employee_id,
+        )
+
         week_number = FeedbackService.get_week_of_month()
         raw_direction = FeedbackService._resolve_direction(sender.user.role, receiver.user.role)
         fallback_direction = FeedbackService._normalize_direction_for_question(raw_direction)
@@ -1098,7 +1132,7 @@ class FeedbackService:
                 detail="Bu asamadaki feedback hakki sadece kendi departmaniniz icindeki bir kisiye verilebilir.",
             )
 
-        if FeedbackService._is_candidate_blocked(
+        if current_slot != "completed" and FeedbackService._is_candidate_blocked(
             db,
             sender_employee_id=sender_employee_id,
             target_employee_id=receiver_employee_id,

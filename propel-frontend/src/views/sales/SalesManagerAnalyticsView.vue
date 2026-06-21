@@ -46,11 +46,19 @@
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Admin ML Kaynagi</p>
           <p class="mt-2 text-sm leading-6 text-slate-500">
-            Model egitimi yalnizca admin ekraninda yapilir; bu sayfa adminin current dataset icin egittigi sonuclari okur.
+            Admin secili dataset ve hedef icin modeli egitir; satis departmani tahminleri current model sonucunu okur.
           </p>
           <h3 class="mt-1 text-lg font-bold text-slate-900">Satış risk tahmini — LightGBM + XGB + RF → LR</h3>
         </div>
         <div class="flex flex-wrap gap-2 w-full xl:max-w-4xl">
+          <button
+            v-if="isAdmin"
+            class="rounded-xl border border-emerald-200 bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
+            :disabled="!!mlLoading || !uploadId"
+            @click="trainModel"
+          >
+            {{ mlLoading === 'train' ? 'Egitiliyor...' : 'Model Egit' }}
+          </button>
           <select
             v-model.number="employeeId"
             class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-sm"
@@ -1030,6 +1038,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import {
   analyticsApi,
   type DepartmentAnalyticsOverviewResponse,
@@ -1044,6 +1053,8 @@ import {
 } from '@/services/api/analytics.api'
 
 const route = useRoute()
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.userRole === 'admin')
 
 // ── Section navigation ──────────────────────────────────────────
 const activeSection = computed(() => {
@@ -1616,6 +1627,9 @@ async function trainModel() {
   try {
     trainResult.value = await analyticsApi.trainSalesModel({ upload_id: uploadId.value, target_column: targetColumn.value })
     modelStates.value = await analyticsApi.getSalesModelState(uploadId.value)
+    predResult.value = null
+    bulkResult.value = null
+    selectedTeam.value = null
   } catch (e: any) {
     mlError.value = e?.response?.data?.detail || e?.message || 'Eğitim hatası'
   } finally {

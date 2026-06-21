@@ -367,9 +367,11 @@ const skillScores = computed(() => [
   { key: 'technical',       label: 'Teknik Beceri',    value: summary.value?.avg_technical },
 ])
 
-const feedbackCandidates = computed(() =>
-  (weeklyAssignment.value?.available_candidates || employees.value).filter(emp => emp.user_id !== authStore.user?.id)
-)
+const feedbackCandidates = computed(() => {
+  const weeklyCandidates = weeklyAssignment.value?.available_candidates ?? []
+  const source = weeklyCandidates.length ? weeklyCandidates : employees.value
+  return source.filter(emp => emp.user_id !== authStore.user?.id)
+})
 
 const progressPercent = computed(() => {
   if (!weeklyProgress.value) return 0
