@@ -3328,3 +3328,15 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
 - Repo kokune standart `LICENSE` dosyasi eklendi.
 - Lisans sahibi satiri `KUTUP Project Contributors` olarak tutuldu.
 - Kod degisikligi olmadigi icin backend/frontend dogrulamasi calistirilmadi.
+
+### 2026-07-05 GitHub Pages 404 Deploy Duzeltmesi
+
+- Kullanici GitHub Pages acildiktan sonra 404/deploy hatasi aldigini ekran goruntusuyle bildirdi.
+- Tespit:
+  - Repo kokunde `index.html`, `KUTUP_Siu_Bildirisi.pdf`, `LICENSE` dosyalari mevcut.
+  - Yerel branch `pr-40`; GitHub Pages genellikle `main`/`master` branch'inden yayin yaptigi icin dosyalar default branch'e merge/push edilmediyse 404 normal.
+  - `.github/workflows` icinde acik bir Pages workflow'u yoktu.
+- Cozum:
+  - `.github/workflows/pages.yml` eklendi; `main`/`master` push'larinda kok klasoru GitHub Pages artifact'i olarak deploy edecek.
+  - `.nojekyll` eklendi; statik dosyalarin Jekyll isleminden gecmeden yayinlanmasi saglandi.
+- Sonraki adim: Dosyalar default branch'e push edilmeli ve GitHub `Settings > Pages` altinda kaynak `GitHub Actions` veya `main/master / root` olarak dogru secilmeli.
