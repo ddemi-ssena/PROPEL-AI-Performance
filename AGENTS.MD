@@ -3295,3 +3295,36 @@ genel_skor   = ml_sağlık * 0.50 + (nabız_sağlık * 0.60 + nabız_tutma * 0.4
   - `npm.cmd run type-check` basarili.
   - `docker restart propel_backend` basarili.
   - `manager.yazilim@propel.com` ile smoke test: `candidate_count=30`, `assignment_available_count=30`, `current_slot=completed`, `current-question` soru metni dondu.
+
+### 2026-07-04 IEEE SIU Poster Icerik Taslagi
+
+- Kullanici KUTUP/Propel projesi icin IEEE SIU poster yarismasina yonelik 70x100 cm poster hazirlamak istedigini belirtti.
+- Poster hikayesi; problem, onerilen sistem, mimari, veri/ozellik muhendisligi, ML/NLP karar destek akisi, deneysel sonuclar, toplumsal/yonetsel etki ve etik sinirlar uzerinden kurgulandi.
+- 70x100 dikey poster icin uc sutunlu akademik yerlesim, baslik/ozet/katki/sonuc bloklari ve dogrudan postere yapistirilabilecek Turkce metin taslagi hazirlandi.
+- Kod degisikligi yapilmadi; dogrulama calistirilmasi gerekmedi.
+- Sonraki adim: Poster gorsel tasarimina gecilirken sistem mimarisi, ML pipeline ve karar destek akisi icin sade diagramlar uretilmeli; ekran goruntuleri gercek uygulamadan alinmali.
+
+### 2026-07-05 IEEE SIU QR Portal index.html
+
+- Kullanici SIU posteri icin tek QR kodla acilacak interaktif portal istedi; portalda iyi olus testi, GitHub linki, demo video linki ve proje raporu butonu olacak.
+- `index.html` repo kokune eklendi ve GitHub Pages icin tek dosyalik mobil uyumlu portal olarak hazirlandi.
+- Linkler guncellendi:
+  - GitHub: `https://github.com/ddemi-ssena/PROPEL-AI-Performance`
+  - Demo video: `https://youtu.be/psTRMd6JAro?si=Az2Kn2DNd-0Lt3hn`
+  - Rapor: `./KUTUP_Siu_Bildirisi.pdf`
+- Rapor PDF dosyasi repoda henuz bulunmuyor; `KUTUP_Siu_Bildirisi.pdf` adiyla `index.html` ile ayni klasore eklendiginde rapor butonu calisacak.
+- Dogrulama: `rg` ile placeholder link kalmadigi ve `index.html` dosyasinin repo kokunde olustugu kontrol edildi.
+
+### 2026-07-05 IEEE SIU QR Portal PDF Ekleme
+
+- Kullanici `C:\Users\serif\Downloads\ieeeli_fixed (1).pdf` dosyasinin portala rapor PDF'i olarak eklenmesini istedi.
+- PDF repo kokune `KUTUP_Siu_Bildirisi.pdf` adiyla kopyalandi.
+- `index.html` icindeki rapor butonu zaten `./KUTUP_Siu_Bildirisi.pdf` adresine baktigi icin GitHub Pages uzerinde ayni klasorden acilacak sekilde hazir.
+- Dogrulama: PDF dosyasinin repo kokunde olustugu ve `index.html` icindeki GitHub, demo video, rapor linklerinin dogru oldugu kontrol edildi.
+
+### 2026-07-05 MIT Lisans Ekleme
+
+- Kullanici push oncesi MIT lisansi eklenmesini istedi.
+- Repo kokune standart `LICENSE` dosyasi eklendi.
+- Lisans sahibi satiri `KUTUP Project Contributors` olarak tutuldu.
+- Kod degisikligi olmadigi icin backend/frontend dogrulamasi calistirilmadi.
