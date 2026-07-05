@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="KUTUP IEEE SIU interaktif demo portalı: iyi oluş simülasyonu, GitHub deposu, demo videosu ve proje raporu." />
+  <title>KUTUP | IEEE SIU İnteraktif Demo Portalı</title>
+  <style>
+    :root {
+      --navy: #003366;
+      --navy-2: #07204a;
+      --ink: #101828;
+      --muted: #667085;
+      --line: rgba(255, 255, 255, 0.14);
+      --blue: #2f80ed;
+      --green: #1cbf82;
+      --amber: #f5a524;
+      --red: #ef4444;
+      --white: #ffffff;
+      --card: rgba(255, 255, 255, 0.09);
+      --card-strong: rgba(255, 255, 255, 0.14);
+      --shadow: 0 22px 70px rgba(0, 20, 56, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--white);
+      background:
+        radial-gradient(circle at 18% 8%, rgba(47, 128, 237, 0.34), transparent 32%),
+        radial-gradient(circle at 86% 0%, rgba(28, 191, 130, 0.22), transparent 28%),
+        linear-gradient(145deg, #06162f 0%, #071b3d 45%, #020817 100%);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .page {
+      width: min(100%, 520px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 24px 16px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .hero {
+      text-align: center;
+      padding-top: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border: 1px solid rgba(91, 171, 255, 0.34);
+      border-radius: 999px;
+      background: rgba(0, 51, 102, 0.42);
+      color: #b9d9ff;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .brand {
+      margin: 14px 0 3px;
+      font-size: 44px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .brand span {
+      background: linear-gradient(90deg, #8dc8ff, #37d99e);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      margin: 0 auto;
+      max-width: 410px;
+      color: #b8c7dc;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.06));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(130deg, rgba(255, 255, 255, 0.16), transparent 36%);
+    }
+
+    .panel {
+      position: relative;
+      z-index: 1;
+      padding: 24px;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .center {
+      text-align: center;
+    }
+
+    .mark {
+      width: 76px;
+      height: 76px;
+      margin: 0 auto 18px;
+      display: grid;
+      place-items: center;
+      border-radius: 24px;
+      border: 1px solid rgba(141, 200, 255, 0.28);
+      background: rgba(47, 128, 237, 0.14);
+      color: #8dc8ff;
+    }
+
+    .mark svg {
+      width: 38px;
+      height: 38px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+      font-size: 23px;
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin-bottom: 0;
+      font-size: 19px;
+      line-height: 1.35;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      color: #c6d2e4;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .primary-btn,
+    .secondary-btn {
+      width: 100%;
+      min-height: 50px;
+      border: 0;
+      border-radius: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 800;
+      transition: transform 160ms ease, filter 160ms ease, background 160ms ease;
+    }
+
+    .primary-btn {
+      color: white;
+      background: linear-gradient(90deg, #155fcb, #11a36f);
+      box-shadow: 0 14px 32px rgba(17, 103, 203, 0.26);
+    }
+
+    .secondary-btn {
+      color: #d7e2f4;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+    }
+
+    .primary-btn:hover,
+    .secondary-btn:hover,
+    .link-card:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.06);
+    }
+
+    .primary-btn:active,
+    .secondary-btn:active,
+    .link-card:active {
+      transform: translateY(0);
+    }
+
+    .progress-wrap {
+      height: 8px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.1);
+      margin-bottom: 22px;
+    }
+
+    .progress {
+      width: 25%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #3b82f6, #20c997);
+      transition: width 250ms ease;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 9px;
+      color: #8dc8ff;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .options {
+      margin: 22px 0;
+    }
+
+    .range-row {
+      display: grid;
+      gap: 14px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--blue);
+    }
+
+    .range-labels {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+      align-items: start;
+      color: #aab8cd;
+      font-size: 12px;
+    }
+
+    .range-labels span:nth-child(2) {
+      color: #8dc8ff;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .range-labels span:last-child {
+      text-align: right;
+    }
+
+    .option-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .option-btn {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 14px;
+      cursor: pointer;
+      color: #dde7f7;
+      background: rgba(255, 255, 255, 0.08);
+      text-align: left;
+      line-height: 1.35;
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      transition: border 160ms ease, background 160ms ease;
+    }
+
+    .option-btn.selected {
+      border-color: rgba(141, 200, 255, 0.75);
+      background: rgba(47, 128, 237, 0.18);
+    }
+
+    .option-dot {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      margin-top: 1px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.28);
+    }
+
+    .option-btn.selected .option-dot {
+      border-color: #8dc8ff;
+      background: radial-gradient(circle, #8dc8ff 0 42%, transparent 44%);
+    }
+
+    .loading {
+      padding: 48px 0;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 74px;
+      height: 74px;
+      margin: 0 auto 18px;
+      border: 5px solid rgba(255, 255, 255, 0.12);
+      border-top-color: #20c997;
+      border-radius: 50%;
+      animation: spin 900ms linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .result-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      color: #bff6df;
+      background: rgba(28, 191, 130, 0.14);
+      border: 1px solid rgba(28, 191, 130, 0.24);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .score-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 18px 0;
+    }
+
+    .score-box {
+      padding: 16px 10px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: center;
+    }
+
+    .score-label {
+      color: #aab8cd;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .score-value {
+      margin-top: 6px;
+      font-size: 34px;
+      line-height: 1;
+      font-weight: 950;
+    }
+
+    .score-value.good {
+      color: #36e0a1;
+    }
+
+    .score-value.risk {
+      color: #ff7979;
+    }
+
+    .recommendation {
+      margin: 0 0 16px;
+      padding: 15px;
+      border-radius: 16px;
+      border: 1px solid rgba(141, 200, 255, 0.18);
+      background: rgba(0, 51, 102, 0.28);
+    }
+
+    .recommendation strong {
+      display: block;
+      margin-bottom: 8px;
+      color: #8dc8ff;
+      font-size: 13px;
+    }
+
+    .recommendation p {
+      margin: 0;
+      color: #d3deef;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .note {
+      margin: 0;
+      color: #9fb0c7;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .links {
+      display: grid;
+      gap: 10px;
+    }
+
+    .section-title {
+      margin: 4px 0 12px;
+      text-align: center;
+      color: #aab8cd;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+    }
+
+    .link-card {
+      min-height: 72px;
+      display: grid;
+      grid-template-columns: 46px 1fr auto;
+      gap: 13px;
+      align-items: center;
+      padding: 13px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.075);
+      transition: transform 160ms ease, border 160ms ease, background 160ms ease;
+    }
+
+    .link-card:hover {
+      border-color: rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.11);
+    }
+
+    .link-icon {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .link-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .link-title {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .link-sub {
+      color: #aab8cd;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .arrow {
+      color: #93a4bd;
+      font-size: 22px;
+    }
+
+    .footer-note {
+      text-align: center;
+      color: #8292a9;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 380px) {
+      .page {
+        padding-inline: 12px;
+      }
+
+      .panel {
+        padding: 20px;
+      }
+
+      .brand {
+        font-size: 38px;
+      }
+
+      h2 {
+        font-size: 21px;
+      }
+
+      h3 {
+        font-size: 17px;
+      }
+
+      .score-value {
+        font-size: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="tag">IEEE SIU 2026 İnteraktif Poster Deneyimi</div>
+      <div class="brand"><span>KUTUP</span></div>
+      <p class="subtitle">Yapay zeka destekli performans, iyi oluş ve çalışan risk analizi karar destek sistemi</p>
+    </header>
+
+    <main class="card">
+      <section class="panel">
+        <div id="welcome-screen" class="screen active center">
+          <div class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 5a3 3 0 0 0-5.83 1" />
+              <path d="M12 5a3 3 0 0 1 5.83 1" />
+              <path d="M6.17 6A3 3 0 0 0 5 11.66" />
+              <path d="M17.83 6A3 3 0 0 1 19 11.66" />
+              <path d="M5 11.66A3 3 0 0 0 8 17" />
+              <path d="M19 11.66A3 3 0 0 1 16 17" />
+              <path d="M8 17a3 3 0 0 0 4 2.83" />
+              <path d="M16 17a3 3 0 0 1-4 2.83" />
+              <path d="M12 5v15" />
+            </svg>
+          </div>
+          <h2>Kendi iyi oluş riskinizi 30 saniyede test edin</h2>
+          <p class="lead">Bu kısa simülasyon, KUTUP’un haftalık nabız anketi mantığını jüri üyeleri için etkileşimli hale getirir. Yanıtlarınıza göre iyi oluş skoru, tükenmişlik riski ve yönetici aksiyon önerisi üretilir.</p>
+          <button class="primary-btn" type="button" onclick="startQuiz()">Analizi Başlat</button>
+        </div>
+
+        <div id="quiz-screen" class="screen">
+          <div class="progress-wrap" aria-hidden="true">
+            <div id="progress" class="progress"></div>
+          </div>
+          <span id="question-num" class="eyebrow">Soru 1 / 4</span>
+          <h3 id="question-text"></h3>
+          <div id="options-container" class="options"></div>
+          <button id="next-btn" class="primary-btn" type="button" onclick="nextQuestion()">Sonraki Soru</button>
+        </div>
+
+        <div id="loading-screen" class="screen loading">
+          <div class="spinner" aria-hidden="true"></div>
+          <h2>KUTUP analiz motoru çalışıyor</h2>
+          <p class="lead">Nabız yanıtları, risk sinyalleri ve karar destek kuralları birlikte değerlendiriliyor.</p>
+        </div>
+
+        <div id="results-screen" class="screen">
+          <div class="center">
+            <div class="result-badge">Analiz tamamlandı</div>
+            <h2>SIU İyi Oluş Raporunuz</h2>
+          </div>
+          <div class="score-grid">
+            <div class="score-box">
+              <div class="score-label">İyi Oluş Skoru</div>
+              <div id="wellbeing-score" class="score-value good">%85</div>
+            </div>
+            <div class="score-box">
+              <div class="score-label">Tükenmişlik Riski</div>
+              <div id="burnout-score" class="score-value risk">%15</div>
+            </div>
+          </div>
+          <div class="recommendation">
+            <strong>Yapay Zeka Yönetici Önerisi</strong>
+            <p id="recommendation-text"></p>
+          </div>
+          <p class="note">Not: Bu demo akademik poster etkileşimi için hazırlanmış kısa bir simülasyondur. Gerçek KUTUP sisteminde sonuçlar KPI, 360 derece geri bildirim, nabız anketi ve departman bağlamı ile birlikte değerlendirilir.</p>
+          <br />
+          <button class="secondary-btn" type="button" onclick="resetQuiz()">Testi Yeniden Başlat</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="section-title">Proje Bağlantıları</div>
+      <div class="links">
+        <a class="link-card" href="https://github.com/ddemi-ssena/PROPEL-AI-Performance" target="_blank" rel="noopener noreferrer" aria-label="GitHub deposunu aç">
+          <div class="link-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 .5A11.5 11.5 0 0 0 8.36 22.9c.58.11.79-.25.79-.56v-2.02c-3.22.7-3.9-1.38-3.9-1.38-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.57-.29-5.27-1.28-5.27-5.72 0-1.26.45-2.3 1.19-3.11-.12-.29-.52-1.47.11-3.07 0 0 .98-.31 3.18 1.19A11 11 0 0 1 12 6.04c.98 0 1.96.13 2.88.39 2.2-1.5 3.17-1.19 3.17-1.19.64 1.6.24 2.78.12 3.07.74.81 1.18 1.85 1.18 3.11 0 4.45-2.7 5.43-5.28 5.72.42.36.79 1.07.79 2.16v3.04c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .5Z" />
+            </svg>
+          </div>
+          <div>
+            <span class="link-title">GitHub Deposu</span>
+            <span class="link-sub">Kaynak kodlar, geliştirme detayları ve proje yapısı</span>
+          </div>
+          <div class="arrow" aria-hidden="true">›</div>
+        </a>
+
+        <a class="link-card" href="https://youtu.be/psTRMd6JAro?si=Az2Kn2DNd-0Lt3hn" target="_blank" rel="noopener noreferrer" aria-label="Demo videosunu aç">
+          <div class="link-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21.58 7.19a2.74 2.74 0 0 0-1.93-1.94C17.94 4.8 12 4.8 12 4.8s-5.94 0-7.65.45a2.74 2.74 0 0 0-1.93 1.94A28.55 28.55 0 0 0 2 12a28.55 28.55 0 0 0 .42 4.81 2.74 2.74 0 0 0 1.93 1.94c1.71.45 7.65.45 7.65.45s5.94 0 7.65-.45a2.74 2.74 0 0 0 1.93-1.94A28.55 28.55 0 0 0 22 12a28.55 28.55 0 0 0-.42-4.81ZM10 15.2V8.8l5.54 3.2L10 15.2Z" />
+            </svg>
+          </div>
+          <div>
+            <span class="link-title">Demo Videosu</span>
+            <span class="link-sub">KUTUP akışı, analiz ekranları ve karar destek senaryosu</span>
+          </div>
+          <div class="arrow" aria-hidden="true">›</div>
+        </a>
+
+        <a class="link-card" href="./KUTUP_Siu_Bildirisi.pdf" target="_blank" rel="noopener noreferrer" aria-label="Proje raporunu aç">
+          <div class="link-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+              <path d="M14 2v6h6" />
+              <path d="M8 13h8" />
+              <path d="M8 17h5" />
+              <path d="M8 9h2" />
+            </svg>
+          </div>
+          <div>
+            <span class="link-title">Proje Raporu</span>
+            <span class="link-sub">Aynı klasördeki KUTUP_Siu_Bildirisi.pdf dosyasını açar</span>
+          </div>
+          <div class="arrow" aria-hidden="true">›</div>
+        </a>
+      </div>
+      <p class="footer-note">İstanbul Sağlık ve Teknoloji Üniversitesi | Bilgisayar Mühendisliği Bölümü</p>
+    </footer>
+  </div>
+
+  <script>
+    const questions = [
+      {
+        text: "Bu hafta üzerinizdeki iş yükü ve yetiştirilmesi gereken iş baskısı ne seviyedeydi?",
+        type: "slider",
+        minLabel: "Çok hafif",
+        maxLabel: "Kritik yoğunluk",
+        invert: true
+      },
+      {
+        text: "Ekip arkadaşlarınızdan veya yöneticinizden aldığınız teknik ve psikolojik destek ne kadar yeterliydi?",
+        type: "slider",
+        minLabel: "Yetersiz",
+        maxLabel: "Çok güçlü",
+        invert: false
+      },
+      {
+        text: "Bu hafta aldığınız geri bildirimlerin sıklığı ve kalitesi sizce nasıldı?",
+        type: "buttons",
+        options: [
+          { label: "Yetersiz veya hiç geri bildirim yok", value: 2 },
+          { label: "Dönemsel ve kısmen yeterli", value: 6 },
+          { label: "Sürekli, net ve geliştirici", value: 10 }
+        ]
+      },
+      {
+        text: "Mesai dışında çalışıp kendinizi yıpranmış hissettiğiniz anlar oldu mu?",
+        type: "buttons",
+        options: [
+          { label: "Evet, neredeyse her gün", value: 1 },
+          { label: "Bazen, birkaç kez", value: 5 },
+          { label: "Hayır, dengemi korudum", value: 10 }
+        ]
+      }
+    ];
+
+    let currentStep = 0;
+    let answers = [];
+    let selectedOptionVal = null;
+
+    const screens = {
+      welcome: document.getElementById("welcome-screen"),
+      quiz: document.getElementById("quiz-screen"),
+      loading: document.getElementById("loading-screen"),
+      results: document.getElementById("results-screen")
+    };
+
+    function setScreen(name) {
+      Object.values(screens).forEach((screen) => screen.classList.remove("active"));
+      screens[name].classList.add("active");
+    }
+
+    function startQuiz() {
+      currentStep = 0;
+      answers = [];
+      selectedOptionVal = null;
+      setScreen("quiz");
+      showQuestion();
+    }
+
+    function showQuestion() {
+      const question = questions[currentStep];
+      document.getElementById("question-num").innerText = `Soru ${currentStep + 1} / ${questions.length}`;
+      document.getElementById("question-text").innerText = question.text;
+      document.getElementById("progress").style.width = `${((currentStep + 1) / questions.length) * 100}%`;
+
+      const container = document.getElementById("options-container");
+      container.innerHTML = "";
+
+      if (question.type === "slider") {
+        container.innerHTML = `
+          <div class="range-row">
+            <input type="range" id="slider-input" min="1" max="10" value="5" aria-label="Yanıt seviyesi" />
+            <div class="range-labels">
+              <span>${question.minLabel}</span>
+              <span id="slider-val">5 / 10</span>
+              <span>${question.maxLabel}</span>
+            </div>
+          </div>
+        `;
+
+        document.getElementById("slider-input").addEventListener("input", function () {
+          document.getElementById("slider-val").innerText = `${this.value} / 10`;
+        });
+        return;
+      }
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "option-grid";
+      question.options.forEach((option, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "option-btn";
+        button.innerHTML = `<span>${option.label}</span><span class="option-dot" aria-hidden="true"></span>`;
+        button.addEventListener("click", () => selectOption(index, option.value));
+        wrapper.appendChild(button);
+      });
+      container.appendChild(wrapper);
+    }
+
+    function selectOption(index, value) {
+      document.querySelectorAll(".option-btn").forEach((button, idx) => {
+        button.classList.toggle("selected", idx === index);
+      });
+      selectedOptionVal = value;
+    }
+
+    function nextQuestion() {
+      const question = questions[currentStep];
+
+      if (question.type === "slider") {
+        const rawValue = Number(document.getElementById("slider-input").value);
+        answers.push(question.invert ? 11 - rawValue : rawValue);
+      } else {
+        if (selectedOptionVal === null) {
+          alert("Lütfen devam etmeden önce bir seçenek belirleyin.");
+          return;
+        }
+        answers.push(selectedOptionVal);
+        selectedOptionVal = null;
+      }
+
+      currentStep += 1;
+
+      if (currentStep < questions.length) {
+        showQuestion();
+      } else {
+        showResults();
+      }
+    }
+
+    function showResults() {
+      setScreen("loading");
+      window.setTimeout(() => {
+        calculateScores();
+        setScreen("results");
+      }, 1300);
+    }
+
+    function calculateScores() {
+      const weightedScore = (
+        answers[0] * 2.8 +
+        answers[1] * 3.4 +
+        answers[2] * 2.1 +
+        answers[3] * 1.9
+      );
+
+      const finalScore = Math.max(12, Math.min(98, Math.round(weightedScore)));
+      const riskScore = 100 - finalScore;
+
+      document.getElementById("wellbeing-score").innerText = `%${finalScore}`;
+      document.getElementById("burnout-score").innerText = `%${riskScore}`;
+
+      const recommendation = document.getElementById("recommendation-text");
+
+      if (finalScore >= 75) {
+        recommendation.innerText = "İyi oluş seviyeniz güçlü görünüyor. KUTUP bu profili düşük riskli çalışan grubu içinde değerlendirir ve mevcut çalışma ritminin korunmasını, düzenli geri bildirim döngüsünün devam etmesini önerir.";
+      } else if (finalScore >= 45) {
+        recommendation.innerText = "Orta seviye risk sinyali oluştu. İş yükü, destek kalitesi veya geri bildirim eksikliği kısa vadede stres yaratabilir. Yönetici için öneri: birebir görüşme, görev önceliklendirme ve destek ihtiyacının netleştirilmesi.";
+      } else {
+        recommendation.innerText = "Yüksek risk sinyali oluştu. KUTUP bu durumda çalışanın iş yükü, ekip desteği ve motivasyon göstergelerinin yönetici tarafından hızlıca incelenmesini önerir. Bu sonuç nihai karar değil, erken destek uyarısıdır.";
+      }
+    }
+
+    function resetQuiz() {
+      currentStep = 0;
+      answers = [];
+      selectedOptionVal = null;
+      setScreen("welcome");
+    }
+  </script>
+</body>
+</html>
